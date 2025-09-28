@@ -1,8 +1,9 @@
 // src/api/apiService.js
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL; // match your backend URL and scheme
+// const API_BASE_URL =
+//   import.meta.env.VITE_API_BASE_URL; // match your backend URL and scheme
 
+const API_BASE_URL = "http://localhost:5224";
 const apiService = async (endpoint, { body, params, ...customOptions } = {}) => {
   const isFormData = body instanceof FormData;
   const headers = isFormData ? {} : { "Content-Type": "application/json" };
