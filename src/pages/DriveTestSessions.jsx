@@ -53,7 +53,7 @@ const DriveTestSessionsPage = () => {
 
     const handleViewOnMap = (sessionId) => {
         console.log('Navigating to map view for session:', sessionId);
-        navigate(`/map?session=${sessionId}`);
+        navigate(`/map?session=${encodeURIComponent(String(sessionId))}`);
     };
 
     const formatDate = (dateString) => {

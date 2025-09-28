@@ -4,17 +4,16 @@ import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import LogCirclesLayer from "@/components/map/layers/LogCirclesLayer";
 import MapLegend from "@/components/map/MapLegend";
 import { settingApi } from "@/api/apiEndpoints";
+import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
-const LIBS = ["visualization"];
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.2090 };
 const MAP_CONTAINER_STYLE = { height: "100vh", width: "100%" };
 
 export default function LogsCirclesPage() {
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries: LIBS, mapId: MAP_ID,
-  });
+  // Use the same loader options as everywhere else
+  const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
+
   const [map, setMap] = useState(null);
   const [thresholds, setThresholds] = useState({});
   const [selectedMetric, setSelectedMetric] = useState("rsrp");

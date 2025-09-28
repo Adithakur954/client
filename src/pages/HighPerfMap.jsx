@@ -1,3 +1,4 @@
+// src/pages/HighPerfMap.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { toast } from "react-toastify";
@@ -21,9 +22,9 @@ import MapLegend from "@/components/map/MapLegend";
 // Utils
 import { loadSavedViewport, saveViewport } from "@/utils/viewport";
 import { parseWKTToRings } from "@/utils/wkt";
+import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
-const LIBS = ["visualization"]; // add "places","geometry" only if you need them
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.2090 };
 const MAP_CONTAINER_STYLE = { height: "100vh", width: "100%" };
 
@@ -59,17 +60,14 @@ const MAP_STYLES = {
 };
 
 export default function HighPerfMap() {
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries: LIBS,
-    mapId: MAP_ID,
-  });
+  // Use the shared loader options (IDENTICAL across the app)
+  const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
   const [map, setMap] = useState(null);
 
   // Loading flags
-  const [isLoading, setIsLoading] = useState(false);     // general (sessions, polygons)
-  const [logsLoading, setLogsLoading] = useState(false); // logs fetch
+  const [isLoading, setIsLoading] = useState(false);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   // Data state
   const [thresholds, setThresholds] = useState({});
@@ -127,7 +125,7 @@ export default function HighPerfMap() {
     fetchThresholds();
   }, []);
 
-  // Load sessions (when map ready and no filters)
+  // Load sessions
   const fetchAllSessions = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -249,7 +247,6 @@ export default function HighPerfMap() {
 
   return (
     <div className="relative h-full w-full">
-      {/* Floating Filters Drawer */}
       <MapSidebarFloating
         onApplyFilters={handleApplyFilters}
         onClearFilters={handleClearFilters}
@@ -274,7 +271,6 @@ export default function HighPerfMap() {
           gestureHandling: "greedy",
         }}
       >
-        {/* Sessions when no log filters */}
         {!activeFilters && ui.showSessions && (
           <SessionsLayer
             map={map}
@@ -284,7 +280,6 @@ export default function HighPerfMap() {
           />
         )}
 
-        {/* Logs (Canvas circles + optional heatmap) */}
         {activeFilters && (
           <LogCirclesLayer
             map={map}
@@ -302,7 +297,6 @@ export default function HighPerfMap() {
           />
         )}
 
-        {/* Project polygons */}
         {ui.showPolygons && (
           <ProjectPolygonsLayer
             polygons={projectPolygons}
@@ -311,12 +305,10 @@ export default function HighPerfMap() {
         )}
       </GoogleMap>
 
-      {/* Legend */}
       {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
         <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} />
       )}
 
-      {/* Session detail panel (slides over map) */}
       <SessionDetailPanel
         sessionData={selectedSessionData}
         isLoading={isLoading}
@@ -325,7 +317,6 @@ export default function HighPerfMap() {
         onClose={() => setSelectedSessionData(null)}
       />
 
-      {/* Logs summary panel + floating toggle button (auto-opens after logs load) */}
       <AllLogsPanelToggle
         logs={drawnLogs}
         thresholds={thresholds}
@@ -333,7 +324,6 @@ export default function HighPerfMap() {
         isLoading={logsLoading}
       />
 
-      {/* Loading overlay */}
       {(isLoading || logsLoading) && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-black/70">
           <div>Loading…</div>

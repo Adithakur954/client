@@ -57,9 +57,30 @@ export const mapViewApi = {
 
   endSession: (data) => api.post("/api/MapView/end_session", data),
 
-  getNetworkLog: (sessionId) =>
-    api.get(`/api/MapView/GetNetworkLog?session_id=${sessionId}`),
+  // getNetworkLog: (sessionId) => {
+  //   console.log("Fetching network log for sessionId:", sessionId);
+  //   return api.get("/api/MapView/GetNetworkLog", { params: { session_id: sessionId } });
+  // },
 
+  getNetworkLog: (sessionLike) => {
+    const extractId = (s) => {
+      if (s == null) return "";
+      if (typeof s === "object") {
+        const sid =
+          s.session_id ??
+          s.id ??
+          s.SessionID ??
+          s.ID ??
+          s.value ??
+          (s.params && s.params.session_id);
+        return sid != null ? String(sid) : "";
+      }
+      return String(s);
+    };
+    const sid = extractId(sessionLike);
+    console.log("[mapViewApi.getNetworkLog] input:", sessionLike, "-> sid:", sid, "typeof sid:", typeof sid);
+    return api.get("/api/MapView/GetNetworkLog", { params: { session_id: sid } });
+  },
   getPredictionLog: (params) => api.get("/api/MapView/GetPredictionLog", { params }),
 
   getProjectPolygons: (projectId) =>

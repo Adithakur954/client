@@ -17,6 +17,8 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+// New: Settings dialog in chart menus
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const CHART_COLORS = ['#60A5FA', '#34D399', '#F59E0B', '#A78BFA', '#F472B6', '#FBBF24', '#22D3EE', '#F87171', '#4ADE80', '#93C5FD'];
 
@@ -30,11 +32,10 @@ const getRSRPPointColor = (rsrp) => {
   return '#065f46';
 };
 
-
 const canonicalOperatorName = (raw) => {
   if (!raw && raw !== 0) return 'Unknown';
   let s = String(raw).trim();
-  s = s.replace(/^IND[-\s]*/i, ''); // drop IND- prefix
+  s = s.replace(/^IND[-\s]*/i, '');
   const lower = s.toLowerCase();
   if (lower === '//////' || lower === '404011') return 'Unknown';
   if (lower.includes('jio')) return 'JIO';
@@ -48,15 +49,12 @@ const toNumber = (v, d = 0) => {
   return Number.isFinite(n) ? n : d;
 };
 
-// Ensure RSRP stays negative (if backend accidentally returns positive magnitudes)
 const ensureNegative = (v) => {
   const n = toNumber(v, 0);
   if (!Number.isFinite(n)) return 0;
-  // Treat bogus positives as magnitudes and flip
   return n > 0 ? -n : n;
 };
 
-// Merge operator counts (sum) for “Operator wise Samples”
 const mergeOperatorCounts = (raw, { nameKey = 'name', valueKey = 'value' } = {}) => {
   if (!Array.isArray(raw)) return [];
   const acc = new Map();
@@ -69,13 +67,12 @@ const mergeOperatorCounts = (raw, { nameKey = 'name', valueKey = 'value' } = {})
     .sort((a, b) => b.value - a.value);
 };
 
-// Merge averages (weighted if sampleCount exists, else average of means)
 const mergeOperatorAverages = (raw, { nameKey = 'name', avgKey = 'value', weightKey = 'sampleCount' } = {}) => {
   if (!Array.isArray(raw)) return [];
   const acc = new Map();
   for (const item of raw) {
     const name = canonicalOperatorName(item?.[nameKey]);
-    const avg = ensureNegative(item?.[avgKey]); // enforce negative for RSRP
+    const avg = ensureNegative(item?.[avgKey]);
     const w = Number(item?.[weightKey]);
     if (!Number.isFinite(avg)) continue;
     const curr = acc.get(name) || { sum: 0, w: 0 };
@@ -90,7 +87,7 @@ const mergeOperatorAverages = (raw, { nameKey = 'name', avgKey = 'value', weight
   }
   return [...acc.entries()]
     .map(([name, { sum, w }]) => ({ name, value: w ? sum / w : 0 }))
-    .sort((a, b) => a.value - b.value); // RSRP is negative; more negative first
+    .sort((a, b) => a.value - b.value);
 };
 
 const normalizeArray = (arr, nameKeys = ["name"], valueKeys = ["value"]) => {
@@ -102,12 +99,10 @@ const normalizeArray = (arr, nameKeys = ["name"], valueKeys = ["value"]) => {
   });
 };
 
-// Single normalize method that understands both API responses
 const normalizePayload = (resp) => {
   const payload = resp?.Data ?? resp?.data ?? resp ?? {};
   if (typeof payload === "string") return null;
 
-  // 1) Operator wise samples (merge categories and SUM values)
   const operatorWiseSamplesRaw =
     payload.operatorWiseSamples ??
     payload.samplesByAlphaLong ??
@@ -117,19 +112,16 @@ const normalizePayload = (resp) => {
     { nameKey: 'name', valueKey: 'value' }
   );
 
-  // 2) Network type distribution
   const networkTypeDistribution = normalizeArray(
     payload.networkTypeDistribution ?? payload.networkTypeDistribution_horizontal_bar,
     ["name", "network"],
     ["value", "count"]
   );
 
-  // 3) Monthly samples
   const monthlySampleCounts = normalizeArray(
     payload.monthlySampleCounts, ["month"], ["count"]
   );
 
-  // 4) Avg RSRP per operator (merge + enforce negatives)
   const avgRsrpRaw =
     payload.avgRsrpPerOperator ?? payload.avgRsrpSinrPerOperator_bar ?? [];
   const avgRsrpPre = normalizeArray(avgRsrpRaw, ["name", "Operator"], ["value", "AvgRSRP"]);
@@ -137,13 +129,11 @@ const normalizePayload = (resp) => {
     nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
   }).map(x => ({ ...x, value: ensureNegative(x.value) }));
 
-  // 5) Band distribution
   const bandDistribution = normalizeArray(
     payload.bandDistribution ?? payload.bandDistribution_pie,
     ["name", "band"], ["value", "count"]
   );
 
-  // 6) Handset-wise avg (RSRP by make) — enforce negatives
   const handsetDistribution = normalizeArray(
     payload.handsetDistribution ?? payload.handsetWiseAvg_bar,
     ["name", "Make"], ["value", "Avg"]
@@ -168,7 +158,6 @@ const normalizePayload = (resp) => {
   };
 };
 
-// Build ranking dataset with rank number and merged operator categories
 const buildRanking = (raw, { nameKey = 'name', countKey = 'count' } = {}) => {
   if (!Array.isArray(raw)) return [];
   const merged = new Map();
@@ -183,59 +172,14 @@ const buildRanking = (raw, { nameKey = 'name', countKey = 'count' } = {}) => {
   return arr.map((x, i) => ({ ...x, rank: i + 1, label: `#${i + 1} ${x.name}` }));
 };
 
-// ------------------------ UI Components ------------------------
-const ChartCard = ({ title, dataset, children }) => {
-  const cardRef = useRef(null);
-  return (
-    <Card ref={cardRef} className="bg-slate-800/80 text-white border-slate-700 backdrop-blur-sm shadow-xl">
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-base font-semibold text-slate-200">{title}</CardTitle>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-1 rounded-full hover:bg-slate-700">
-                <MoreVertical className="h-4 w-4 text-slate-400" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700 text-slate-200">
-              <div className="px-3 py-2 text-xs opacity-70">Export</div>
-              <DropdownMenuItem className="hover:bg-slate-800">Download PNG</DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-slate-800">Download CSV</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-      <CardContent className="h-[320px]">
-        {!dataset || dataset.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-500">No data available</div>
-        ) : (
-          children
-        )}
-      </CardContent>
-    </Card>
-  );
-};
-
-const StatCard = ({ title, value, icon: Icon, color }) => (
-  <Card className={`${color} text-white border-none shadow-lg`}>
-    <CardContent className="p-4 flex items-center gap-4">
-      <Icon className="h-8 w-8 opacity-90" />
-      <div className="flex-1">
-        <p className="text-3xl font-bold leading-tight">{Number(value ?? 0).toLocaleString()}</p>
-        <p className="text-sm opacity-90">{title}</p>
-      </div>
-    </CardContent>
-  </Card>
-);
-
-// Tooltip theme
+// Neutral tooltip style (no dark/light dependency)
 const tooltipStyle = {
-  backgroundColor: '#0f172a', // slate-900
-  border: '1px solid #334155', // slate-700
-  color: '#e2e8f0' // slate-200
+  backgroundColor: '#ffffff',
+  border: '1px solid #e5e7eb',
+  color: '#111827'
 };
 
-// Permanent dBm label at end of bar
+// Label at end of bar for RSRP
 const RSRPValueLabel = ({ x = 0, y = 0, width = 0, height = 0, value }) => {
   const midY = y + height / 2;
   const barEndX = width >= 0 ? x + width : x;
@@ -246,7 +190,7 @@ const RSRPValueLabel = ({ x = 0, y = 0, width = 0, height = 0, value }) => {
     <text
       x={barEndX + dx}
       y={midY}
-      fill="#e2e8f0"
+      fill="#111827"
       dominantBaseline="middle"
       textAnchor={anchor}
       fontSize={12}
@@ -257,6 +201,198 @@ const RSRPValueLabel = ({ x = 0, y = 0, width = 0, height = 0, value }) => {
   );
 };
 
+// ---------- Utility: export PNG/CSV ----------
+const downloadCSVFromData = (data = [], filename = 'data.csv') => {
+  if (!Array.isArray(data) || data.length === 0) {
+    toast.info("No data to export");
+    return;
+  }
+  const cols = Array.from(
+    data.reduce((set, row) => {
+      Object.keys(row || {}).forEach(k => {
+        const v = row[k];
+        if (typeof v !== 'object' && typeof v !== 'function') set.add(k);
+      });
+      return set;
+    }, new Set())
+  );
+
+  const escapeCsv = (v) => {
+    if (v == null) return '';
+    const s = String(v);
+    if (s.includes('"') || s.includes(',') || s.includes('\n')) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const lines = [cols.join(',')];
+  for (const row of data) {
+    lines.push(cols.map(c => escapeCsv(row[c])).join(','));
+  }
+  const csvBlob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(csvBlob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+};
+
+const sanitizeFileName = (s = 'chart') => s.replace(/[^\w\d-_]+/g, '_').slice(0, 64);
+
+// ------------------------ UI Components ------------------------
+// Updated: universal (light) styles, built-in PNG/CSV/Table, and per-chart Settings in menu
+const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
+  const cardRef = useRef(null);
+  const [showTable, setShowTable] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const handleDownloadPNG = async () => {
+    try {
+      const node = cardRef.current?.querySelector('.chart-content') ?? cardRef.current;
+      if (!node) return toast.error("Chart not found for export");
+      const { toPng } = await import('html-to-image');
+      const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 2 });
+      const link = document.createElement('a');
+      link.download = `${sanitizeFileName(exportFileName || title || 'chart')}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to export PNG");
+    }
+  };
+
+  const handleDownloadCSV = () => {
+    downloadCSVFromData(dataset, `${sanitizeFileName(exportFileName || title || 'chart')}.csv`);
+  };
+
+  // default table columns: show all primitive keys
+  const columns = React.useMemo(() => {
+    if (!Array.isArray(dataset) || dataset.length === 0) return [];
+    const keys = Array.from(
+      dataset.reduce((set, row) => {
+        Object.entries(row || {}).forEach(([k, v]) => {
+          if (['object', 'function'].includes(typeof v)) return;
+          set.add(k);
+        });
+        return set;
+      }, new Set())
+    );
+    return keys;
+  }, [dataset]);
+
+  return (
+    <Card className="bg-white text-gray-900 border-gray-200 shadow-sm">
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-base font-semibold text-gray-800">{title}</CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-1 rounded-full hover:bg-gray-100">
+                <MoreVertical className="h-4 w-4 text-gray-500" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-white border border-gray-200 text-gray-800 w-52">
+              {settings && (
+                <DropdownMenuItem className="hover:bg-gray-100" onClick={() => setSettingsOpen(true)}>
+                  <SettingsIcon className="h-4 w-4 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem className="hover:bg-gray-100" onClick={() => setShowTable(v => !v)}>
+                {showTable ? 'Back to Chart' : 'See as Table'}
+              </DropdownMenuItem>
+              <div className="px-3 py-1 text-xs text-gray-500">Export</div>
+              <DropdownMenuItem className="hover:bg-gray-100" onClick={handleDownloadPNG}>Download PNG</DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-gray-100" onClick={handleDownloadCSV}>Download CSV</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardHeader>
+
+      <CardContent className="h-[320px] relative">
+        {!dataset || dataset.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-gray-400">No data available</div>
+        ) : showTable ? (
+          <div className="h-full overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  {columns.map((c) => (
+                    <th key={c} className="text-left px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">{c}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dataset.map((row, i) => (
+                  <tr key={i} className="odd:bg-white even:bg-gray-50">
+                    {columns.map(c => (
+                      <td key={c} className="px-3 py-2 border-b border-gray-100">
+                        {typeof row[c] === 'number' ? row[c].toLocaleString() : String(row[c] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div ref={cardRef} className="chart-content h-full">
+            {children}
+          </div>
+        )}
+
+        {/* Settings dialog, opened from chart menu */}
+        {settings && (
+          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{settings.title || 'Settings'}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {typeof settings.render === 'function' ? settings.render() : settings.render}
+              </div>
+              <DialogFooter className="gap-2">
+                <button
+                  className="px-3 py-2 rounded-md border border-gray-300 hover:bg-gray-50"
+                  onClick={() => setSettingsOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-500"
+                  onClick={() => {
+                    if (typeof settings.onApply === 'function') settings.onApply();
+                    setSettingsOpen(false);
+                  }}
+                >
+                  Apply
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// KPI card: responsive, overflow-safe text
+const StatCard = ({ title, value, icon: Icon, color }) => (
+  <Card className="bg-white text-gray-900 border-gray-200 shadow-sm">
+    <CardContent className="p-4 flex items-center gap-3 min-w-0">
+      <div className={`h-10 w-10 rounded-md flex items-center justify-center ${color} text-white flex-shrink-0`}>
+        <Icon className="h-6 w-6" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-2xl md:text-3xl font-bold leading-tight truncate">{Number(value ?? 0).toLocaleString()}</p>
+        <p className="text-xs md:text-sm text-gray-500 truncate">{title}</p>
+      </div>
+    </CardContent>
+  </Card>
+);
+
 // ------------------------ Page ------------------------
 const DashboardPage = () => {
   const [payload, setPayload] = useState(null);
@@ -264,14 +400,13 @@ const DashboardPage = () => {
 
   // Ranking states and settings
   const [settings, setSettings] = useState({
-    rsrpMin: -95, rsrpMax: 0,   // "good coverage" default
-    rsrqMin: -10, rsrqMax: 0,   // "good quality" default
+    rsrpMin: -95, rsrpMax: 0,
+    rsrqMin: -10, rsrqMax: 0,
   });
   const [rankLoading, setRankLoading] = useState(false);
-  const [coverageRank, setCoverageRank] = useState([]); // [{ name, value, rank, label }]
-  const [qualityRank, setQualityRank] = useState([]);   // same shape
+  const [coverageRank, setCoverageRank] = useState([]);
+  const [qualityRank, setQualityRank] = useState([]);
 
-  // Fetch main dashboard data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -293,11 +428,9 @@ const DashboardPage = () => {
     fetchData();
   }, []);
 
-  // Fetch ranking charts when settings change
   const fetchRanking = useCallback(async () => {
     setRankLoading(true);
     try {
-      // Add these methods in adminApi (see backend section below)
       const [covResp, qualResp] = await Promise.all([
         adminApi.getOperatorCoverageRanking({ min: settings.rsrpMin, max: settings.rsrpMax }),
         adminApi.getOperatorQualityRanking({ min: settings.rsrqMin, max: settings.rsrqMax })
@@ -332,101 +465,30 @@ const DashboardPage = () => {
       { title: "Total Samples", value: data.totals.samples, icon: FileText, color: "bg-amber-600" },
       { title: "Operators", value: data.totals.operators, icon: Wifi, color: "bg-sky-600" },
       { title: "Technologies", value: data.totals.technologies, icon: BarChart2, color: "bg-pink-600" },
-      { title: "Total Bands", value: data.totals.bands, icon: RadioTower, color: "bg-indigo-600" }
+      // { title: "Total Bands", value: data.totals.bands, icon: RadioTower, color: "bg-indigo-600" }
     ];
   }, [data]);
 
   const applySettings = () => {
-    // validate ranges a bit
     if (settings.rsrpMin > settings.rsrpMax) return toast.warn("RSRP: Min cannot be greater than Max");
     if (settings.rsrqMin > settings.rsrqMax) return toast.warn("RSRQ: Min cannot be greater than Max");
     fetchRanking();
   };
 
   if (loading) return <Spinner />;
-  if (!data) return <div className="p-6 text-red-500">Failed to load dashboard data.</div>;
+  if (!data) return <div className="p-6 text-red-600">Failed to load dashboard data.</div>;
 
   return (
-    <div className="h-full  no-scrollbar overflow-y-auto space-y-6 bg-slate-900 text-slate-100 p-6">
-      {/* Top toolbar: KPI + Settings */}
-      <div className="flex flex-col gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6">
-          {stats.map(s => <StatCard key={s.title} {...s} />)}
-        </div>
-
-        {/* Graph Settings */}
-        <div className="flex items-center justify-end">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200">
-                <SettingsIcon className="h-4 w-4" />
-                Graph Settings
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700 text-slate-200 w-[320px] p-3">
-              <div className="space-y-3 text-sm">
-                <div className="font-semibold text-slate-300">RSRP Coverage Range (dBm)</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-slate-400">Min</label>
-                    <input
-                      type="number" step="1"
-                      className="w-full px-2 py-1 rounded bg-slate-800 border border-slate-700"
-                      value={settings.rsrpMin}
-                      onChange={(e) => setSettings(s => ({ ...s, rsrpMin: Number(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-slate-400">Max</label>
-                    <input
-                      type="number" step="1"
-                      className="w-full px-2 py-1 rounded bg-slate-800 border border-slate-700"
-                      value={settings.rsrpMax}
-                      onChange={(e) => setSettings(s => ({ ...s, rsrpMax: Number(e.target.value) }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="font-semibold text-slate-300 pt-2">RSRQ Quality Range (dB)</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-slate-400">Min</label>
-                    <input
-                      type="number" step="0.5"
-                      className="w-full px-2 py-1 rounded bg-slate-800 border border-slate-700"
-                      value={settings.rsrqMin}
-                      onChange={(e) => setSettings(s => ({ ...s, rsrqMin: Number(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-slate-400">Max</label>
-                    <input
-                      type="number" step="0.5"
-                      className="w-full px-2 py-1 rounded bg-slate-800 border border-slate-700"
-                      value={settings.rsrqMax}
-                      onChange={(e) => setSettings(s => ({ ...s, rsrqMax: Number(e.target.value) }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-1">
-                  <button
-                    onClick={applySettings}
-                    className="w-full px-3 py-2 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+    <div className="h-full no-scrollbar overflow-y-auto space-y-6 bg-white text-gray-900 p-6">
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+        {stats.map(s => <StatCard key={s.title} {...s} />)}
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Samples (modern area) */}
-        <ChartCard title="Monthly Samples" dataset={data.monthlySampleCounts}>
+        {/* Monthly Samples */}
+        <ChartCard title="Monthly Samples" dataset={data.monthlySampleCounts} exportFileName="monthly_samples">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.monthlySampleCounts} margin={{ top: 16, right: 24, left: -10, bottom: 8 }}>
               <defs>
@@ -435,32 +497,32 @@ const DashboardPage = () => {
                   <stop offset="95%" stopColor="#60A5FA" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.2)" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <Tooltip cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} contentStyle={tooltipStyle} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} contentStyle={tooltipStyle} />
               <Area
                 type="monotone"
                 dataKey="value"
                 stroke="#60A5FA"
                 strokeWidth={2}
                 fill="url(#gradBlue)"
-                dot={{ r: 2, stroke: '#60A5FA', strokeWidth: 1, fill: '#0ea5e9' }}
+                dot={{ r: 2, stroke: '#60A5FA', strokeWidth: 1, fill: '#60A5FA' }}
               />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Operator wise Samples (merged categories) */}
-        <ChartCard title="Operator wise Samples" dataset={data.operatorWiseSamples}>
+        {/* Operator wise Samples */}
+        <ChartCard title="Operator wise Samples" dataset={data.operatorWiseSamples} exportFileName="operator_samples">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.operatorWiseSamples} layout="vertical" margin={{ top: 12, right: 40, left: 10, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(148, 163, 184, 0.2)" />
-              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" width={130} tick={{ fill: '#e2e8f0', fontSize: 12 }} />
-              <Tooltip cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} contentStyle={tooltipStyle} />
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.06)" />
+              <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <YAxis dataKey="name" type="category" width={130} tick={{ fill: '#111827', fontSize: 12 }} />
+              <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} contentStyle={tooltipStyle} />
               <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                <LabelList dataKey="value" position="right" style={{ fill: '#e2e8f0', fontSize: '12px', fontWeight: 600 }} />
+                <LabelList dataKey="value" position="right" style={{ fill: '#111827', fontSize: '12px', fontWeight: 600 }} />
                 {data.operatorWiseSamples.map((entry, index) => (
                   <Cell key={`cell-ops-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                 ))}
@@ -470,27 +532,27 @@ const DashboardPage = () => {
         </ChartCard>
 
         {/* Network Type Distribution */}
-        <ChartCard title="Network Type Distribution" dataset={data.networkTypeDistribution}>
+        <ChartCard title="Network Type Distribution" dataset={data.networkTypeDistribution} exportFileName="network_type_distribution">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.networkTypeDistribution} layout="vertical" margin={{ top: 12, right: 36, left: 10, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(148, 163, 184, 0.2)" />
-              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" width={130} tick={{ fill: '#e2e8f0', fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.06)" />
+              <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <YAxis dataKey="name" type="category" width={130} tick={{ fill: '#111827', fontSize: 12 }} />
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="value" fill="#34D399" radius={[0, 6, 6, 0]}>
-                <LabelList dataKey="value" position="right" style={{ fill: '#e2e8f0', fontSize: '12px', fontWeight: 600 }} />
+                <LabelList dataKey="value" position="right" style={{ fill: '#111827', fontSize: '12px', fontWeight: 600 }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Avg RSRP per Operator (merged categories, enforced negative) */}
-        <ChartCard title="Avg RSRP (dBm) Per Operator" dataset={data.avgRsrpPerOperator}>
+        {/* Avg RSRP per Operator */}
+        <ChartCard title="Avg RSRP (dBm) Per Operator" dataset={data.avgRsrpPerOperator} exportFileName="avg_rsrp_per_operator">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.avgRsrpPerOperator} layout="vertical" margin={{ top: 12, right: 40, left: 10, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(148, 163, 184, 0.2)" />
-              <XAxis type="number" domain={[-120, -60]} tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${v} dBm`} />
-              <YAxis dataKey="name" type="category" width={140} tick={{ fill: '#e2e8f0', fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.06)" />
+              <XAxis type="number" domain={[-120, -60]} tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(v) => `${v} dBm`} />
+              <YAxis dataKey="name" type="category" width={140} tick={{ fill: '#111827', fontSize: 12 }} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${Number(v).toFixed(1)} dBm`, 'Avg RSRP']} />
               <Bar dataKey="value" name="RSRP" radius={[0, 6, 6, 0]}>
                 <LabelList dataKey="value" content={RSRPValueLabel} />
@@ -503,15 +565,15 @@ const DashboardPage = () => {
         </ChartCard>
 
         {/* Band Distribution */}
-        <ChartCard title="Band Distribution" dataset={data.bandDistribution}>
+        <ChartCard title="Band Distribution" dataset={data.bandDistribution} exportFileName="band_distribution">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.bandDistribution} layout="vertical" margin={{ top: 12, right: 36, left: 10, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(148, 163, 184, 0.2)" />
-              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" width={130} tick={{ fill: '#e2e8f0', fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.06)" />
+              <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <YAxis dataKey="name" type="category" width={130} tick={{ fill: '#111827', fontSize: 12 }} />
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                <LabelList dataKey="value" position="right" style={{ fill: '#e2e8f0', fontSize: '12px', fontWeight: 600 }} />
+                <LabelList dataKey="value" position="right" style={{ fill: '#111827', fontSize: '12px', fontWeight: 600 }} />
                 {data.bandDistribution.map((entry, index) => (
                   <Cell key={`cell-band-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                 ))}
@@ -520,8 +582,8 @@ const DashboardPage = () => {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Handset wise Avg RSRP — enforced negative, with permanent labels & thresholds */}
-        <ChartCard title="Handset wise Avg RSRP" dataset={data.handsetDistribution}>
+        {/* Handset wise Avg RSRP */}
+        <ChartCard title="Handset wise Avg RSRP" dataset={data.handsetDistribution} exportFileName="handset_avg_rsrp">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data.handsetDistribution}
@@ -530,115 +592,112 @@ const DashboardPage = () => {
               barCategoryGap="25%"
               barSize={14}
             >
-               {/* Quality zones */}
-  <ReferenceArea x1={-120} x2={-105} fill="#ef4444" fillOpacity={0.06} />
-  <ReferenceArea x1={-105} x2={-95} fill="#f59e0b" fillOpacity={0.06} />
-  <ReferenceArea x1={-95}  x2={-85} fill="#60a5fa" fillOpacity={0.06} />
-  <ReferenceArea x1={-85}  x2={-60} fill="#10b981" fillOpacity={0.06} />
+              <ReferenceArea x1={-120} x2={-105} fill="#ef4444" fillOpacity={0.06} />
+              <ReferenceArea x1={-105} x2={-95} fill="#f59e0b" fillOpacity={0.06} />
+              <ReferenceArea x1={-95}  x2={-85} fill="#60a5fa" fillOpacity={0.06} />
+              <ReferenceArea x1={-85}  x2={-60} fill="#10b981" fillOpacity={0.06} />
 
-  <XAxis
-    type="number"
-    domain={[-120, -60]}
-    tick={{ fill: '#94a3b8', fontSize: 11 }}
-    tickFormatter={(v) => `${v} dBm`}
-  />
-  <YAxis
-    dataKey="name"
-    type="category"
-    width={180}
-    tick={{ fill: '#e2e8f0', fontSize: 12 }}
-  />
-  <Tooltip
-    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', color: '#e2e8f0' }}
-    formatter={(v) => [`${Number(v).toFixed(1)} dBm`, 'Avg RSRP']}
-  />
+              <XAxis
+                type="number"
+                domain={[-120, -60]}
+                tick={{ fill: '#6b7280', fontSize: 11 }}
+                tickFormatter={(v) => `${v} dBm`}
+              />
+              <YAxis
+                dataKey="name"
+                type="category"
+                width={180}
+                tick={{ fill: '#111827', fontSize: 12 }}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(v) => [`${Number(v).toFixed(1)} dBm`, 'Avg RSRP']}
+              />
 
-  <Bar
-    dataKey="value"
-    name="Avg RSRP"
-    radius={[0, 8, 8, 0]}
-    isAnimationActive
-    animationDuration={650}
-    background={{ fill: 'rgba(148,163,184,0.10)', radius: [0, 8, 8, 0] }}
-  >
-    <LabelList
-      dataKey="value"
-      content={({ x = 0, y = 0, width = 0, height = 0, value }) => {
-        const midY = y + height / 2;
-        const barEndX = x + width;
-        return (
-          <text
-            x={barEndX + 8}
-            y={midY}
-            fill="#e2e8f0"
-            dominantBaseline="middle"
-            textAnchor="start"
-            fontSize={12}
-            fontWeight={600}
-          >
-            {`${Number(value).toFixed(1)} dBm`}
-          </text>
-        );
-      }}
-    />
-    {
-      (data?.handsetDistribution ?? [])
-        .map(d => ({ ...d, value: Number(d.value) > 0 ? -Number(d.value) : Number(d.value) }))
-        .sort((a, b) => a.value - b.value)
-        .slice(0, 12)
-        .map((entry, index) => (
-          <Cell key={`cell-handset-${index}`} fill={getRSRPPointColor(entry.value)} />
-        ))
-    }
-  </Bar>
-</BarChart>
+              <Bar
+                dataKey="value"
+                name="Avg RSRP"
+                radius={[0, 8, 8, 0]}
+                isAnimationActive
+                animationDuration={650}
+                background={{ fill: 'rgba(0,0,0,0.06)', radius: [0, 8, 8, 0] }}
+              >
+                <LabelList
+                  dataKey="value"
+                  content={({ x = 0, y = 0, width = 0, height = 0, value }) => {
+                    const midY = y + height / 2;
+                    const barEndX = x + width;
+                    return (
+                      <text
+                        x={barEndX + 8}
+                        y={midY}
+                        fill="#111827"
+                        dominantBaseline="middle"
+                        textAnchor="start"
+                        fontSize={12}
+                        fontWeight={600}
+                      >
+                        {`${Number(value).toFixed(1)} dBm`}
+                      </text>
+                    );
+                  }}
+                />
+                {(data?.handsetDistribution ?? [])
+                  .map(d => ({ ...d, value: Number(d.value) > 0 ? -Number(d.value) : Number(d.value) }))
+                  .sort((a, b) => a.value - b.value)
+                  .slice(0, 12)
+                  .map((entry, index) => (
+                    <Cell key={`cell-handset-${index}`} fill={getRSRPPointColor(entry.value)} />
+                  ))
+                }
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        
-<ChartCard title={`Operator Coverage Rank (RSRP ${settings.rsrpMin} to ${settings.rsrpMax} dBm)`} dataset={coverageRank}>
-  <ResponsiveContainer width="100%" height="100%">
-    <BarChart
-      data={coverageRank}
-      margin={{ top: 12, right: 40, left: 10, bottom: 40 }}
-      barSize={24}
-    >
-      <CartesianGrid strokeDasharray="3 3" horizontal stroke="rgba(148, 163, 184, 0.2)" vertical={false} />
-      <XAxis
-        dataKey="label"
-        tickLine={false}
-        axisLine={false}
-        interval={0}
-        angle={-20}
-        textAnchor="end"
-        height={50}
-        tick={{ fill: '#e2e8f0', fontSize: 12 }}
-      />
-      <YAxis
-        type="number"
-        tick={{ fill: '#94a3b8', fontSize: 11 }}
-      />
-      <Tooltip contentStyle={tooltipStyle} formatter={(v) => [v, 'Samples in range']} />
-      <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-        <LabelList dataKey="value" position="top" style={{ fill: '#e2e8f0', fontSize: '12px', fontWeight: 600 }} />
-        {coverageRank.map((entry, index) => (
-          <Cell key={`cell-cov-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-        ))}
-      </Bar>
-    </BarChart>
-  </ResponsiveContainer>
-  {rankLoading && <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center text-slate-300 text-sm">Loading…</div>}
-</ChartCard>
-
-       
-        <ChartCard title={`Operator Quality Rank (RSRQ ${settings.rsrqMin} to ${settings.rsrqMax} dB)`} dataset={qualityRank}>
+        {/* Operator Coverage Rank - now with Settings in menu */}
+        <ChartCard
+          title={`Operator Coverage Rank (RSRP ${settings.rsrpMin} to ${settings.rsrpMax} dBm)`}
+          dataset={coverageRank}
+          exportFileName="coverage_rank"
+          settings={{
+            title: 'Coverage Rank Settings',
+            render: () => (
+              <div className="space-y-3 text-sm">
+                <div className="font-medium text-gray-700">RSRP Coverage Range (dBm)</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500">Min</label>
+                    <input
+                      type="number" step="1"
+                      className="w-full px-2 py-1 rounded border border-gray-300"
+                      value={settings.rsrpMin}
+                      onChange={(e) => setSettings(s => ({ ...s, rsrpMin: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500">Max</label>
+                    <input
+                      type="number" step="1"
+                      className="w-full px-2 py-1 rounded border border-gray-300"
+                      value={settings.rsrpMax}
+                      onChange={(e) => setSettings(s => ({ ...s, rsrpMax: Number(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            ),
+            onApply: applySettings
+          }}
+        >
+          <div className="absolute inset-0 pointer-events-none" />
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={qualityRank}
+              data={coverageRank}
               margin={{ top: 12, right: 40, left: 10, bottom: 40 }}
               barSize={24}
             >
-              <CartesianGrid strokeDasharray="3 3" horizontal stroke="rgba(148, 163, 184, 0.2)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" horizontal stroke="rgba(0,0,0,0.06)" vertical={false} />
               <XAxis
                 dataKey="label"
                 tickLine={false}
@@ -647,22 +706,84 @@ const DashboardPage = () => {
                 angle={-20}
                 textAnchor="end"
                 height={50}
-                tick={{ fill: '#e2e8f0', fontSize: 12 }}
+                tick={{ fill: '#111827', fontSize: 12 }}
               />
-              <YAxis
-                type="number"
-                tick={{ fill: '#94a3b8', fontSize: 11 }}
-              />
+              <YAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v) => [v, 'Samples in range']} />
               <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                <LabelList dataKey="value" position="top" style={{ fill: '#e2e8f0', fontSize: '12px', fontWeight: 600 }} />
+                <LabelList dataKey="value" position="top" style={{ fill: '#111827', fontSize: '12px', fontWeight: 600 }} />
+                {coverageRank.map((entry, index) => (
+                  <Cell key={`cell-cov-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          {rankLoading && <div className="absolute inset-0 bg-white/40 flex items-center justify-center text-gray-700 text-sm">Loading…</div>}
+        </ChartCard>
+
+        {/* Operator Quality Rank - now with Settings in menu */}
+        <ChartCard
+          title={`Operator Quality Rank (RSRQ ${settings.rsrqMin} to ${settings.rsrqMax} dB)`}
+          dataset={qualityRank}
+          exportFileName="quality_rank"
+          settings={{
+            title: 'Quality Rank Settings',
+            render: () => (
+              <div className="space-y-3 text-sm">
+                <div className="font-medium text-gray-700">RSRQ Quality Range (dB)</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500">Min</label>
+                    <input
+                      type="number" step="0.5"
+                      className="w-full px-2 py-1 rounded border border-gray-300"
+                      value={settings.rsrqMin}
+                      onChange={(e) => setSettings(s => ({ ...s, rsrqMin: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500">Max</label>
+                    <input
+                      type="number" step="0.5"
+                      className="w-full px-2 py-1 rounded border border-gray-300"
+                      value={settings.rsrqMax}
+                      onChange={(e) => setSettings(s => ({ ...s, rsrqMax: Number(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            ),
+            onApply: applySettings
+          }}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={qualityRank}
+              margin={{ top: 12, right: 40, left: 10, bottom: 40 }}
+              barSize={24}
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal stroke="rgba(0,0,0,0.06)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                interval={0}
+                angle={-20}
+                textAnchor="end"
+                height={50}
+                tick={{ fill: '#111827', fontSize: 12 }}
+              />
+              <YAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [v, 'Samples in range']} />
+              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                <LabelList dataKey="value" position="top" style={{ fill: '#111827', fontSize: '12px', fontWeight: 600 }} />
                 {qualityRank.map((entry, index) => (
                   <Cell key={`cell-qual-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          {rankLoading && <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center text-slate-300 text-sm">Loading…</div>}
+          {rankLoading && <div className="absolute inset-0 bg-white/40 flex items-center justify-center text-gray-700 text-sm">Loading…</div>}
         </ChartCard>
       </div>
     </div>
