@@ -1,7 +1,4 @@
-// src/api/apiService.js
 
-// const API_BASE_URL =
-//   import.meta.env.VITE_API_BASE_URL; // match your backend URL and scheme
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5224";
 const apiService = async (endpoint, { body, params, ...customOptions } = {}) => {
@@ -15,7 +12,7 @@ const apiService = async (endpoint, { body, params, ...customOptions } = {}) => 
       ...headers,
       ...customOptions.headers,
     },
-    credentials: "include", // required for cookie/session auth
+    credentials: "include", 
   };
 
   if (body) config.body = isFormData ? body : JSON.stringify(body);

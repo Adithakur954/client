@@ -2,9 +2,7 @@ import React, { useEffect, useState } from "react";
 import { BarChart3 } from "lucide-react";
 import AllLogsDetailPanel from "./AllLogsDetailPanel";
 
-// A tiny wrapper that:
-// - shows a floating button when minimized
-// - auto-opens when new logs are loaded (logs.length > 0)
+
 export default function AllLogsPanelToggle({
   logs = [],
   thresholds = {},

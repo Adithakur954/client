@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
 import { toast } from "react-toastify";
 import { adminApi } from "../api/apiEndpoints";
 import Spinner from "../components/common/Spinner";
@@ -17,7 +18,7 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-// New: Settings dialog in chart menus
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const CHART_COLORS = ['#60A5FA', '#34D399', '#F59E0B', '#A78BFA', '#F472B6', '#FBBF24', '#22D3EE', '#F87171', '#4ADE80', '#93C5FD'];
@@ -240,8 +241,7 @@ const downloadCSVFromData = (data = [], filename = 'data.csv') => {
 
 const sanitizeFileName = (s = 'chart') => s.replace(/[^\w\d-_]+/g, '_').slice(0, 64);
 
-// ------------------------ UI Components ------------------------
-// Updated: universal (light) styles, built-in PNG/CSV/Table, and per-chart Settings in menu
+// ------------------------ Reusable Cards ------------------------
 const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
   const cardRef = useRef(null);
   const [showTable, setShowTable] = useState(false);
@@ -286,7 +286,7 @@ const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
     <Card className="bg-white text-gray-900 border-gray-200 shadow-sm">
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle className="text-base font-semibold text-gray-800">{title}</CardTitle>
+          <CardTitle className="text/base font-semibold text-gray-800">{title}</CardTitle>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="p-1 rounded-full hover:bg-gray-100">
@@ -393,68 +393,89 @@ const StatCard = ({ title, value, icon: Icon, color }) => (
   </Card>
 );
 
-// ------------------------ Page ------------------------
+// ------------------------ Page (with SWR) ------------------------
 const DashboardPage = () => {
-  const [payload, setPayload] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // Ranking states and settings
+  // Applied settings (drive SWR keys) + Draft settings (edited in dialog)
   const [settings, setSettings] = useState({
     rsrpMin: -95, rsrpMax: 0,
     rsrqMin: -10, rsrqMax: 0,
   });
-  const [rankLoading, setRankLoading] = useState(false);
-  const [coverageRank, setCoverageRank] = useState([]);
-  const [qualityRank, setQualityRank] = useState([]);
+  const [draft, setDraft] = useState(settings);
+  useEffect(() => setDraft(settings), [settings]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [statsResp, graphsResp] = await Promise.all([
-          adminApi.getReactDashboardData(),
-          adminApi.getDashboardGraphData()
-        ]);
-        const merged = { ...(statsResp?.Data ?? {}), ...(graphsResp?.Data ?? {}) };
-        const normalized = normalizePayload({ Data: merged });
-        setPayload(normalized);
-      } catch (err) {
-        console.error("Dashboard fetch error:", err);
-        toast.error(`Failed to load dashboard: ${err?.message ?? 'Unknown error'}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  const fetchRanking = useCallback(async () => {
-    setRankLoading(true);
+  // Base dashboard payload via SWR (fetches both endpoints concurrently)
+  const fetchDashboard = async () => {
     try {
-      const [covResp, qualResp] = await Promise.all([
-        adminApi.getOperatorCoverageRanking({ min: settings.rsrpMin, max: settings.rsrpMax }),
-        adminApi.getOperatorQualityRanking({ min: settings.rsrqMin, max: settings.rsrqMax })
+      const [statsResp, graphsResp] = await Promise.all([
+        adminApi.getReactDashboardData(),
+        adminApi.getDashboardGraphData()
       ]);
-
-      const covPayload = covResp?.Data ?? covResp?.data ?? covResp ?? [];
-      const qualPayload = qualResp?.Data ?? qualResp?.data ?? qualResp ?? [];
-
-      const covRank = buildRanking(covPayload, { nameKey: 'name', countKey: 'count' });
-      const qualRank = buildRanking(qualPayload, { nameKey: 'name', countKey: 'count' });
-
-      setCoverageRank(covRank);
-      setQualityRank(qualRank);
+      const merged = { ...(statsResp?.Data ?? statsResp ?? {}), ...(graphsResp?.Data ?? graphsResp ?? {}) };
+      const normalized = normalizePayload({ Data: merged });
+      return normalized;
     } catch (err) {
-      console.error("Ranking fetch error:", err);
-      toast.error(`Failed to load ranking charts: ${err?.message ?? 'Unknown error'}`);
-    } finally {
-      setRankLoading(false);
+      toast.error(`Failed to load dashboard: ${err?.message ?? 'Unknown error'}`);
+      throw err;
     }
-  }, [settings]);
+  };
 
-  useEffect(() => { fetchRanking(); }, [fetchRanking]);
+  const {
+    data,
+    error: dashError,
+    isLoading: isDashLoading,
+    mutate: refreshDashboard,
+  } = useSWR('dashboard:core', fetchDashboard, {
+    keepPreviousData: true,
+    dedupingInterval: 60_000,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
 
-  const data = payload;
+  // Ranking data via SWR (keys depend on applied settings)
+  const fetchCoverageRank = async ([, min, max]) => {
+    try {
+      const resp = await adminApi.getOperatorCoverageRanking({ min, max });
+      const payload = resp?.Data ?? resp?.data ?? resp ?? [];
+      return buildRanking(payload, { nameKey: 'name', countKey: 'count' });
+    } catch (err) {
+      toast.error(`Failed to load coverage ranking: ${err?.message ?? 'Unknown error'}`);
+      throw err;
+    }
+  };
+  const fetchQualityRank = async ([, min, max]) => {
+    try {
+      const resp = await adminApi.getOperatorQualityRanking({ min, max });
+      const payload = resp?.Data ?? resp?.data ?? resp ?? [];
+      return buildRanking(payload, { nameKey: 'name', countKey: 'count' });
+    } catch (err) {
+      toast.error(`Failed to load quality ranking: ${err?.message ?? 'Unknown error'}`);
+      throw err;
+    }
+  };
+
+  const {
+    data: coverageRank = [],
+    error: covError,
+    isLoading: isCoverageLoading,
+    mutate: refreshCoverage,
+  } = useSWR(['rank:coverage', settings.rsrpMin, settings.rsrpMax], fetchCoverageRank, {
+    keepPreviousData: true,
+    dedupingInterval: 15_000,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
+
+  const {
+    data: qualityRank = [],
+    error: qualError,
+    isLoading: isQualityLoading,
+    mutate: refreshQuality,
+  } = useSWR(['rank:quality', settings.rsrqMin, settings.rsrqMax], fetchQualityRank, {
+    keepPreviousData: true,
+    dedupingInterval: 15_000,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
 
   const stats = useMemo(() => {
     if (!data?.totals) return [];
@@ -470,12 +491,16 @@ const DashboardPage = () => {
   }, [data]);
 
   const applySettings = () => {
-    if (settings.rsrpMin > settings.rsrpMax) return toast.warn("RSRP: Min cannot be greater than Max");
-    if (settings.rsrqMin > settings.rsrqMax) return toast.warn("RSRQ: Min cannot be greater than Max");
-    fetchRanking();
+    if (draft.rsrpMin > draft.rsrpMax) return toast.warn("RSRP: Min cannot be greater than Max");
+    if (draft.rsrqMin > draft.rsrqMax) return toast.warn("RSRQ: Min cannot be greater than Max");
+    setSettings(draft);
+    // Optionally force revalidate immediately:
+    // refreshCoverage();
+    // refreshQuality();
   };
 
-  if (loading) return <Spinner />;
+  if (isDashLoading) return <Spinner />;
+  if (dashError) return <div className="p-6 text-red-600">Failed to load dashboard data.</div>;
   if (!data) return <div className="p-6 text-red-600">Failed to load dashboard data.</div>;
 
   return (
@@ -655,7 +680,7 @@ const DashboardPage = () => {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Operator Coverage Rank - now with Settings in menu */}
+        {/* Operator Coverage Rank */}
         <ChartCard
           title={`Operator Coverage Rank (RSRP ${settings.rsrpMin} to ${settings.rsrpMax} dBm)`}
           dataset={coverageRank}
@@ -671,8 +696,8 @@ const DashboardPage = () => {
                     <input
                       type="number" step="1"
                       className="w-full px-2 py-1 rounded border border-gray-300"
-                      value={settings.rsrpMin}
-                      onChange={(e) => setSettings(s => ({ ...s, rsrpMin: Number(e.target.value) }))}
+                      value={draft.rsrpMin}
+                      onChange={(e) => setDraft(s => ({ ...s, rsrpMin: Number(e.target.value) }))}
                     />
                   </div>
                   <div className="space-y-1">
@@ -680,8 +705,8 @@ const DashboardPage = () => {
                     <input
                       type="number" step="1"
                       className="w-full px-2 py-1 rounded border border-gray-300"
-                      value={settings.rsrpMax}
-                      onChange={(e) => setSettings(s => ({ ...s, rsrpMax: Number(e.target.value) }))}
+                      value={draft.rsrpMax}
+                      onChange={(e) => setDraft(s => ({ ...s, rsrpMax: Number(e.target.value) }))}
                     />
                   </div>
                 </div>
@@ -718,10 +743,10 @@ const DashboardPage = () => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          {rankLoading && <div className="absolute inset-0 bg-white/40 flex items-center justify-center text-gray-700 text-sm">Loading…</div>}
+          {isCoverageLoading && <div className="absolute inset-0 bg-white/40 flex items-center justify-center text-gray-700 text-sm">Loading…</div>}
         </ChartCard>
 
-        {/* Operator Quality Rank - now with Settings in menu */}
+        {/* Operator Quality Rank */}
         <ChartCard
           title={`Operator Quality Rank (RSRQ ${settings.rsrqMin} to ${settings.rsrqMax} dB)`}
           dataset={qualityRank}
@@ -737,8 +762,8 @@ const DashboardPage = () => {
                     <input
                       type="number" step="0.5"
                       className="w-full px-2 py-1 rounded border border-gray-300"
-                      value={settings.rsrqMin}
-                      onChange={(e) => setSettings(s => ({ ...s, rsrqMin: Number(e.target.value) }))}
+                      value={draft.rsrqMin}
+                      onChange={(e) => setDraft(s => ({ ...s, rsrqMin: Number(e.target.value) }))}
                     />
                   </div>
                   <div className="space-y-1">
@@ -746,8 +771,8 @@ const DashboardPage = () => {
                     <input
                       type="number" step="0.5"
                       className="w-full px-2 py-1 rounded border border-gray-300"
-                      value={settings.rsrqMax}
-                      onChange={(e) => setSettings(s => ({ ...s, rsrqMax: Number(e.target.value) }))}
+                      value={draft.rsrqMax}
+                      onChange={(e) => setDraft(s => ({ ...s, rsrqMax: Number(e.target.value) }))}
                     />
                   </div>
                 </div>
@@ -783,7 +808,7 @@ const DashboardPage = () => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          {rankLoading && <div className="absolute inset-0 bg-white/40 flex items-center justify-center text-gray-700 text-sm">Loading…</div>}
+          {isQualityLoading && <div className="absolute inset-0 bg-white/40 flex items-center justify-center text-gray-700 text-sm">Loading…</div>}
         </ChartCard>
       </div>
     </div>

@@ -1,4 +1,3 @@
-// src/pages/HighPerfMap.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { toast } from "react-toastify";
@@ -15,6 +14,7 @@ import AllLogsPanelToggle from "@/components/map/layout/AllLogsPanelToggle";
 import SessionsLayer from "@/components/map/overlays/SessionsLayer";
 import LogCirclesLayer from "@/components/map/layers/LogCirclesLayer";
 import ProjectPolygonsLayer from "@/components/map/overlays/ProjectPolygonsLayer";
+import DrawingToolsLayer from "@/components/map/tools/DrawingToolsLayer";
 
 // UI
 import MapLegend from "@/components/map/MapLegend";
@@ -25,9 +25,10 @@ import { parseWKTToRings } from "@/utils/wkt";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
-const DEFAULT_CENTER = { lat: 28.6139, lng: 77.2090 };
+const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
 const MAP_CONTAINER_STYLE = { height: "100vh", width: "100%" };
 
+// Ensure your loader options include: libraries: ["drawing", "geometry", "visualization"]
 const MAP_STYLES = {
   default: null,
   clean: [
@@ -60,9 +61,7 @@ const MAP_STYLES = {
 };
 
 export default function HighPerfMap() {
-  // Use the shared loader options (IDENTICAL across the app)
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
-
   const [map, setMap] = useState(null);
 
   // Loading flags
@@ -81,10 +80,10 @@ export default function HighPerfMap() {
   // Session detail
   const [selectedSessionData, setSelectedSessionData] = useState(null);
 
-  // Logs (for summary panel)
+  // Logs (for summary panel and drawing analysis)
   const [drawnLogs, setDrawnLogs] = useState([]);
 
-  // UI toggles
+  // UI toggles (extended with drawing controls)
   const [ui, setUi] = useState({
     showSessions: true,
     clusterSessions: true,
@@ -94,7 +93,15 @@ export default function HighPerfMap() {
     basemapStyle: "clean",
     showPolygons: false,
     selectedProjectId: null,
+
+    // Drawing
+    drawEnabled: false,
+    drawPixelateRect: false,
+    drawCellSizeMeters: 100,
+    drawClearSignal: 0,
   });
+
+  const [analysis, setAnalysis] = useState(null);
 
   // Bounds persistence and debounce
   const [visibleBounds, setVisibleBounds] = useState(null);
@@ -214,6 +221,7 @@ export default function HighPerfMap() {
     setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
     setSelectedSessionData(null);
     setDrawnLogs([]);
+    setAnalysis(null);
     setUi((u) => ({ ...u, showLogsCircles: true }));
   };
 
@@ -221,6 +229,7 @@ export default function HighPerfMap() {
     setActiveFilters(null);
     setSelectedSessionData(null);
     setDrawnLogs([]);
+    setAnalysis(null);
     setUi((u) => ({ ...u, showHeatmap: false }));
     fetchAllSessions();
   }, [fetchAllSessions]);
@@ -256,6 +265,8 @@ export default function HighPerfMap() {
         position="left"
         autoCloseOnApply={true}
       />
+
+      
 
       <GoogleMap
         mapContainerStyle={MAP_CONTAINER_STYLE}
@@ -303,10 +314,52 @@ export default function HighPerfMap() {
             onClick={(poly) => toast.info(poly.name || `Region ${poly.id}`)}
           />
         )}
+
+        {/* Drawing tools layer */}
+        {ui.drawEnabled && (
+          <DrawingToolsLayer
+            map={map}
+            enabled={ui.drawEnabled}
+            logs={drawnLogs}
+            selectedMetric={selectedMetric}
+            thresholds={thresholds}
+            pixelateRect={ui.drawPixelateRect}
+            cellSizeMeters={ui.drawCellSizeMeters || 100}
+            onSummary={setAnalysis}
+            clearSignal={ui.drawClearSignal || 0}
+            maxCells={1500}
+          />
+        )}
       </GoogleMap>
 
       {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
         <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} />
+      )}
+
+      {/* Selection stats panel */}
+      {analysis && (
+        <div className="absolute bottom-4 left-4 z-30 bg-white/95 dark:bg-gray-900/95 rounded-md shadow p-3 min-w-[240px]">
+          <div className="font-medium mb-1">Selection stats</div>
+          <div className="text-sm text-gray-700 dark:text-gray-200 space-y-1">
+            <div>Shape: {analysis.type}</div>
+            <div>Logs: {analysis.count}</div>
+            {analysis.stats?.count > 0 ? (
+              <>
+                <div>Mean: {analysis.stats.mean?.toFixed(2)}</div>
+                <div>Median: {analysis.stats.median?.toFixed(2)}</div>
+                <div>Max: {analysis.stats.max?.toFixed(2)}</div>
+                <div>Min: {analysis.stats.min?.toFixed(2)}</div>
+                {analysis.grid ? (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Grid: ~{analysis.grid.cells} cells @ {analysis.grid.cellSizeMeters}m
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div>No metric values in selection.</div>
+            )}
+          </div>
+        </div>
       )}
 
       <SessionDetailPanel

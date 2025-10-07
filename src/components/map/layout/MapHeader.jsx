@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pin } from 'lucide-react';
-// 1. Import your new PlaceAutocomplete component
-import PlaceAutocomplete from '../PlaceAutocomplete'; // Adjust path if necessary
+
+import PlaceAutocomplete from '../PlaceAutocomplete'; 
 
 const MapHeader = ({ map }) => {
     const goToMyLocation = () => {

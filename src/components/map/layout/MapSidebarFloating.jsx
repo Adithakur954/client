@@ -166,12 +166,12 @@ export default function MapSidebarFloating({
           <PanelSection title="Date Range">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label>Start</Label>
+                <Label className="pb-2">Start</Label>
                 <DatePicker className="w-70" date={filters.startDate} setDate={(d) => handleFilterChange("startDate", d)} />
               </div>
               <br />
               <div>
-                <Label>End</Label>
+                <Label className="pb-2">End</Label>
                 <DatePicker className="w-70" date={filters.endDate} setDate={(d) => handleFilterChange("endDate", d)} />
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function MapSidebarFloating({
           <PanelSection title="Filter by">
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <Label>Provider</Label>
+                <Label className="pb-2">Provider</Label>
                 <Select value={filters.provider} onValueChange={(v) => handleFilterChange("provider", v)}>
                   <SelectTrigger><SelectValue placeholder="Select Provider..." /></SelectTrigger>
                   <SelectContent>
@@ -193,7 +193,7 @@ export default function MapSidebarFloating({
               </div>
 
               <div>
-                <Label>Technology</Label>
+                <Label className="pb-2">Technology</Label>
                 <Select value={filters.technology} onValueChange={(v) => handleFilterChange("technology", v)}>
                   <SelectTrigger><SelectValue placeholder="Select Technology..." /></SelectTrigger>
                   <SelectContent>
@@ -206,7 +206,7 @@ export default function MapSidebarFloating({
               </div>
 
               <div>
-                <Label>Band / Frequency</Label>
+                <Label className="pb-2">Band / Frequency</Label>
                 <Select value={filters.band} onValueChange={(v) => handleFilterChange("band", v)}>
                   <SelectTrigger><SelectValue placeholder="Select Band..." /></SelectTrigger>
                   <SelectContent>
@@ -219,15 +219,15 @@ export default function MapSidebarFloating({
               </div>
 
               <div>
-                <Label>Visualize Metric</Label>
+                <Label className="pb-2">Visualize Metric</Label>
                 <Select value={filters.measureIn} onValueChange={(v) => handleFilterChange("measureIn", v)}>
                   <SelectTrigger><SelectValue placeholder="Select metric..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="rsrp">RSRP</SelectItem>
                     <SelectItem value="rsrq">RSRQ</SelectItem>
                     <SelectItem value="sinr">SINR</SelectItem>
-                    <SelectItem value="ul-throughput">UL-Throughput</SelectItem>
-                    <SelectItem value="dl-throughput">DL-Throughput</SelectItem>
+                    <SelectItem value="ul-tpt">UL-Throughput</SelectItem>
+                    <SelectItem value="dl-tpt">DL-Throughput</SelectItem>
                     <SelectItem value="lte-bler">LTE-BLER</SelectItem>
                     <SelectItem value="mos">MOS</SelectItem>
                   </SelectContent>
@@ -236,34 +236,7 @@ export default function MapSidebarFloating({
             </div>
           </PanelSection>
 
-          <PanelSection title="Project Polygons">
-            <div className="space-y-2">
-              <Select
-                value={ui.selectedProjectId ?? ""}
-                onValueChange={(v) => {
-                  if (v === "none") onUIChange?.({ selectedProjectId: null });
-                  else onUIChange?.({ selectedProjectId: v });
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Select Project..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={ui.showPolygons}
-                  onChange={(e) => onUIChange?.({ showPolygons: e.target.checked })}
-                />
-                Show Project Polygons
-              </label>
-            </div>
-          </PanelSection>
 
           <PanelSection title="Layers">
             <div className="space-y-2 text-sm">
@@ -316,6 +289,59 @@ export default function MapSidebarFloating({
                 />
                 Render Visible Logs Only
               </label>
+            </div>
+          </PanelSection>
+
+          <PanelSection title="Drawing & Analysis">
+            <div className="space-y-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!ui.drawEnabled}
+                  onChange={(e) => onUIChange?.({ drawEnabled: e.target.checked })}
+                />
+                Enable Drawing Tools
+              </label>
+
+              <div className={`pl-5 space-y-2 ${ui.drawEnabled ? "" : "opacity-50 pointer-events-none"}`}>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!!ui.drawPixelateRect}
+                    onChange={(e) => onUIChange?.({ drawPixelateRect: e.target.checked })}
+                  />
+                  Pixelate rectangle
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs">Cell size</Label>
+                  <input
+                    type="number"
+                    min={10}
+                    step={10}
+                    value={ui.drawCellSizeMeters ?? 100}
+                    onChange={(e) =>
+                      onUIChange?.({ drawCellSizeMeters: Math.max(10, Number(e.target.value || 100)) })
+                    }
+                    className="w-24 px-2 py-1 rounded border"
+                  />
+                  <span className="text-xs">m</span>
+                </div>
+
+                <div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onUIChange?.({ drawClearSignal: (ui.drawClearSignal || 0) + 1 })}
+                  >
+                    Clear drawings
+                  </Button>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  Draw rectangle/circle/polygon on the map. Rectangle can be split into a grid for per‑cell stats.
+                </p>
+              </div>
             </div>
           </PanelSection>
 

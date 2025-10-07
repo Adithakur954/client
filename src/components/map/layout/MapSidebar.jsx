@@ -49,7 +49,7 @@ const MapSidebar = ({ onApplyFilters, onClearFilters, onUIChange, ui, initialFil
           mapViewApi.getProviders(),
           mapViewApi.getTechnologies(),
           mapViewApi.getBands(),
-          mapViewApi.getProjects?.() // may return {Status, Data}, handle below
+          mapViewApi.getProjects?.() 
         ]);
 
         const provList = Array.isArray(provRes) ? provRes : [];
@@ -81,7 +81,7 @@ const normalizeProviderName = (raw) => {
   const s = String(raw).trim();
 
   // Unknowns first
-  if (/^\/+$/.test(s)) return "Unknown User"; // ////// etc.
+  if (/^\/+$/.test(s)) return "Unknown User"; 
   if (s.replace(/\s+/g, "") === "404011") return "Unknown User";
 
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
@@ -110,7 +110,7 @@ const normalizeProviderName = (raw) => {
 };
 
   return (
-    <div className="absolute top-4 left-10 h-auto max-h-[90vh] w-80 bg-white dark:bg-slate-950 dark:text-white rounded-lg border z-10 flex flex-col shadow-lg">
+    <div className="absolute top-4 left-10 h-auto max-h-[90vh] w-80 bg-white  rounded-lg border z-10 flex flex-col shadow-lg">
       {/* Tabs header (single tab for logs/controls) */}
       <div className="flex border-b">
         <button

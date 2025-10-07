@@ -45,6 +45,7 @@ const normalizeOperator = (raw) => {
 };
 
 const FALLBACK_BUCKET_COLORS = ["#dc2626", "#f97316", "#f59e0b", "#84cc16", "#22c55e"];
+
 const buildDistribution = (values, thresholds) => {
   if (Array.isArray(thresholds) && thresholds.length > 0) {
     const buckets = thresholds.map((r) => ({
@@ -94,6 +95,7 @@ const buildDistribution = (values, thresholds) => {
   return bins;
 };
 
+// FIX: percentage now uses counted total (not logs.length)
 const buildTopCounts = (logs, getter, topN = 6) => {
   const map = new Map();
   for (const l of logs) {
@@ -102,26 +104,29 @@ const buildTopCounts = (logs, getter, topN = 6) => {
     map.set(k, (map.get(k) || 0) + 1);
   }
   const entries = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  const total = logs.length || 1;
+  const countedTotal = entries.reduce((acc, [, c]) => acc + c, 0) || 1;
   return entries.slice(0, topN).map(([name, count]) => ({
-    name, count, percent: Math.round((count / total) * 100),
+    name,
+    count,
+    percent: Math.round((count / countedTotal) * 100),
   }));
 };
 
+// FIX: align with backend (session_id, provider, network)
 const exportCsv = ({ logs, field, filename = "logs_metric.csv" }) => {
   if (!Array.isArray(logs) || !logs.length) return;
-  const header = ["id", "lat", "lon", field, "operator", "technology", "band", "timestamp"];
+  const header = ["session_id", "lat", "lon", field, "provider", "network", "band", "timestamp"];
   const lines = [header.join(",")];
   for (const l of logs) {
-    const id = l.id ?? "";
+    const id = l.session_id ?? l.id ?? "";
     const lat = l.lat ?? "";
     const lon = l.lon ?? l.lng ?? "";
     const val = l[field] ?? "";
-    const operator = normalizeOperator(l.m_alpha_long ?? l.provider ?? "");
-    const tech = l.technology ?? l.tech ?? "";
+    const provider = normalizeOperator(l.provider ?? l.m_alpha_long ?? "");
+    const network = l.network ?? l.technology ?? l.tech ?? l.network_type ?? "";
     const band = l.band ?? "";
     const ts = l.timestamp ?? l.time ?? l.created_at ?? "";
-    lines.push([id, lat, lon, val, operator, tech, band, ts].map((v) => String(v ?? "").replace(/,/g, " ")).join(","));
+    lines.push([id, lat, lon, val, provider, network, band, ts].map((v) => String(v ?? "").replace(/,/g, " ")).join(","));
   }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -165,15 +170,19 @@ const AllLogsDetailPanel = ({ logs = [], thresholds = {}, selectedMetric = "rsrp
 
   const buckets = useMemo(() => buildDistribution(numericValues, ranges), [numericValues, ranges]);
 
-  const operatorTop = useMemo(
-    () => buildTopCounts(logs, (l) => normalizeOperator(l.m_alpha_long ?? l.provider ?? "Unknown")),
+  // FIX: use provider and network per backend shape
+  const providerTop = useMemo(
+    () => buildTopCounts(logs, (l) => normalizeOperator(l.provider ?? l.m_alpha_long ?? "Unknown")),
     [logs]
   );
-  const techTop = useMemo(
-    () => buildTopCounts(logs, (l) => l.technology ?? l.tech ?? l.network_type ?? "Unknown"),
+  const networkTop = useMemo(
+    () => buildTopCounts(logs, (l) => l.network ?? l.technology ?? l.tech ?? l.network_type ?? "Unknown"),
     [logs]
   );
-  const bandTop = useMemo(() => buildTopCounts(logs, (l) => l.band ?? "Unknown"), [logs]);
+  const bandTop = useMemo(
+    () => buildTopCounts(logs, (l) => l.band ?? "Unknown"),
+    [logs]
+  );
 
   return (
     <div className="fixed top-0 right-0 h-screen w-[26rem] max-w-[100vw] text-white bg-slate-900 shadow-2xl z-50">
@@ -214,8 +223,8 @@ const AllLogsDetailPanel = ({ logs = [], thresholds = {}, selectedMetric = "rsrp
                   <div><div className="text-slate-400">Min</div><div className="font-semibold">{stats.min}{unit}</div></div>
                   <div><div className="text-slate-400">Max</div><div className="font-semibold">{stats.max}{unit}</div></div>
                   <div><div className="text-slate-400">Median</div><div className="font-semibold">{stats.median}{unit}</div></div>
-                  <div><div className="text-slate-400">p95</div><div className="font-semibold">{stats.p95}{unit}</div></div>
-                  <div><div className="text-slate-400">p05</div><div className="font-semibold">{stats.p05}{unit}</div></div>
+                  {/* <div><div className="text-slate-400">p95</div><div className="font-semibold">{stats.p95}{unit}</div></div>
+                  <div><div className="text-slate-400">p05</div><div className="font-semibold">{stats.p05}{unit}</div></div> */}
                   <div><div className="text-slate-400">Std Dev</div><div className="font-semibold">{stats.std}{unit}</div></div>
                 </div>
               </div>
@@ -248,9 +257,9 @@ const AllLogsDetailPanel = ({ logs = [], thresholds = {}, selectedMetric = "rsrp
               {/* Breakdowns */}
               <div className="grid grid-cols-1 gap-3">
                 <div className="bg-slate-800/60 rounded-lg p-3">
-                  <div className="font-semibold mb-2">Operators</div>
+                  <div className="font-semibold mb-2">Providers</div>
                   <div className="space-y-2">
-                    {buildTopCounts(logs, (l) => normalizeOperator(l.m_alpha_long ?? l.provider ?? "Unknown")).map((o) => (
+                    {providerTop.map((o) => (
                       <div key={o.name} className="text-sm">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-200">{o.name}</span>
@@ -265,9 +274,9 @@ const AllLogsDetailPanel = ({ logs = [], thresholds = {}, selectedMetric = "rsrp
                 </div>
 
                 <div className="bg-slate-800/60 rounded-lg p-3">
-                  <div className="font-semibold mb-2">Technology</div>
+                  <div className="font-semibold mb-2">Network</div>
                   <div className="space-y-2">
-                    {buildTopCounts(logs, (l) => l.technology ?? l.tech ?? l.network_type ?? "Unknown").map((t) => (
+                    {networkTop.map((t) => (
                       <div key={t.name} className="text-sm">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-200">{t.name}</span>
@@ -284,7 +293,7 @@ const AllLogsDetailPanel = ({ logs = [], thresholds = {}, selectedMetric = "rsrp
                 <div className="bg-slate-800/60 rounded-lg p-3">
                   <div className="font-semibold mb-2">Bands</div>
                   <div className="space-y-2">
-                    {buildTopCounts(logs, (l) => l.band ?? "Unknown").map((b) => (
+                    {bandTop.map((b) => (
                       <div key={b.name} className="text-sm">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-200">{b.name}</span>
