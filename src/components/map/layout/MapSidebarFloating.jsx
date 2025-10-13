@@ -12,6 +12,11 @@ import {
 } from "@/components/ui/select";
 import { mapViewApi } from "@/api/apiEndpoints";
 
+/**
+ * Floating sidebar that manages Filters, Layers, and Basemap.
+ * NOTE: Drawing tools have been moved to the Header for better UX.
+ */
+
 const getYesterday = () => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
@@ -27,6 +32,7 @@ const defaultFilters = {
   measureIn: "rsrp",
 };
 
+// Normalize carrier/provider names from API
 const normalizeProviderName = (raw) => {
   if (!raw) return "Unknown";
   const s = String(raw).trim();
@@ -41,6 +47,7 @@ const normalizeProviderName = (raw) => {
 
 const isObjectNonEmpty = (obj) => obj && typeof obj === "object" && Object.keys(obj).length > 0;
 
+// Small wrapper to keep sections consistent
 const PanelSection = ({ title, children }) => (
   <div className="space-y-2">
     <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{title}</div>
@@ -51,26 +58,40 @@ const PanelSection = ({ title, children }) => (
 export default function MapSidebarFloating({
   onApplyFilters,
   onClearFilters,
-  onUIChange,
-  ui,
+  onUIChange, // still provided for Layers/Basemap toggles
+  ui,         // read UI toggles (layers, basemap) from parent
   initialFilters,
   position = "left", // "left" | "right"
   autoCloseOnApply = true,
+
+  // NEW: controlled open state + option to hide trigger
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
 }) {
-  const [open, setOpen] = useState(false);
+  // Controlled/uncontrolled open handling
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = typeof controlledOpen === "boolean";
+  const isOpen = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (v) => {
+    if (!isControlled) setInternalOpen(v);
+    onOpenChange?.(v);
+  };
+
   const [filters, setFilters] = useState(defaultFilters);
   const [providers, setProviders] = useState([]);
   const [technologies, setTechnologies] = useState([]);
   const [bands, setBands] = useState([]);
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjects] = useState([]); // not used in UI but kept for future extension
 
+  // If parent provides initialFilters, merge them once on mount/changes
   const hasActiveFilters = isObjectNonEmpty(initialFilters);
-
   useEffect(() => {
     if (!initialFilters) return;
     setFilters((prev) => ({ ...prev, ...initialFilters }));
   }, [initialFilters]);
 
+  // Fetch filter options on mount
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
@@ -81,6 +102,7 @@ export default function MapSidebarFloating({
           mapViewApi.getProjects?.(),
         ]);
 
+        // Providers with normalization
         const provList = Array.isArray(provRes) ? provRes : [];
         const normalizedSet = new Set(provList.map((p) => normalizeProviderName(p.name)));
         const normalizedProviders = Array.from(normalizedSet).map((name) => ({ id: name, name }));
@@ -89,6 +111,7 @@ export default function MapSidebarFloating({
         setTechnologies(Array.isArray(techRes) ? techRes : []);
         setBands(Array.isArray(bandsRes) ? bandsRes : []);
 
+        // Optional projects
         const projData = Array.isArray(projRes?.Data) ? projRes.Data : (Array.isArray(projRes) ? projRes : []);
         const projList = projData.map((p) => ({ id: p.id, name: p.project_name }));
         setProjects(projList);
@@ -101,24 +124,28 @@ export default function MapSidebarFloating({
 
   const handleFilterChange = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
 
+  // Drawer position classes
   const sideClasses = useMemo(() => {
     const base = "fixed top-0 h-full z-50 w-[90vw] sm:w-[360px] bg-white dark:bg-slate-950 dark:text-white shadow-2xl transition-transform duration-200 ease-out";
     if (position === "right") {
-      return open ? `${base} right-0 translate-x-0` : `${base} right-0 translate-x-full`;
+      return isOpen ? `${base} right-0 translate-x-0` : `${base} right-0 translate-x-full`;
     }
-    return open ? `${base} left-0 translate-x-0` : `${base} left-0 -translate-x-full`;
-  }, [open, position]);
+    return isOpen ? `${base} left-0 translate-x-0` : `${base} left-0 -translate-x-full`;
+  }, [isOpen, position]);
 
+  // Floating Action Button position (used only if hideTrigger = false)
   const fabPosition = useMemo(() => {
     const base = "fixed z-40";
     return position === "right" ? `${base} top-4 right-4` : `${base} top-4 left-4`;
   }, [position]);
 
+  // Apply & Close
   const applyAndClose = () => {
     onApplyFilters?.(filters, "logs");
     if (autoCloseOnApply) setOpen(false);
   };
 
+  // Clear & Close
   const clearAndClose = () => {
     onClearFilters?.();
     setOpen(false);
@@ -126,22 +153,24 @@ export default function MapSidebarFloating({
 
   return (
     <>
-      {/* Floating Filter Button */}
-      <button
-        type="button"
-        className={`${fabPosition} inline-flex items-center gap-2 mt-15 ml-50 rounded-full px-4 py-2 bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none`}
-        onClick={() => setOpen(true)}
-        aria-label="Open filters"
-      >
-        <Filter size={16} />
-        Filters
-        {hasActiveFilters && (
-          <span className="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-400" title="Filters active" />
-        )}
-      </button>
+      {/* Floating Filter Button (hidden when hideTrigger = true) */}
+      {!hideTrigger && (
+        <button
+          type="button"
+          className={`${fabPosition} inline-flex items-center gap-2 rounded-full px-4 py-2 bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none`}
+          onClick={() => setOpen(true)}
+          aria-label="Open filters"
+        >
+          <Filter size={16} />
+          Filters
+          {hasActiveFilters && (
+            <span className="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-400" title="Filters active" />
+          )}
+        </button>
+      )}
 
-      {/* Backdrop */}
-      {open && (
+      {/* Backdrop (click to close) */}
+      {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
           onClick={() => setOpen(false)}
@@ -163,20 +192,30 @@ export default function MapSidebarFloating({
 
         {/* Content */}
         <div className="h-[calc(100%-112px)] overflow-y-auto p-3 space-y-4">
+          {/* Date Range */}
           <PanelSection title="Date Range">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="pb-2">Start</Label>
-                <DatePicker className="w-70" date={filters.startDate} setDate={(d) => handleFilterChange("startDate", d)} />
+                <DatePicker
+                  className="w-70"
+                  date={filters.startDate}
+                  setDate={(d) => handleFilterChange("startDate", d)}
+                />
               </div>
               <br />
               <div>
                 <Label className="pb-2">End</Label>
-                <DatePicker className="w-70" date={filters.endDate} setDate={(d) => handleFilterChange("endDate", d)} />
+                <DatePicker
+                  className="w-70"
+                  date={filters.endDate}
+                  setDate={(d) => handleFilterChange("endDate", d)}
+                />
               </div>
             </div>
           </PanelSection>
 
+          {/* Filter by Provider/Technology/Band/Metric */}
           <PanelSection title="Filter by">
             <div className="grid grid-cols-1 gap-3">
               <div>
@@ -236,14 +275,13 @@ export default function MapSidebarFloating({
             </div>
           </PanelSection>
 
-
-
+          {/* Layers (still controlled via `ui` and `onUIChange`) */}
           <PanelSection title="Layers">
             <div className="space-y-2 text-sm">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={ui.showSessions}
+                  checked={ui?.showSessions}
                   onChange={(e) => onUIChange?.({ showSessions: e.target.checked })}
                   disabled={hasActiveFilters} // sessions visible only when no filters
                 />
@@ -253,9 +291,9 @@ export default function MapSidebarFloating({
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={ui.clusterSessions}
+                  checked={ui?.clusterSessions}
                   onChange={(e) => onUIChange?.({ clusterSessions: e.target.checked })}
-                  disabled={!ui.showSessions || hasActiveFilters}
+                  disabled={!ui?.showSessions || hasActiveFilters}
                 />
                 Cluster Sessions
               </label>
@@ -263,7 +301,7 @@ export default function MapSidebarFloating({
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={ui.showLogsCircles}
+                  checked={ui?.showLogsCircles}
                   onChange={(e) => onUIChange?.({ showLogsCircles: e.target.checked })}
                   disabled={!hasActiveFilters}
                 />
@@ -273,7 +311,7 @@ export default function MapSidebarFloating({
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={ui.showHeatmap}
+                  checked={ui?.showHeatmap}
                   onChange={(e) => onUIChange?.({ showHeatmap: e.target.checked })}
                   disabled={!hasActiveFilters}
                 />
@@ -283,7 +321,7 @@ export default function MapSidebarFloating({
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={ui.renderVisibleLogsOnly}
+                  checked={ui?.renderVisibleLogsOnly}
                   onChange={(e) => onUIChange?.({ renderVisibleLogsOnly: e.target.checked })}
                   disabled={!hasActiveFilters}
                 />
@@ -292,61 +330,9 @@ export default function MapSidebarFloating({
             </div>
           </PanelSection>
 
-          <PanelSection title="Drawing & Analysis">
-            <div className="space-y-2 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={!!ui.drawEnabled}
-                  onChange={(e) => onUIChange?.({ drawEnabled: e.target.checked })}
-                />
-                Enable Drawing Tools
-              </label>
-
-              <div className={`pl-5 space-y-2 ${ui.drawEnabled ? "" : "opacity-50 pointer-events-none"}`}>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={!!ui.drawPixelateRect}
-                    onChange={(e) => onUIChange?.({ drawPixelateRect: e.target.checked })}
-                  />
-                  Pixelate rectangle
-                </label>
-
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs">Cell size</Label>
-                  <input
-                    type="number"
-                    min={10}
-                    step={10}
-                    value={ui.drawCellSizeMeters ?? 100}
-                    onChange={(e) =>
-                      onUIChange?.({ drawCellSizeMeters: Math.max(10, Number(e.target.value || 100)) })
-                    }
-                    className="w-24 px-2 py-1 rounded border"
-                  />
-                  <span className="text-xs">m</span>
-                </div>
-
-                <div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onUIChange?.({ drawClearSignal: (ui.drawClearSignal || 0) + 1 })}
-                  >
-                    Clear drawings
-                  </Button>
-                </div>
-
-                <p className="text-xs text-slate-500">
-                  Draw rectangle/circle/polygon on the map. Rectangle can be split into a grid for per‑cell stats.
-                </p>
-              </div>
-            </div>
-          </PanelSection>
-
+          {/* Basemap Style */}
           <PanelSection title="Basemap Style">
-            <Select value={ui.basemapStyle} onValueChange={(v) => onUIChange?.({ basemapStyle: v })}>
+            <Select value={ui?.basemapStyle} onValueChange={(v) => onUIChange?.({ basemapStyle: v })}>
               <SelectTrigger><SelectValue placeholder="Select style..." /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">Default</SelectItem>
@@ -355,13 +341,16 @@ export default function MapSidebarFloating({
               </SelectContent>
             </Select>
           </PanelSection>
+
+          {/* Drawing & Analysis moved to Header */}
+          {/* Intentionally removed from sidebar for a simpler workflow */}
         </div>
 
-        {/* Footer */}
+        {/* Footer with Clear/Apply */}
         <div className="p-3 border-t flex gap-2">
           <Button variant="secondary" className="flex-1" onClick={clearAndClose}>Clear</Button>
           <Button className="flex-1" onClick={applyAndClose}>
-            <Filter className="h-4 w-4 mr-2" /> Apply & Fetch Logs
+            <Filter title="Apply & Fetch Logs" className="h-4 w-4 mr-2" /> Apply & Fetch Logs
           </Button>
         </div>
       </div>

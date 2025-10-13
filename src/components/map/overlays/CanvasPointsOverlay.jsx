@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from "react";
 export default function CanvasPointsOverlay({
   map,
   points,
-  getRadiusPx,
+  getRadiusPx, // may be function or number
   opacity = 0.9,
   maxDraw = 50000,
   padding = 80,
@@ -26,9 +26,8 @@ export default function CanvasPointsOverlay({
       overlay.getPanes()?.overlayLayer.appendChild(canvas);
 
       const redraw = () => drawCanvas();
+      // Using only 'idle' reduces redundant redraws
       listenersRef.current.push(
-        map.addListener("bounds_changed", redraw),
-        map.addListener("zoom_changed", redraw),
         map.addListener("idle", redraw)
       );
     };
@@ -52,7 +51,13 @@ export default function CanvasPointsOverlay({
   useEffect(() => {
     drawCanvas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points]);
+  }, [points, getRadiusPx, opacity, maxDraw, padding]);
+
+  function resolveRadiusPx(zoom) {
+    if (typeof getRadiusPx === "function") return getRadiusPx(zoom);
+    if (Number.isFinite(getRadiusPx)) return getRadiusPx;
+    return 5; // fallback default
+  }
 
   function drawCanvas() {
     const overlay = overlayRef.current;
@@ -68,8 +73,12 @@ export default function CanvasPointsOverlay({
 
     const ne = bounds.getNorthEast();
     const sw = bounds.getSouthWest();
-    const topLeft = proj.fromLatLngToDivPixel(new window.google.maps.LatLng(ne.lat(), sw.lng()));
-    const bottomRight = proj.fromLatLngToDivPixel(new window.google.maps.LatLng(sw.lat(), ne.lng()));
+    const topLeft = proj.fromLatLngToDivPixel(
+      new window.google.maps.LatLng(ne.lat(), sw.lng())
+    );
+    const bottomRight = proj.fromLatLngToDivPixel(
+      new window.google.maps.LatLng(sw.lat(), ne.lng())
+    );
 
     const width = Math.ceil(bottomRight.x - topLeft.x) + padding * 2;
     const height = Math.ceil(bottomRight.y - topLeft.y) + padding * 2;
@@ -92,7 +101,7 @@ export default function CanvasPointsOverlay({
       proj.fromDivPixelToLatLng({ x: bottomRight.x + padding, y: topLeft.y - padding })
     );
 
-    const rPx = Math.max(1, getRadiusPx(zoom));
+    const rPx = Math.max(1, resolveRadiusPx(zoom));
     const n = points?.length || 0;
     const drawCount = Math.min(n, maxDraw);
 

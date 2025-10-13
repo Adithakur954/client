@@ -24,32 +24,54 @@ export default function LogCirclesLayer({
   const heatmapRef = useRef(null);
   const { field } = resolveMetricConfig(selectedMetric);
 
-  // Fetch logs
+  // Keep a stable ref for onLogsLoaded to avoid effect dependency loops
+  const onLogsLoadedRef = useRef(onLogsLoaded);
   useEffect(() => {
-    if (!filters || !map) return;
+    onLogsLoadedRef.current = onLogsLoaded;
+  }, [onLogsLoaded]);
+
+  // Build a stable signature for filters so effect only runs when actual values change
+  const filterSignature = useMemo(() => {
+    if (!filters) return null;
+    return JSON.stringify({
+      StartDate: toYmdLocal(filters.startDate),
+      EndDate: toYmdLocal(filters.endDate),
+      Provider: filters.provider && filters.provider !== "ALL" ? filters.provider : undefined,
+      Technology: filters.technology && filters.technology !== "ALL" ? filters.technology : undefined,
+      Band: filters.band && filters.band !== "ALL" ? filters.band : undefined,
+    });
+  }, [
+    filters?.startDate,
+    filters?.endDate,
+    filters?.provider,
+    filters?.technology,
+    filters?.band,
+  ]);
+
+  // Fetch logs when map or filterSignature changes (not on every parent re-render)
+  useEffect(() => {
+    if (!filters || !map || !filterSignature) return;
+
+    let cancelled = false;
 
     const fetchAndDrawLogs = async () => {
       setIsLoading?.(true);
       try {
-        const apiParams = {
-          StartDate: toYmdLocal(filters.startDate),
-          EndDate: toYmdLocal(filters.endDate),
-        };
-        if (filters.provider && filters.provider !== "ALL") apiParams.Provider = filters.provider;
-        if (filters.technology && filters.technology !== "ALL") apiParams.Technology = filters.technology;
-        if (filters.band && filters.band !== "ALL") apiParams.Band = filters.band;
+        const apiParams = JSON.parse(filterSignature);
 
         const fetched = await mapViewApi.getLogsByDateRange(apiParams);
+        if (cancelled) return;
+
         if (!Array.isArray(fetched) || fetched.length === 0) {
           toast.warn("No logs found for the selected filters.");
           setLogs([]);
-          onLogsLoaded?.([]);
+          onLogsLoadedRef.current?.([]);
           if (heatmapRef.current) heatmapRef.current.setMap(null);
           return;
         }
 
         setLogs(fetched);
-        onLogsLoaded?.(fetched);
+        onLogsLoadedRef.current?.(fetched);
 
         // Fit map to logs
         const pts = [];
@@ -62,23 +84,21 @@ export default function LogCirclesLayer({
 
         toast.info(`Loaded ${fetched.length} logs.`);
       } catch (e) {
+        if (cancelled) return;
         toast.error(`Failed to fetch logs: ${e?.message || "Unknown error"}`);
         setLogs([]);
-        onLogsLoaded?.([]);
+        onLogsLoadedRef.current?.([]);
         if (heatmapRef.current) heatmapRef.current.setMap(null);
       } finally {
-        setIsLoading?.(false);
+        if (!cancelled) setIsLoading?.(false);
       }
     };
 
     fetchAndDrawLogs();
     return () => {
-      if (heatmapRef.current) {
-        heatmapRef.current.setMap(null);
-        heatmapRef.current = null;
-      }
+      cancelled = true;
     };
-  }, [filters, map]); 
+  }, [map, filterSignature, setIsLoading]);
 
   // Parse & prep
   const processed = useMemo(() => {
@@ -104,9 +124,9 @@ export default function LogCirclesLayer({
     const crossesAntimeridian = east < west;
     return processed.filter((p) => {
       const latOk = p.lat <= north && p.lat >= south;
-      let lngOk = false;
-      if (crossesAntimeridian) lngOk = p.lng >= west || p.lng <= east;
-      else lngOk = p.lng <= east && p.lng >= west;
+      const lngOk = crossesAntimeridian
+        ? p.lng >= west || p.lng <= east
+        : p.lng <= east && p.lng >= west;
       return latOk && lngOk;
     });
   }, [processed, renderVisibleOnly, visibleBounds]);
@@ -127,9 +147,13 @@ export default function LogCirclesLayer({
     }
     const g = window.google;
     if (!g?.maps?.visualization) return;
+
     const points = processed.map((p) => new g.maps.LatLng(p.lat, p.lng));
     if (!heatmapRef.current) {
-      heatmapRef.current = new g.maps.visualization.HeatmapLayer({ data: points, radius: 24 });
+      heatmapRef.current = new g.maps.visualization.HeatmapLayer({
+        data: points,
+        radius: 24,
+      });
       heatmapRef.current.setMap(map);
     } else {
       heatmapRef.current.setData(points);

@@ -28,9 +28,42 @@ const defaultFilters = {
   measureIn: "rsrp",
 };
 
-const normalizeProviderName = (raw) => (raw || "").trim();
+// Keep ONE normalizeProviderName (avoid TDZ/duplicate binding)
+const normalizeProviderName = (raw) => {
+  if (!raw) return "Unknown User";
+  const s = String(raw).trim();
 
-const MapSidebar = ({ onApplyFilters, onClearFilters, onUIChange, ui, initialFilters }) => {
+  // Unknowns first
+  if (/^\/+$/.test(s)) return "Unknown User";
+  if (s.replace(/\s+/g, "") === "404011") return "Unknown User";
+
+  const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
+
+  // JIO family
+  if (cleaned.includes("JIO") || /^(IND)?JIO(4G|5G|TRUE5G)?$/.test(cleaned)) return "JIO";
+
+  // Airtel family
+  if (cleaned.includes("AIRTEL") || /^INDAIRTEL$/.test(cleaned)) return "Airtel";
+
+  // VI family
+  if (
+    cleaned === "VI" ||
+    cleaned.includes("VIINDIA") ||
+    cleaned.includes("VODAFONEIN") ||
+    cleaned.includes("VODAFONE") ||
+    cleaned.includes("IDEA")
+  ) return "VI India";
+
+  return s;
+};
+
+const MapSidebar = ({
+  onApplyFilters,
+  onClearFilters,
+  onUIChange,
+  ui = {},
+  initialFilters,
+}) => {
   const [filters, setFilters] = useState(defaultFilters);
   const [providers, setProviders] = useState([]);
   const [technologies, setTechnologies] = useState([]);
@@ -49,20 +82,31 @@ const MapSidebar = ({ onApplyFilters, onClearFilters, onUIChange, ui, initialFil
           mapViewApi.getProviders(),
           mapViewApi.getTechnologies(),
           mapViewApi.getBands(),
-          mapViewApi.getProjects?.() 
+          mapViewApi.getProjects?.(),
         ]);
 
         const provList = Array.isArray(provRes) ? provRes : [];
-        const normalizedSet = new Set(provList.map((p) => normalizeProviderName(p.name)));
-        const normalizedProviders = Array.from(normalizedSet).map((name) => ({ id: name, name }));
+        const normalizedSet = new Set(
+          provList.map((p) => normalizeProviderName(p.name))
+        );
+        const normalizedProviders = Array.from(normalizedSet).map((name) => ({
+          id: name,
+          name,
+        }));
 
         setProviders(normalizedProviders);
         setTechnologies(Array.isArray(techRes) ? techRes : []);
         setBands(Array.isArray(bandsRes) ? bandsRes : []);
 
-        // Projects may come wrapped {Status, Data}
-        const projData = Array.isArray(projRes?.Data) ? projRes.Data : (Array.isArray(projRes) ? projRes : []);
-        const projList = projData.map((p) => ({ id: p.id, name: p.project_name }));
+        const projData = Array.isArray(projRes?.Data)
+          ? projRes.Data
+          : Array.isArray(projRes)
+          ? projRes
+          : [];
+        const projList = projData.map((p) => ({
+          id: p.id,
+          name: p.project_name,
+        }));
         setProjects(projList);
       } catch (error) {
         console.error("Failed to fetch filter options", error);
@@ -75,43 +119,9 @@ const MapSidebar = ({ onApplyFilters, onClearFilters, onUIChange, ui, initialFil
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  // MapSidebar.jsx
-const normalizeProviderName = (raw) => {
-  if (!raw) return "Unknown User";
-  const s = String(raw).trim();
-
-  // Unknowns first
-  if (/^\/+$/.test(s)) return "Unknown User"; 
-  if (s.replace(/\s+/g, "") === "404011") return "Unknown User";
-
-  const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
-
-  // JIO family
-  if (
-    cleaned.includes("JIO") || // catches JIO, JIO4G, JIOTRUE5G, INDJIO, etc.
-    /^(IND)?JIO(4G|5G|TRUE5G)?$/.test(cleaned)
-  ) return "JIO";
-
-  // Airtel family
-  if (cleaned.includes("AIRTEL") || /^INDAIRTEL$/.test(cleaned))
-    return "Airtel";
-
-  // VI family (Vodafone/Idea/Vi)
-  if (
-    cleaned === "VI" ||
-    cleaned.includes("VIINDIA") ||
-    cleaned.includes("VODAFONEIN") ||
-    cleaned.includes("VODAFONE") ||
-    cleaned.includes("IDEA")
-  ) return "VI India";
-
-  // fallback to original (title-cased)
-  return s;
-};
-
   return (
-    <div className="absolute top-4 left-10 h-auto max-h-[90vh] w-80 bg-white  rounded-lg border z-10 flex flex-col shadow-lg">
-      {/* Tabs header (single tab for logs/controls) */}
+    <div className="absolute top-4 left-10 h-auto max-h-[90vh] w-80 bg-white rounded-lg border z-10 flex flex-col shadow-lg">
+      {/* Header */}
       <div className="flex border-b">
         <button
           className="flex-1 p-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 border-blue-600 text-blue-600 bg-blue-50 dark:bg-slate-900"
@@ -122,20 +132,19 @@ const normalizeProviderName = (raw) => {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Filters body */}
       <div className="flex-grow overflow-y-auto p-4 space-y-4">
+        {/* Dates */}
         <div className="grid grid-cols-1 gap-3">
           <div>
-            <Label lassName="p-2">Start Date</Label>
-            
+            <Label className="p-2">Start Date</Label>
             <DatePicker
               date={filters.startDate}
               setDate={(d) => handleFilterChange("startDate", d)}
             />
           </div>
           <div>
-            <Label lassName="p-2">End Date</Label>
-           
+            <Label className="p-2">End Date</Label>
             <DatePicker
               date={filters.endDate}
               setDate={(d) => handleFilterChange("endDate", d)}
@@ -143,9 +152,9 @@ const normalizeProviderName = (raw) => {
           </div>
         </div>
 
+        {/* Provider */}
         <div>
           <Label className="p-2">Provider</Label>
-          
           <Select
             onValueChange={(v) => handleFilterChange("provider", v)}
             value={filters.provider}
@@ -164,6 +173,7 @@ const normalizeProviderName = (raw) => {
           </Select>
         </div>
 
+        {/* Technology */}
         <div>
           <Label className="p-2">Technology</Label>
           <Select
@@ -184,6 +194,7 @@ const normalizeProviderName = (raw) => {
           </Select>
         </div>
 
+        {/* Metric */}
         <div>
           <Label className="p-2">Visualize Metric</Label>
           <Select
@@ -205,6 +216,7 @@ const normalizeProviderName = (raw) => {
           </Select>
         </div>
 
+        {/* Band */}
         <div>
           <Label className="p-2">Band / Frequency</Label>
           <Select
@@ -229,7 +241,9 @@ const normalizeProviderName = (raw) => {
         <div className="grid grid-cols-1 gap-2">
           <Label>Project (Polygons)</Label>
           <Select
-            onValueChange={(v) => onUIChange?.({ selectedProjectId: v || null })}
+            onValueChange={(v) =>
+              onUIChange?.({ selectedProjectId: v && v !== "none" ? v : null })
+            }
             value={ui.selectedProjectId ?? ""}
           >
             <SelectTrigger>
@@ -248,7 +262,7 @@ const normalizeProviderName = (raw) => {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={ui.showPolygons}
+              checked={!!ui.showPolygons}
               onChange={(e) => onUIChange?.({ showPolygons: e.target.checked })}
             />
             Show Project Polygons
@@ -262,7 +276,7 @@ const normalizeProviderName = (raw) => {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={ui.showSessions}
+              checked={!!ui.showSessions}
               onChange={(e) => onUIChange?.({ showSessions: e.target.checked })}
               disabled={Boolean(initialFilters)} // sessions are shown only when no log filters
             />
@@ -272,7 +286,7 @@ const normalizeProviderName = (raw) => {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={ui.clusterSessions}
+              checked={!!ui.clusterSessions}
               onChange={(e) => onUIChange?.({ clusterSessions: e.target.checked })}
               disabled={!ui.showSessions}
             />
@@ -282,7 +296,7 @@ const normalizeProviderName = (raw) => {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={ui.showLogsCircles}
+              checked={!!ui.showLogsCircles}
               onChange={(e) => onUIChange?.({ showLogsCircles: e.target.checked })}
               disabled={!initialFilters}
             />
@@ -292,7 +306,7 @@ const normalizeProviderName = (raw) => {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={ui.showHeatmap}
+              checked={!!ui.showHeatmap}
               onChange={(e) => onUIChange?.({ showHeatmap: e.target.checked })}
               disabled={!initialFilters}
             />
@@ -302,8 +316,10 @@ const normalizeProviderName = (raw) => {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={ui.renderVisibleLogsOnly}
-              onChange={(e) => onUIChange?.({ renderVisibleLogsOnly: e.target.checked })}
+              checked={!!ui.renderVisibleLogsOnly}
+              onChange={(e) =>
+                onUIChange?.({ renderVisibleLogsOnly: e.target.checked })
+              }
               disabled={!initialFilters}
             />
             Render Visible Logs Only
@@ -315,15 +331,18 @@ const normalizeProviderName = (raw) => {
           <Label>Basemap Style</Label>
           <Select
             onValueChange={(v) => onUIChange?.({ basemapStyle: v })}
-            value={ui.basemapStyle}
+            value={ui.basemapStyle || "roadmap"}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select style..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="default">Default</SelectItem>
-              <SelectItem value="clean">Clean</SelectItem>
-              <SelectItem value="night">Night</SelectItem>
+              <SelectItem value="roadmap">Default (Roadmap)</SelectItem>
+              <SelectItem value="satellite">Satellite</SelectItem>
+              <SelectItem value="hybrid">Hybrid</SelectItem>
+              <SelectItem value="terrain">Terrain</SelectItem>
+              <SelectItem value="clean">Clean (Custom Style)</SelectItem>
+              <SelectItem value="night">Night (Custom Style)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -342,4 +361,4 @@ const normalizeProviderName = (raw) => {
   );
 };
 
-export default MapSidebar;
+export default MapSidebar; 

@@ -18,7 +18,7 @@ function normalizeMetricKey(m) {
   if (s === "dl-throughput") return "dl_thpt";
   if (s === "ul-throughput") return "ul_thpt";
   if (s === "lte-bler") return "lte_bler";
-  return s; // rsrp, rsrq, sinr, mos, dl_thpt, ul_thpt, lte_bler
+  return s;
 }
 
 const metricKeyMap = {
@@ -87,7 +87,7 @@ function analyzeInside(type, overlay, logs, selectedMetric) {
   const poly = gm.geometry?.poly;
   const spherical = gm.geometry?.spherical;
 
-  // Pre-filter by bounding box to save work
+  // Pre-filter by bounding box
   let bb = null;
   if (type === "rectangle") bb = overlay.getBounds?.();
   else if (type === "circle") bb = overlay.getBounds?.();
@@ -120,15 +120,143 @@ function analyzeInside(type, overlay, logs, selectedMetric) {
 }
 
 function metersToDegLat(m) {
-  // ~111320 m per degree latitude
   return m / 111320;
 }
 
 function metersToDegLng(m, lat) {
-  // ~111320 * cos(lat) m per degree longitude
   const metersPerDeg = 111320 * Math.cos((lat * Math.PI) / 180);
-  if (metersPerDeg <= 0) return m / 111320; // fallback
+  if (metersPerDeg <= 0) return m / 111320;
   return m / metersPerDeg;
+}
+
+// ✅ NEW: Get bounding box for any shape
+function getShapeBounds(type, overlay) {
+  if (type === "rectangle" || type === "circle") {
+    return overlay.getBounds();
+  }
+  if (type === "polygon") {
+    return buildPolygonBounds(overlay);
+  }
+  return null;
+}
+
+// ✅ NEW: Check if point is inside shape
+function isPointInShape(type, overlay, point) {
+  const gm = window.google.maps;
+  
+  if (type === "rectangle") {
+    return overlay.getBounds().contains(point);
+  }
+  if (type === "polygon") {
+    return gm.geometry?.poly?.containsLocation?.(point, overlay) ?? false;
+  }
+  if (type === "circle") {
+    const d = gm.geometry?.spherical?.computeDistanceBetween?.(point, overlay.getCenter());
+    return Number.isFinite(d) && d <= overlay.getRadius();
+  }
+  return false;
+}
+
+// ✅ NEW: Pixelate ANY shape (polygon, rectangle, circle)
+function pixelateShape(
+  type,
+  overlay,
+  logs,
+  selectedMetric,
+  thresholds,
+  cellSizeMeters,
+  maxCells,
+  map,
+  overlaysRef,
+  colorizeCells
+) {
+  const gm = window.google.maps;
+  const bounds = getShapeBounds(type, overlay);
+  
+  if (!bounds) {
+    console.warn("Could not determine bounds for shape");
+    return { cellsDrawn: 0, totalCells: 0 };
+  }
+
+  const centerLat = bounds.getCenter().lat();
+  const stepLat = metersToDegLat(cellSizeMeters);
+  const stepLng = metersToDegLng(cellSizeMeters, centerLat);
+
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const south = sw.lat();
+  const west = sw.lng();
+  const north = ne.lat();
+  const east = ne.lng();
+
+  // Get logs that are inside the shape
+  const { inside } = analyzeInside(type, overlay, logs, selectedMetric);
+  const baseInside = inside.map((l) => ({ log: l, pt: toLatLng(l) })).filter((x) => !!x.pt);
+
+  const cols = Math.max(1, Math.ceil((east - west) / stepLng));
+  const rows = Math.max(1, Math.ceil((north - south) / stepLat));
+  const totalCells = cols * rows;
+
+  if (totalCells > maxCells) {
+    toast.warn(
+      `Grid too dense (${totalCells} cells). Increase cell size or draw a smaller shape. Capping at ${maxCells}.`
+    );
+  }
+
+  let cellsDrawn = 0;
+
+  for (let lat = south; lat < north - 1e-12; lat += stepLat) {
+    const top = Math.min(lat + stepLat, north);
+    for (let lng = west; lng < east - 1e-12; lng += stepLng) {
+      if (cellsDrawn >= maxCells) break;
+      const right = Math.min(lng + stepLng, east);
+
+      const cellBounds = new gm.LatLngBounds(
+        new gm.LatLng(lat, lng),
+        new gm.LatLng(top, right)
+      );
+
+      const cellCenter = cellBounds.getCenter();
+
+      // ✅ Only draw cell if its center is inside the original shape
+      if (!isPointInShape(type, overlay, cellCenter)) {
+        continue;
+      }
+
+      // Get logs in this cell
+      const inCell = baseInside.filter((x) => cellBounds.contains(x.pt));
+      const vals = inCell
+        .map((x) => getMetricValue(x.log, selectedMetric))
+        .filter((v) => Number.isFinite(v));
+
+      if (!vals.length) continue;
+
+      const statsCell = computeStats(vals);
+      const fillColor = colorizeCells
+        ? pickColorForValue(
+            statsCell.mean ?? statsCell.median ?? statsCell.max,
+            selectedMetric,
+            thresholds
+          )
+        : "#9ca3af";
+
+      const rect = new gm.Rectangle({
+        map,
+        bounds: cellBounds,
+        strokeWeight: 0.4,
+        strokeColor: "#111827",
+        fillOpacity: 0.35,
+        fillColor,
+        clickable: false,
+        zIndex: 50,
+      });
+      overlaysRef.current.push(rect);
+      cellsDrawn++;
+    }
+    if (cellsDrawn >= maxCells) break;
+  }
+
+  return { cellsDrawn, totalCells: Math.min(totalCells, maxCells) };
 }
 
 export default function DrawingToolsLayer({
@@ -137,11 +265,11 @@ export default function DrawingToolsLayer({
   logs,
   selectedMetric,
   thresholds,
-  pixelateRect = false,
+  pixelateRect = false,  // ✅ This now applies to ALL shapes, not just rectangles
   cellSizeMeters = 100,
   maxCells = 1200,
-  onSummary, // ({ type, count, stats, grid?: { cells, cellSizeMeters } })
-  clearSignal = 0, // increment to clear overlays from parent
+  onSummary,
+  clearSignal = 0,
   colorizeCells = true,
 }) {
   const managerRef = useRef(null);
@@ -153,8 +281,8 @@ export default function DrawingToolsLayer({
 
     const gm = window.google?.maps;
     if (!gm?.drawing?.DrawingManager) {
-      console.warn('Google Maps drawing library not loaded. Add "drawing" to libraries and hard reload.');
-      toast.error('Drawing library not loaded. Add "drawing" to GOOGLE_MAPS_LOADER_OPTIONS.libraries and hard reload.');
+      console.warn('Google Maps drawing library not loaded. Add "drawing" to libraries.');
+      toast.error('Drawing library not loaded. Add "drawing" to GOOGLE_MAPS_LOADER_OPTIONS.libraries.');
       return;
     }
 
@@ -190,95 +318,45 @@ export default function DrawingToolsLayer({
     dm.setMap(map);
 
     const handleComplete = (e) => {
-      // e.type is a string like "polygon" | "rectangle" | "circle"
       const type = e.type;
       const overlay = e.overlay;
       overlaysRef.current.push(overlay);
 
       const { inside, stats } = analyzeInside(type, overlay, logs || [], selectedMetric);
-      onSummary?.({ type, count: inside.length, stats });
 
-      // Pixelate rectangle if enabled
-      if (type === "rectangle" && pixelateRect) {
-        const bounds = overlay.getBounds();
-        if (!bounds) return;
-
-        const centerLat = bounds.getCenter().lat();
-        const stepLat = metersToDegLat(cellSizeMeters);
-        const stepLng = metersToDegLng(cellSizeMeters, centerLat);
-
-        const sw = bounds.getSouthWest();
-        const ne = bounds.getNorthEast();
-        const south = sw.lat();
-        const west = sw.lng();
-        const north = ne.lat();
-        const east = ne.lng();
-
-        // We will analyze only logs already inside the rectangle
-        const baseInside = inside.map((l) => ({ log: l, pt: toLatLng(l) })).filter((x) => !!x.pt);
-
-        const cols = Math.max(1, Math.ceil((east - west) / stepLng));
-        const rows = Math.max(1, Math.ceil((north - south) / stepLat));
-        const totalCells = cols * rows;
-        if (totalCells > maxCells) {
-          toast.warn(
-            `Grid too dense (${totalCells} cells). Increase cell size or draw a smaller rectangle. Capping at ~${maxCells}.`
-          );
-        }
-
-        let cellsDrawn = 0;
-        for (let lat = south; lat < north - 1e-12; lat += stepLat) {
-          const top = Math.min(lat + stepLat, north);
-          for (let lng = west; lng < east - 1e-12; lng += stepLng) {
-            if (cellsDrawn >= maxCells) break;
-            const right = Math.min(lng + stepLng, east);
-
-            const cellBounds = new gm.LatLngBounds(
-              new gm.LatLng(lat, lng),
-              new gm.LatLng(top, right)
-            );
-
-            const inCell = baseInside.filter((x) => cellBounds.contains(x.pt));
-            const vals = inCell
-              .map((x) => getMetricValue(x.log, selectedMetric))
-              .filter((v) => Number.isFinite(v));
-
-            if (!vals.length) continue;
-
-            const statsCell = computeStats(vals);
-            const fillColor = colorizeCells
-              ? pickColorForValue(
-                  statsCell.mean ?? statsCell.median ?? statsCell.max,
-                  selectedMetric,
-                  thresholds
-                )
-              : "#9ca3af";
-
-            const rect = new gm.Rectangle({
-              map,
-              bounds: cellBounds,
-              strokeWeight: 0.4,
-              strokeColor: "#111827",
-              fillOpacity: 0.35,
-              fillColor,
-              clickable: false,
-              zIndex: 50,
-            });
-            overlaysRef.current.push(rect);
-            cellsDrawn++;
-          }
-          if (cellsDrawn >= maxCells) break;
-        }
+      // ✅ PIXELATE ALL SHAPES if enabled
+      if (pixelateRect) {
+        const { cellsDrawn, totalCells } = pixelateShape(
+          type,
+          overlay,
+          logs || [],
+          selectedMetric,
+          thresholds,
+          cellSizeMeters,
+          maxCells,
+          map,
+          overlaysRef,
+          colorizeCells
+        );
 
         onSummary?.({
           type,
           count: inside.length,
           stats,
-          grid: { cells: Math.min(totalCells, maxCells), cellSizeMeters },
+          grid: { cells: cellsDrawn, cellSizeMeters },
+          logs: inside,
+        });
+      } else {
+        // Non-pixelated mode
+        onSummary?.({
+          type,
+          count: inside.length,
+          stats,
+          logs: inside,
         });
       }
 
-      // Set back to "hand" mode after drawing
+      // Set back to hand mode
       managerRef.current?.setDrawingMode(null);
     };
 
@@ -300,6 +378,7 @@ export default function DrawingToolsLayer({
     cellSizeMeters,
     maxCells,
     onSummary,
+    colorizeCells,
   ]);
 
   // Clear overlays when asked
@@ -310,5 +389,5 @@ export default function DrawingToolsLayer({
     onSummary?.(null);
   }, [clearSignal, onSummary]);
 
-  return null; // logic-only layer
+  return null;
 }

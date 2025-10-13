@@ -14,6 +14,8 @@ export const adminApi = {
   getAllUsers: (filters) => api.post("/Admin/GetAllUsers", filters),
   getUsers: (params) => api.get("/Admin/GetUsers", { params }),
 
+  getOnlineUsers: () => api.get("/Admin/GetOnlineUsers"),
+
   getOperatorCoverageRanking: ({ min, max }) =>
     api.get("/Admin/GetOperatorCoverageRanking", { params: { min, max } }),
 
@@ -57,10 +59,7 @@ export const mapViewApi = {
 
   endSession: (data) => api.post("/api/MapView/end_session", data),
 
-  // getNetworkLog: (sessionId) => {
-  //   console.log("Fetching network log for sessionId:", sessionId);
-  //   return api.get("/api/MapView/GetNetworkLog", { params: { session_id: sessionId } });
-  // },
+  
 
   getNetworkLog: (sessionLike) => {
     const extractId = (s) => {

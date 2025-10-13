@@ -11,6 +11,8 @@ const AppLayout = ({ children }) => {
     setVisible(!visible);
   };
 
+  const isMapview = pathname.includes("mapview");
+
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar with accent edge */}
@@ -42,8 +44,11 @@ const AppLayout = ({ children }) => {
         className={`flex-1 flex flex-col transition-all duration-500 ease-in-out 
         ${visible ? "ml-[250px]" : "ml-0"}`}
       >
-        <Header className="sticky top-0 z-30 bg-white shadow" />
-        <main className="overflow-y-auto flex-1 ">
+        {/* ✅ ONLY render Header for non-map routes */}
+        {!isMapview && <Header className="sticky top-0 z-30 bg-white shadow" />}
+        
+        {/* ✅ Map routes will render their own headers */}
+        <main className={`flex-1 ${isMapview ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {children || <Outlet />}
         </main>
       </div>

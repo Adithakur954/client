@@ -5,8 +5,8 @@ import { toast } from "react-toastify";
 // APIs
 import { adminApi, mapViewApi, settingApi } from "@/api/apiEndpoints";
 
-// Floating filter drawer and panels
-import MapSidebarFloating from "@/components/map/layout/MapSidebarFloating";
+// Layout components
+import MapHeader from "@/components/map/layout/MapHeader";
 import SessionDetailPanel from "@/components/map/layout/SessionDetail";
 import AllLogsPanelToggle from "@/components/map/layout/AllLogsPanelToggle";
 
@@ -26,9 +26,8 @@ import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
-const MAP_CONTAINER_STYLE = { height: "100vh", width: "100%" };
+const MAP_CONTAINER_STYLE = { height: "calc(100vh - 64px)", width: "100%" };
 
-// Ensure your loader options include: libraries: ["drawing", "geometry", "visualization"]
 const MAP_STYLES = {
   default: null,
   clean: [
@@ -64,26 +63,19 @@ export default function HighPerfMap() {
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
   const [map, setMap] = useState(null);
 
-  // Loading flags
   const [isLoading, setIsLoading] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
 
-  // Data state
   const [thresholds, setThresholds] = useState({});
   const [allSessions, setAllSessions] = useState([]);
   const [projectPolygons, setProjectPolygons] = useState([]);
 
-  // Filters and metric
   const [activeFilters, setActiveFilters] = useState(null);
   const [selectedMetric, setSelectedMetric] = useState("rsrp");
 
-  // Session detail
   const [selectedSessionData, setSelectedSessionData] = useState(null);
-
-  // Logs (for summary panel and drawing analysis)
   const [drawnLogs, setDrawnLogs] = useState([]);
 
-  // UI toggles (extended with drawing controls)
   const [ui, setUi] = useState({
     showSessions: true,
     clusterSessions: true,
@@ -93,22 +85,19 @@ export default function HighPerfMap() {
     basemapStyle: "clean",
     showPolygons: false,
     selectedProjectId: null,
-
-    // Drawing
     drawEnabled: false,
+    shapeMode: "polygon",
     drawPixelateRect: false,
-    drawCellSizeMeters: 100,
+    drawCellSizeMeters: 10,
     drawClearSignal: 0,
   });
 
   const [analysis, setAnalysis] = useState(null);
 
-  // Bounds persistence and debounce
   const [visibleBounds, setVisibleBounds] = useState(null);
   const idleListenerRef = useRef(null);
   const idleTimerRef = useRef(null);
 
-  // Load thresholds
   useEffect(() => {
     const fetchThresholds = async () => {
       try {
@@ -132,7 +121,6 @@ export default function HighPerfMap() {
     fetchThresholds();
   }, []);
 
-  // Load sessions
   const fetchAllSessions = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -152,7 +140,6 @@ export default function HighPerfMap() {
     if (isLoaded && !activeFilters) fetchAllSessions();
   }, [isLoaded, fetchAllSessions, activeFilters]);
 
-  // Polygons
   useEffect(() => {
     const loadPolygons = async () => {
       if (!ui.showPolygons || !ui.selectedProjectId) {
@@ -178,7 +165,6 @@ export default function HighPerfMap() {
     loadPolygons();
   }, [ui.showPolygons, ui.selectedProjectId]);
 
-  // Map load/unmount
   const onMapLoad = useCallback((m) => {
     setMap(m);
     const saved = loadSavedViewport();
@@ -215,7 +201,6 @@ export default function HighPerfMap() {
     setMap(null);
   }, []);
 
-  // Sidebar handlers
   const handleApplyFilters = (filters) => {
     setActiveFilters(filters);
     setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
@@ -230,158 +215,307 @@ export default function HighPerfMap() {
     setSelectedSessionData(null);
     setDrawnLogs([]);
     setAnalysis(null);
-    setUi((u) => ({ ...u, showHeatmap: false }));
+    setUi((u) => ({ ...u, showHeatmap: false, drawEnabled: false }));
     fetchAllSessions();
   }, [fetchAllSessions]);
 
   const handleUIChange = (partial) => setUi((prev) => ({ ...prev, ...partial }));
 
-  // Session click -> panel
   const handleSessionMarkerClick = async (session) => {
     setIsLoading(true);
     try {
       const logs = await mapViewApi.getNetworkLog(session.id);
+      console.log("hello check here",logs)
       setSelectedSessionData({ session, logs: logs || [] });
     } catch (e) {
       toast.error(`Failed to fetch logs for session ${session.id}: ${e?.message || "Unknown error"}`);
     } finally {
       setIsLoading(false);
     }
+    
   };
 
-  const mapStyles = useMemo(() => MAP_STYLES[ui.basemapStyle] || null, [ui.basemapStyle]);
+  
+  const handleDownloadStatsCsv = useCallback(() => {
+    if (!analysis || !analysis.stats) {
+      toast.error("No polygon stats available. Draw a shape first.");
+      return;
+    }
+
+    const csvRows = [
+      ["Metric", "Value"],
+      ["Shape Type", analysis.type || "N/A"],
+      ["Total Logs Inside", analysis.count || 0],
+      ["Mean", analysis.stats.mean?.toFixed(2) || "N/A"],
+      ["Median", analysis.stats.median?.toFixed(2) || "N/A"],
+      ["Min", analysis.stats.min?.toFixed(2) || "N/A"],
+      ["Max", analysis.stats.max?.toFixed(2) || "N/A"],
+      ["Selected Metric", selectedMetric],
+    ];
+
+    if (analysis.grid) {
+      csvRows.push(
+        ["Grid Cells", analysis.grid.cells],
+        ["Cell Size (meters)", analysis.grid.cellSizeMeters]
+      );
+    }
+
+    const csvContent = csvRows.map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `polygon_stats_${selectedMetric}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast.success("✅ Stats CSV downloaded!");
+  }, [analysis, selectedMetric]);
+
+  const handleDownloadRawCsv = useCallback(() => {
+    if (!analysis || !analysis.logs || !analysis.logs.length) {
+      toast.error("No logs inside polygon. Draw a shape with data first.");
+      return;
+    }
+
+    const logsInside = analysis.logs;
+
+    const headers = [
+      "latitude",
+      "longitude",
+      "rsrp",
+      "rsrq",
+      "sinr",
+      "dl_throughput",
+      "ul_throughput",
+      "mos",
+      "lte_bler",
+      "timestamp",
+      "carrier",
+      "technology",
+    ];
+
+    console.log(headers)
+
+    const csvRows = [
+      headers.join(","),
+      ...logsInside.map((log) => {
+        return headers
+          .map((h) => {
+            let val =
+              log[h] ??
+              log[h.replace("_", "-")] ??
+              log[h.replace("dl_throughput", "dl_thpt")] ??
+              log[h.replace("ul_throughput", "ul_thpt")] ??
+              "";
+
+            if (h === "latitude" && !val) {
+              val = log.lat ?? log.latitude ?? log.Latitude ?? "";
+            }
+            if (h === "longitude" && !val) {
+              val = log.lng ?? log.lon ?? log.longitude ?? log.Longitude ?? "";
+            }
+
+            return typeof val === "string" && val.includes(",") ? `"${val}"` : val;
+          })
+          .join(",");
+      }),
+    ];
+
+    const csvContent = csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `polygon_raw_logs_${selectedMetric}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast.success(`✅ Raw CSV downloaded (${logsInside.length} logs inside polygon)!`);
+  }, [analysis, selectedMetric]);
+
+  const mapOptions = useMemo(() => {
+    const standardMapTypes = ["roadmap", "satellite", "hybrid", "terrain"];
+    const styleKey = ui.basemapStyle || "roadmap";
+
+    const options = {
+      disableDefaultUI: true,
+      zoomControl: true,
+      mapId: MAP_ID,
+      gestureHandling: "greedy",
+      mapTypeId: "roadmap",
+      styles: null,
+    };
+
+    if (standardMapTypes.includes(styleKey)) {
+      options.mapTypeId = styleKey;
+    } else if (MAP_STYLES[styleKey]) {
+      options.mapTypeId = "roadmap";
+      options.styles = MAP_STYLES[styleKey];
+    }
+
+    return options;
+  }, [ui.basemapStyle]);
+
+  console.log("hello here to check data ",selectedSessionData)
 
   if (loadError) return <div>Error loading Google Maps.</div>;
   if (!isLoaded) return <div className="p-4">Loading map…</div>;
 
   return (
-    <div className="relative h-full w-full">
-      <MapSidebarFloating
+    <div className="h-screen w-full flex flex-col bg-white">
+      <MapHeader
+        ui={ui}
+        onUIChange={handleUIChange}
+        hasLogs={!!activeFilters && drawnLogs.length > 0}
+        polygonStats={analysis}
+        onDownloadStatsCsv={handleDownloadStatsCsv}
+        onDownloadRawCsv={handleDownloadRawCsv}
+        // moved here so the sidebar is controlled from the header
         onApplyFilters={handleApplyFilters}
         onClearFilters={handleClearFilters}
-        onUIChange={handleUIChange}
-        ui={ui}
         initialFilters={activeFilters}
-        position="left"
-        autoCloseOnApply={true}
       />
 
-      
+      <div className="relative flex-1">
+        <GoogleMap
+          mapContainerStyle={MAP_CONTAINER_STYLE}
+          center={DEFAULT_CENTER}
+          zoom={13}
+          onLoad={onMapLoad}
+          onUnmount={onMapUnmount}
+          options={mapOptions}
+        >
+          {!activeFilters && ui.showSessions && (
+            <SessionsLayer
+              map={map}
+              sessions={allSessions}
+              onClick={handleSessionMarkerClick}
+              cluster={ui.clusterSessions}
+            />
+          )}
 
-      <GoogleMap
-        mapContainerStyle={MAP_CONTAINER_STYLE}
-        center={DEFAULT_CENTER}
-        zoom={13}
-        onLoad={onMapLoad}
-        onUnmount={onMapUnmount}
-        options={{
-          disableDefaultUI: true,
-          zoomControl: true,
-          mapId: MAP_ID,
-          styles: mapStyles,
-          gestureHandling: "greedy",
-        }}
-      >
-        {!activeFilters && ui.showSessions && (
-          <SessionsLayer
-            map={map}
-            sessions={allSessions}
-            onClick={handleSessionMarkerClick}
-            cluster={ui.clusterSessions}
-          />
+          {activeFilters && (
+            <LogCirclesLayer
+              map={map}
+              filters={activeFilters}
+              selectedMetric={selectedMetric}
+              thresholds={thresholds}
+              onLogsLoaded={(list) => setDrawnLogs(Array.isArray(list) ? list : [])}
+              setIsLoading={setLogsLoading}
+              showCircles={ui.showLogsCircles}
+              showHeatmap={ui.showHeatmap}
+              visibleBounds={ui.renderVisibleLogsOnly ? visibleBounds : null}
+              renderVisibleOnly={ui.renderVisibleLogsOnly}
+              canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
+              maxDraw={80000}
+            />
+          )}
+
+          {ui.showPolygons && (
+            <ProjectPolygonsLayer
+              polygons={projectPolygons}
+              onClick={(poly) => toast.info(poly.name || `Region ${poly.id}`)}
+            />
+          )}
+
+          {ui.drawEnabled && (
+            <DrawingToolsLayer
+              map={map}
+              enabled={ui.drawEnabled}
+              logs={drawnLogs}
+              selectedMetric={selectedMetric}
+              thresholds={thresholds}
+              pixelateRect={ui.drawPixelateRect}
+              cellSizeMeters={ui.drawCellSizeMeters || 100}
+              onSummary={setAnalysis}
+              clearSignal={ui.drawClearSignal || 0}
+              maxCells={1500}
+            />
+          )}
+        </GoogleMap>
+
+        {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
+          <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} />
         )}
 
-        {activeFilters && (
-          <LogCirclesLayer
-            map={map}
-            filters={activeFilters}
-            selectedMetric={selectedMetric}
-            thresholds={thresholds}
-            onLogsLoaded={(list) => setDrawnLogs(Array.isArray(list) ? list : [])}
-            setIsLoading={setLogsLoading}
-            showCircles={ui.showLogsCircles}
-            showHeatmap={ui.showHeatmap}
-            visibleBounds={ui.renderVisibleLogsOnly ? visibleBounds : null}
-            renderVisibleOnly={ui.renderVisibleLogsOnly}
-            canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
-            maxDraw={80000}
-          />
-        )}
-
-        {ui.showPolygons && (
-          <ProjectPolygonsLayer
-            polygons={projectPolygons}
-            onClick={(poly) => toast.info(poly.name || `Region ${poly.id}`)}
-          />
-        )}
-
-        {/* Drawing tools layer */}
-        {ui.drawEnabled && (
-          <DrawingToolsLayer
-            map={map}
-            enabled={ui.drawEnabled}
-            logs={drawnLogs}
-            selectedMetric={selectedMetric}
-            thresholds={thresholds}
-            pixelateRect={ui.drawPixelateRect}
-            cellSizeMeters={ui.drawCellSizeMeters || 100}
-            onSummary={setAnalysis}
-            clearSignal={ui.drawClearSignal || 0}
-            maxCells={1500}
-          />
-        )}
-      </GoogleMap>
-
-      {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
-        <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} />
-      )}
-
-      {/* Selection stats panel */}
-      {analysis && (
-        <div className="absolute bottom-4 left-4 z-30 bg-white/95 dark:bg-gray-900/95 rounded-md shadow p-3 min-w-[240px]">
-          <div className="font-medium mb-1">Selection stats</div>
-          <div className="text-sm text-gray-700 dark:text-gray-200 space-y-1">
-            <div>Shape: {analysis.type}</div>
-            <div>Logs: {analysis.count}</div>
-            {analysis.stats?.count > 0 ? (
-              <>
-                <div>Mean: {analysis.stats.mean?.toFixed(2)}</div>
-                <div>Median: {analysis.stats.median?.toFixed(2)}</div>
-                <div>Max: {analysis.stats.max?.toFixed(2)}</div>
-                <div>Min: {analysis.stats.min?.toFixed(2)}</div>
-                {analysis.grid ? (
-                  <div className="text-xs text-gray-500 mt-1">
-                    Grid: ~{analysis.grid.cells} cells @ {analysis.grid.cellSizeMeters}m
+        {analysis && (
+          <div className="absolute bottom-4 left-4 z-30 bg-white/95 dark:bg-gray-900/95 rounded-lg shadow-xl p-4 min-w-[260px] border border-gray-200">
+            <div className="font-semibold mb-2 text-gray-800 dark:text-white flex items-center gap-2">
+              <span className="text-lg">📊</span>
+              Selection Stats
+            </div>
+            <div className="text-sm text-gray-700 dark:text-gray-200 space-y-1.5">
+              <div className="flex justify-between border-b border-gray-100 pb-1">
+                <span className="text-gray-600">Shape:</span>
+                <span className="font-medium capitalize">{analysis.type}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-1">
+                <span className="text-gray-600">Total Logs:</span>
+                <span className="font-medium">{analysis.count}</span>
+              </div>
+              {analysis.stats?.count > 0 ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Mean:</span>
+                    <span className="font-medium text-blue-600">{analysis.stats.mean?.toFixed(2)}</span>
                   </div>
-                ) : null}
-              </>
-            ) : (
-              <div>No metric values in selection.</div>
-            )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Median:</span>
+                    <span className="font-medium text-green-600">{analysis.stats.median?.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Range:</span>
+                    <span className="font-medium text-orange-600">
+                      {analysis.stats.min?.toFixed(2)} → {analysis.stats.max?.toFixed(2)}
+                    </span>
+                  </div>
+                  {analysis.grid && (
+                    <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
+                      <div className="flex justify-between">
+                        <span>Grid Cells:</span>
+                        <span className="font-medium">{analysis.grid.cells}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Cell Size:</span>
+                        <span className="font-medium">{analysis.grid.cellSizeMeters}m</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-gray-500 italic text-center py-2">
+                  No metric values in selection
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+         
+        <SessionDetailPanel
+          sessionData={selectedSessionData}
+          isLoading={isLoading}
+          thresholds={thresholds}
+          selectedMetric={selectedMetric}
+          onClose={() => setSelectedSessionData(null)}
+        />
 
-      <SessionDetailPanel
-        sessionData={selectedSessionData}
-        isLoading={isLoading}
-        thresholds={thresholds}
-        selectedMetric={selectedMetric}
-        onClose={() => setSelectedSessionData(null)}
-      />
+        <AllLogsPanelToggle
+          logs={drawnLogs}
+          thresholds={thresholds}
+          selectedMetric={selectedMetric}
+          isLoading={logsLoading}
+        />
 
-      <AllLogsPanelToggle
-        logs={drawnLogs}
-        thresholds={thresholds}
-        selectedMetric={selectedMetric}
-        isLoading={logsLoading}
-      />
-
-      {(isLoading || logsLoading) && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-black/70">
-          <div>Loading…</div>
-        </div>
-      )}
+        {(isLoading || logsLoading) && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-black/70 backdrop-blur-sm">
+            <div className="bg-white rounded-lg shadow-xl p-6 flex items-center gap-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="text-lg font-medium text-gray-700">Loading…</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

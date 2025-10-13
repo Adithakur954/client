@@ -140,6 +140,12 @@ const normalizePayload = (resp) => {
     ["name", "Make"], ["value", "Avg"]
   ).map(x => ({ ...x, value: ensureNegative(x.value) }));
 
+
+  const handsetWiseAvg_bar = (payload.handsetWiseAvg_bar ?? []).map((x) => ({
+  Make: String(x?.Make ?? ''),
+  Avg: ensureNegative(x?.Avg),       // keep Avg negative
+  Samples: toNumber(x?.Samples),     // keep samples for tooltip
+}));
   return {
     totals: {
       users: toNumber(payload.totalUsers),
@@ -155,7 +161,8 @@ const normalizePayload = (resp) => {
     networkTypeDistribution,
     avgRsrpPerOperator,
     bandDistribution,
-    handsetDistribution
+    handsetDistribution,
+    handsetWiseAvg_bar
   };
 };
 
@@ -408,10 +415,15 @@ const DashboardPage = () => {
     try {
       const [statsResp, graphsResp] = await Promise.all([
         adminApi.getReactDashboardData(),
-        adminApi.getDashboardGraphData()
+        adminApi.getDashboardGraphData(),
+        
       ]);
+      console.log('statsResp', statsResp);
+      console.log('graphsResp', graphsResp);
+      // console.log('onlineUsersResp', onlineUsersResp);
       const merged = { ...(statsResp?.Data ?? statsResp ?? {}), ...(graphsResp?.Data ?? graphsResp ?? {}) };
       const normalized = normalizePayload({ Data: merged });
+      console.log('normalized dashboard', normalized);
       return normalized;
     } catch (err) {
       toast.error(`Failed to load dashboard: ${err?.message ?? 'Unknown error'}`);
@@ -608,10 +620,11 @@ const DashboardPage = () => {
         </ChartCard>
 
         {/* Handset wise Avg RSRP */}
-        <ChartCard title="Handset wise Avg RSRP" dataset={data.handsetDistribution} exportFileName="handset_avg_rsrp">
+        <ChartCard title="Handset wise Avg RSRP" dataset={data.handsetWiseAvg_bar} exportFileName="handset_avg_rsrp">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={data.handsetDistribution}
+              data={data.handsetWiseAvg_bar}
+              
               layout="vertical"
               margin={{ top: 12, right: 40, left: 10, bottom: 8 }}
               barCategoryGap="25%"
@@ -629,18 +642,22 @@ const DashboardPage = () => {
                 tickFormatter={(v) => `${v} dBm`}
               />
               <YAxis
-                dataKey="name"
+                dataKey="Make"
                 type="category"
                 width={180}
                 tick={{ fill: '#111827', fontSize: 12 }}
               />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(v) => [`${Number(v).toFixed(1)} dBm`, 'Avg RSRP']}
+                formatter={(v, name, { payload }) => [`${Number(v).toFixed(1)} dBm`, 'Avg RSRP']}
+        labelFormatter={(label, payload) => {
+          const item = payload?.[0]?.payload;
+          return item ? `${label} • ${item.Samples?.toLocaleString()} samples` : label;
+        }}
               />
 
               <Bar
-                dataKey="value"
+                dataKey="Avg"
                 name="Avg RSRP"
                 radius={[0, 8, 8, 0]}
                 isAnimationActive
@@ -662,7 +679,7 @@ const DashboardPage = () => {
                         fontSize={12}
                         fontWeight={600}
                       >
-                        {`${Number(value).toFixed(1)} dBm`}
+                        
                       </text>
                     );
                   }}
@@ -672,7 +689,7 @@ const DashboardPage = () => {
                   .sort((a, b) => a.value - b.value)
                   .slice(0, 12)
                   .map((entry, index) => (
-                    <Cell key={`cell-handset-${index}`} fill={getRSRPPointColor(entry.value)} />
+                    <Cell key={`cell-handset-${index}`} fill={getRSRPPointColor(entry.Avg)} />
                   ))
                 }
               </Bar>
