@@ -1,6 +1,6 @@
 
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5224";
+const API_BASE_URL = "https://signaltrackers.onrender.com";
 const apiService = async (endpoint, { body, params, ...customOptions } = {}) => {
   const isFormData = body instanceof FormData;
   const headers = isFormData ? {} : { "Content-Type": "application/json" };
