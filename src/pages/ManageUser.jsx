@@ -180,7 +180,7 @@ const ManageUsersPage = () => {
     if (loading && users.length === 0) return <Spinner />;
 
     return (
-        <div className="space-y-6 bg-gray-800 text-white">
+        <div className="space-y-6 bg-gray-800 h-100% text-white">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold">Manage Users</h1>
             </div>

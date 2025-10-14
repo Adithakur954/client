@@ -129,6 +129,7 @@ const UploadDataPage = () => {
     setHistoryLoading(true);
     try {
       const response = await excelApi.getUploadedFiles(activeTab === "session" ? 1 : 2);
+      
       setUploadedFiles(response.Data || []);
     } catch {
       setUploadedFiles([]);

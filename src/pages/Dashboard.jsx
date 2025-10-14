@@ -384,18 +384,57 @@ const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
     </Card>
   );
 };
+const ProgressBar = ({
+  value = 0,                // 0–100
+  className = '',
+  color = 'bg-blue-600',    // Tailwind bg-xxx for the fill
+  height = 'h-2',           // h-1.5, h-2, h-3 ...
+  rounded = 'rounded-full', // rounded, rounded-md, rounded-full
+  showLabel = false,
+}) => {
+  const pct = Math.max(0, Math.min(100, Number(value) || 0));
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+      className={`w-full bg-gray-200 ${rounded} overflow-hidden ${height} ${className}`}
+    >
+      <div
+        className={`${color} h-full transition-[width] duration-300 ease-in-out flex items-center`}
+        style={{ width: `${pct}%` }}
+      >
+        {showLabel && (
+          <span className="ml-auto mr-1 text-[10px] text-white font-medium">{pct}%</span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // KPI card: responsive, overflow-safe text
-const StatCard = ({ title, value, icon: Icon, color }) => (
+const StatCard = ({ title, value, icon: Icon, color, progress }) => (
   <Card className="bg-white text-gray-900 border-gray-200 shadow-sm">
-    <CardContent className="p-4 flex items-center gap-3 min-w-0">
-      <div className={`h-10 w-10 rounded-md flex items-center justify-center ${color} text-white flex-shrink-0`}>
-        <Icon className="h-6 w-6" />
+    <CardContent className="p-4 min-w-0">
+      <div className="flex items-center gap-3">
+        <div className={`h-10 w-10 rounded-md flex items-center justify-center ${color} text-white flex-shrink-0`}>
+          <Icon className="h-6 w-6" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-2xl md:text-3xl font-bold leading-tight truncate">
+            {Number(value ?? 0).toLocaleString()}
+          </p>
+          <p className="text-xs md:text-sm text-gray-500 truncate">{title}</p>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-2xl md:text-3xl font-bold leading-tight truncate">{Number(value ?? 0).toLocaleString()}</p>
-        <p className="text-xs md:text-sm text-gray-500 truncate">{title}</p>
-      </div>
+
+      {typeof progress === 'number' && (
+        <div className="mt-3">
+          <ProgressBar value={progress} color={color} height="h-2" />
+          <div className="mt-1 text-[11px] text-gray-500">{progress}%</div>
+        </div>
+      )}
     </CardContent>
   </Card>
 );
@@ -489,18 +528,35 @@ const DashboardPage = () => {
     revalidateOnReconnect: true,
   });
 
+  const percent = (part, total) => {
+  const a = toNumber(part, 0);
+  const b = toNumber(total, 0);
+  return b > 0 ? Math.round((a / b) * 100) : 0;
+};
   const stats = useMemo(() => {
-    if (!data?.totals) return [];
-    return [
-      { title: "Users", value: data.totals.users, icon: Users, color: "bg-purple-600" },
-      { title: "Total Drive Sessions", value: data.totals.sessions, icon: Car, color: "bg-teal-600" },
-      { title: "Online Sessions", value: data.totals.onlineSessions, icon: Waypoints, color: "bg-orange-600" },
-      { title: "Total Samples", value: data.totals.samples, icon: FileText, color: "bg-amber-600" },
-      { title: "Operators", value: data.totals.operators, icon: Wifi, color: "bg-sky-600" },
-      { title: "Technologies", value: data.totals.technologies, icon: BarChart2, color: "bg-pink-600" },
-      // { title: "Total Bands", value: data.totals.bands, icon: RadioTower, color: "bg-indigo-600" }
-    ];
-  }, [data]);
+  if (!data?.totals) return [];
+  return [
+    { title: "Users", value: data.totals.users, icon: Users, color: "bg-purple-600" },
+    { title: "Total Drive Sessions", value: data.totals.sessions, icon: Car, color: "bg-teal-600" },
+   {
+    title: "Online Sessions",
+    value: data.totals.onlineSessions,
+    icon: Waypoints,
+    color: "bg-orange-600",
+    
+  },
+  {
+    title: "Samples Processed",
+    value: data.totals.samples,
+    icon: FileText,
+    color: "bg-green-600",
+    
+  },
+    { title: "Total Samples", value: data.totals.samples, icon: FileText, color: "bg-amber-600" },
+    { title: "Operators", value: data.totals.operators, icon: Wifi, color: "bg-sky-600" },
+    { title: "Technologies", value: data.totals.technologies, icon: BarChart2, color: "bg-pink-600" },
+  ];
+}, [data]);
 
   const applySettings = () => {
     if (draft.rsrpMin > draft.rsrpMax) return toast.warn("RSRP: Min cannot be greater than Max");
