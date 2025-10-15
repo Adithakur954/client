@@ -335,9 +335,10 @@ export default function MapSidebarFloating({
             <Select value={ui?.basemapStyle} onValueChange={(v) => onUIChange?.({ basemapStyle: v })}>
               <SelectTrigger><SelectValue placeholder="Select style..." /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">Default</SelectItem>
-                <SelectItem value="clean">Clean</SelectItem>
-                <SelectItem value="night">Night</SelectItem>
+                <SelectItem value="roadmap">Default (Roadmap)</SelectItem>
+                <SelectItem value="satellite">Satellite</SelectItem>
+                <SelectItem value="hybrid">Hybrid</SelectItem>
+                
               </SelectContent>
             </Select>
           </PanelSection>

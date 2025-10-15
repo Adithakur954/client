@@ -1,12 +1,11 @@
-// MapHeader.jsx
+// src/components/map/layout/MapHeader.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ChevronDown, ChevronUp, PenTool, XCircle, Download, SlidersHorizontal, Upload } from "lucide-react";
+import { LogOut, ChevronDown, ChevronUp, PenTool, XCircle, Download, SlidersHorizontal, Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import img from "../../../assets/vinfocom_logo.png";
 import MapSidebarFloating from "./MapSidebarFloating";
-import uploadImage from '@/components/UploadImages'
 
 export default function MapHeader({
   ui,
@@ -18,13 +17,14 @@ export default function MapHeader({
   onApplyFilters,
   onClearFilters,
   initialFilters,
+  isSearchOpen,
+  onSearchToggle,
 }) {
   const { user, logout } = useAuth();
   const [dropOpen, setDropOpen] = useState(false);
   const dropdownRef = useRef(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [preview, setPreview] = useState(false);
-
+  
   const safeUi = {
     drawEnabled: false,
     shapeMode: "polygon",
@@ -73,7 +73,8 @@ export default function MapHeader({
           aria-expanded={dropOpen}
         >
           <PenTool className="w-4 h-4" />
-          <span>Draw / Analyze</span>
+          {/* CHANGED: More generic label */}
+          <span>Drawing Tools</span>
           {dropOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
 
@@ -88,7 +89,6 @@ export default function MapHeader({
               </div>
             )}
 
-            {/* Master toggle */}
             <label className="flex items-center gap-2 font-medium text-sm mb-2">
               <input
                 type="checkbox"
@@ -98,44 +98,17 @@ export default function MapHeader({
               />
               Enable Drawing Tools
             </label>
+            <p className="text-xs text-gray-500 mt-1 mb-3 pl-6">
+              Use the controls on the map to select a shape.
+            </p>
 
-            {/* Quick: Draw Polygon */}
-            <div className="mb-3">
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white w-full"
-                onClick={startDrawPolygon}
-                disabled={!hasLogs}
-              >
-                <PenTool className="h-4 w-4 mr-2" />
-                Draw Polygon
-              </Button>
-              <p className="text-xs text-gray-500 mt-1">
-                Click to start drawing polygon on the map.
-              </p>
-            </div>
-
-            {/* Advanced options */}
             <div
               className={`pl-3 space-y-4 text-sm ${
                 safeUi.drawEnabled ? "" : "opacity-50 pointer-events-none"
               }`}
             >
-              {/* Shape Type */}
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs text-gray-700">Shape</Label>
-                <select
-                  value={safeUi.shapeMode}
-                  onChange={(e) => onUIChange?.({ shapeMode: e.target.value })}
-                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="polygon">Polygon</option>
-                  <option value="rectangle">Rectangle</option>
-                  <option value="circle">Circle</option>
-                </select>
-              </div>
-
-              {/* Pixelate all shapes */}
+              {/* REMOVED: The redundant Shape Type dropdown is now gone */}
+              
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -145,7 +118,6 @@ export default function MapHeader({
                 <span className="font-medium">Pixelate shape into grid</span>
               </label>
 
-              {/* Cell size */}
               <div className="flex items-center gap-2">
                 <Label className="text-xs text-gray-700">Cell size</Label>
                 <input
@@ -175,10 +147,6 @@ export default function MapHeader({
                   Clear drawings
                 </Button>
               </div>
-
-              <p className="text-xs text-gray-500 pt-1 leading-snug">
-                Draw any shape. Enable pixelate to create a colored grid based on signal values.
-              </p>
             </div>
 
             {/* Downloads */}
@@ -215,7 +183,13 @@ export default function MapHeader({
 
       {/* Right: Header controls + User */}
       <div className="flex items-center space-x-4">
-        {/* Filters button in header */}
+        <Button 
+          size="sm"
+          onClick={onSearchToggle}
+        >
+          {isSearchOpen ? <XCircle/> : <Search /> }
+        </Button>
+
         <Button
           size="sm"
           className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -226,11 +200,10 @@ export default function MapHeader({
           Filters
         </Button>
 
-        {/* Sidebar component controlled from header */}
         <MapSidebarFloating
           open={filtersOpen}
           onOpenChange={setFiltersOpen}
-          hideTrigger={true}          // <-- removes floating toggle button
+          hideTrigger={true}
           onApplyFilters={onApplyFilters}
           onClearFilters={onClearFilters}
           onUIChange={onUIChange}
@@ -239,17 +212,7 @@ export default function MapHeader({
           position="left"
           autoCloseOnApply={true}
         />
-
-        {/* <button className=" flex  bg-blue-600 px-2 py-1 rounded-[5px] hover:bg-blue-800" onClick={()=>{
-          setPreview(!preview)
-        }}>
-          <Upload className="h-4 w-4 mr-2 " />
-          Upload Image
-        </button> */}
-
-        {preview && <div className="absolute right-0 mt-2 bg-white text-gray-800 rounded-lg shadow-lg p-4 w-72 z-50">
-          <h1>hello world</h1>
-          </div>}
+        
         <p className="text-gray-300 text-sm">
           Welcome,&nbsp;<span className="font-semibold text-white">{user?.name || "User"}</span>
         </p>

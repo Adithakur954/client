@@ -208,7 +208,7 @@ const handleFetchSessions = async () => {
     files.length ? (
       <div className="mt-4 space-y-2">
         {files.map((file, i) => (
-          <div key={i} className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded px-2 py-1">
+          <div key={i} className="flex items-center justify-between bg-gray-700 rounded px-2 py-1">
             <div className="flex items-center gap-2">
               <File className="h-5 w-5 text-gray-500 dark:text-gray-300" />
               <span>{file.name}</span>
@@ -232,7 +232,7 @@ const handleFetchSessions = async () => {
   );
 
   return (
-    <div className="p-6 flex flex-col items-center  bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div className="p-6 flex flex-col items-center bg-gray-900  text-gray-100">
       <div className="max-w-4xl w-full">
         <h1 className="text-2xl font-semibold mb-4 text-center">Upload Data</h1>
 

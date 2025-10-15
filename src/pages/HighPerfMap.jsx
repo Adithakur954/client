@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { toast } from "react-toastify";
+import MapSearchBox from "@/components/map/MapSearchBox";
 
 // APIs
 import { adminApi, mapViewApi, settingApi } from "@/api/apiEndpoints";
@@ -58,6 +59,13 @@ const MAP_STYLES = {
     { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
   ],
 };
+const formatArea = (areaInMeters) => {
+  if (!areaInMeters || areaInMeters < 1) return "N/A";
+  if (areaInMeters > 1000000) {
+    return `${(areaInMeters / 1000000).toFixed(2)} km²`;
+  }
+  return `${areaInMeters.toFixed(0)} m²`;
+};
 
 export default function HighPerfMap() {
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
@@ -97,6 +105,8 @@ export default function HighPerfMap() {
   const [visibleBounds, setVisibleBounds] = useState(null);
   const idleListenerRef = useRef(null);
   const idleTimerRef = useRef(null);
+
+  const [isSearchOpen, setIsSearchOpen]= useState(false);
 
   useEffect(() => {
     const fetchThresholds = async () => {
@@ -375,6 +385,8 @@ export default function HighPerfMap() {
         onApplyFilters={handleApplyFilters}
         onClearFilters={handleClearFilters}
         initialFilters={activeFilters}
+        isSearchOpen={isSearchOpen}
+        onSearchToggle={() => setIsSearchOpen(prev => !prev)}
       />
 
       <div className="relative flex-1">
@@ -386,6 +398,7 @@ export default function HighPerfMap() {
           onUnmount={onMapUnmount}
           options={mapOptions}
         >
+          {isSearchOpen && <MapSearchBox />}
           {!activeFilters && ui.showSessions && (
             <SessionsLayer
               map={map}
@@ -403,13 +416,13 @@ export default function HighPerfMap() {
               thresholds={thresholds}
               onLogsLoaded={(list) => setDrawnLogs(Array.isArray(list) ? list : [])}
               setIsLoading={setLogsLoading}
-              showCircles={ui.showLogsCircles}
+              showCircles={ui.showLogsCircles && !(ui.drawPixelateRect && analysis)}
               showHeatmap={ui.showHeatmap}
               visibleBounds={ui.renderVisibleLogsOnly ? visibleBounds : null}
               renderVisibleOnly={ui.renderVisibleLogsOnly}
               canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
               maxDraw={80000}
-            />
+              />
           )}
 
           {ui.showPolygons && (
@@ -451,9 +464,29 @@ export default function HighPerfMap() {
                 <span className="font-medium capitalize">{analysis.type}</span>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-1">
+                <span className="text-gray-600">Area:</span>
+                <span className="font-medium">{formatArea(analysis.area)}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-1">
                 <span className="text-gray-600">Total Logs:</span>
                 <span className="font-medium">{analysis.count}</span>
               </div>
+              {analysis.grid && (
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>Cell Size:</span>
+                                        <span className="font-medium">{analysis.grid.cellSizeMeters}m</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>Active Grid Cells:</span>
+                                        <span className="font-medium">{analysis.grid.cellsWithLogs}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>Grid Area:</span>
+                                        <span className="font-medium">{formatArea(analysis.grid.totalGridArea)}</span>
+                                    </div>
+                                </div>
+                            )}
               {analysis.stats?.count > 0 ? (
                 <>
                   <div className="flex justify-between">

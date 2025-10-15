@@ -78,7 +78,7 @@ function App() {
                         <Route path="/upload-data" element={<PrivateRoute><UploadDataPage /></PrivateRoute>} />
                         <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
                         <Route path="/manage-session" element={<PrivateRoute><ManageSessionPage /></PrivateRoute>} />
-                        {/* <Route path="/map" element={<PrivateRoute><MapView /></PrivateRoute>} /> */}
+                        <Route path="/map" element={<PrivateRoute><MapView /></PrivateRoute>} />
                         <Route path="/alllogs" element={<PrivateRoute><AllLogsMapPage /></PrivateRoute>} />
                         <Route path="/mapview" element={<PrivateRoute><HighPerfMap /></PrivateRoute>} />
                         <Route path="/logscircles" element={<PrivateRoute><LogsCirclesPage /></PrivateRoute>} />

@@ -384,35 +384,58 @@ const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
     </Card>
   );
 };
-const ProgressBar = ({
-  value = 0,                // 0–100
-  className = '',
-  color = 'bg-blue-600',    // Tailwind bg-xxx for the fill
-  height = 'h-2',           // h-1.5, h-2, h-3 ...
-  rounded = 'rounded-full', // rounded, rounded-md, rounded-full
-  showLabel = false,
-}) => {
-  const pct = Math.max(0, Math.min(100, Number(value) || 0));
+const PageLoadProgress = () => {
+  const [pct, setPct] = React.useState(0);
+
+  React.useEffect(() => {
+    let t;
+    const tick = () => {
+      setPct(p => {
+        if (p < 70) return Math.min(70, p + 12);
+        return Math.min(90, p + Math.max(0.5, (90 - p) * 0.1));
+      });
+      t = setTimeout(tick, 200);
+    };
+    tick();
+    return () => clearTimeout(t);
+  }, []);
+
   return (
-    <div
-      role="progressbar"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={pct}
-      className={`w-full bg-gray-200 ${rounded} overflow-hidden ${height} ${className}`}
-    >
-      <div
-        className={`${color} h-full transition-[width] duration-300 ease-in-out flex items-center`}
-        style={{ width: `${pct}%` }}
-      >
-        {showLabel && (
-          <span className="ml-auto mr-1 text-[10px] text-white font-medium">{pct}%</span>
-        )}
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-64">
+        <div className="w-full bg-gray-200 rounded-full overflow-hidden h-2.5">
+          <div
+            className="relative bg-blue-600 h-full transition-[width] duration-200 ease-in-out"
+            style={{ width: `${pct}%` }}
+          >
+            {/* Striped filler overlay */}
+            <div
+              className="absolute inset-0 opacity-40"
+              style={{
+                backgroundImage:
+                  'repeating-linear-gradient(45deg, rgba(255,255,255,0.9) 0, rgba(255,255,255,0.9) 10px, rgba(255,255,255,0.5) 10px, rgba(255,255,255,0.5) 20px)',
+                backgroundSize: '40px 40px',
+                animation: 'moveStripes 1s linear infinite',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
+        </div>
+        <div className="mt-2 text-sm text-gray-500 text-center">Loading dashboard…</div>
+
+        {/* Keyframes for the stripe animation */}
+        <style>
+          {`
+            @keyframes moveStripes {
+              0% { background-position: 0 0; }
+              100% { background-position: 40px 0; }
+            }
+          `}
+        </style>
       </div>
     </div>
   );
 };
-
 // KPI card: responsive, overflow-safe text
 const StatCard = ({ title, value, icon: Icon, color, progress }) => (
   <Card className="bg-white text-gray-900 border-gray-200 shadow-sm">
@@ -422,7 +445,7 @@ const StatCard = ({ title, value, icon: Icon, color, progress }) => (
           <Icon className="h-6 w-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-2xl md:text-3xl font-bold leading-tight truncate">
+          <p className="text-2xl md:text-3xl font-bold leading-tight">
             {Number(value ?? 0).toLocaleString()}
           </p>
           <p className="text-xs md:text-sm text-gray-500 truncate">{title}</p>
@@ -545,13 +568,7 @@ const DashboardPage = () => {
     color: "bg-orange-600",
     
   },
-  {
-    title: "Samples Processed",
-    value: data.totals.samples,
-    icon: FileText,
-    color: "bg-green-600",
-    
-  },
+  
     { title: "Total Samples", value: data.totals.samples, icon: FileText, color: "bg-amber-600" },
     { title: "Operators", value: data.totals.operators, icon: Wifi, color: "bg-sky-600" },
     { title: "Technologies", value: data.totals.technologies, icon: BarChart2, color: "bg-pink-600" },
@@ -567,7 +584,7 @@ const DashboardPage = () => {
     // refreshQuality();
   };
 
-  if (isDashLoading) return <Spinner />;
+ if (isDashLoading) return <PageLoadProgress />;
   if (dashError) return <div className="p-6 text-red-600">Failed to load dashboard data.</div>;
   if (!data) return <div className="p-6 text-red-600">Failed to load dashboard data.</div>;
 
