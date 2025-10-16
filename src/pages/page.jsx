@@ -41,7 +41,6 @@ const canonicalOperatorName = (raw) => {
   return s;
 };
 
-// Map the UI-selected metric to the underlying data/threshold key
 const METRIC_KEY_BY_SELECT = {
   rsrp: 'rsrp',
   rsrq: 'rsrq',
@@ -55,55 +54,67 @@ const METRIC_KEY_BY_SELECT = {
 const normalizeMetricKey = (selectedMetric) =>
   METRIC_KEY_BY_SELECT[selectedMetric] || selectedMetric;
 
-// Build a predicate that returns true when a value falls in the "coverage hole" bucket
-function makeCoverageHolePredicate(metricKey, thresholds) {
+// ------------------------------------------------------
+// coverage-hole predicate (works for both modes)
+// ------------------------------------------------------
+function makeCoverageHolePredicate(metricKey, thresholds, predictionMode, predictionData) {
+  if (predictionMode && predictionData?.colorSetting?.length) {
+    // Pick the "worst" bucket of the prediction coloring
+    const lowerIsWorse = ['rsrp', 'rsrq', 'sinr', 'dl_thpt', 'ul_thpt', 'mos'].includes(metricKey);
+    const arr = predictionData.colorSetting;
+    if (!arr.length) return () => false;
+
+    let bucket;
+    if (lowerIsWorse) {
+      bucket = [...arr].sort((a, b) => a.min - b.min)[0];
+    } else {
+      bucket = [...arr].sort((a, b) => b.max - a.max)[0];
+    }
+
+    const min = Number(bucket.min ?? Number.NEGATIVE_INFINITY);
+    const max = Number(bucket.max ?? Number.POSITIVE_INFINITY);
+    return (valRaw) => {
+      const v = Number(valRaw);
+      return Number.isFinite(v) && v >= min && v <= max;
+    };
+  }
+
+  // otherwise use thresholds
   const lowerIsWorse = ['rsrp', 'rsrq', 'sinr', 'dl_thpt', 'ul_thpt', 'mos'].includes(metricKey);
   const arr = thresholds?.[metricKey] || [];
-
   const labStr = (x) => String(x ?? '').toLowerCase();
 
-  // Prefer an explicit bucket label mentioning "hole" or "no coverage"
   let bucket = arr.find(x => {
     const label = labStr(x.label || x.name || x.title);
-    return label.includes('hole') || label.includes('no coverage') || label.includes('nocoverage');
+    return label.includes('hole') || label.includes('no coverage');
   });
 
-  // Fallback: choose the worst bucket heuristically
   if (!bucket && arr.length) {
     if (lowerIsWorse) {
-      // Worst = bucket on the lowest end (smallest max/min)
-      bucket = [...arr].sort((a, b) => {
-        const aEdge = Number.isFinite(a.max) ? a.max : (Number.isFinite(a.min) ? a.min : Infinity);
-        const bEdge = Number.isFinite(b.max) ? b.max : (Number.isFinite(b.min) ? b.min : Infinity);
-        return aEdge - bEdge;
-      })[0];
+      bucket = [...arr].sort((a, b) =>
+        (a.max ?? a.min ?? Infinity) - (b.max ?? b.min ?? Infinity)
+      )[0];
     } else {
-      // Higher is worse (e.g., BLER): choose the highest-end bucket
-      bucket = [...arr].sort((a, b) => {
-        const aEdge = Number.isFinite(a.min) ? a.min : (Number.isFinite(a.max) ? a.max : -Infinity);
-        const bEdge = Number.isFinite(b.min) ? b.min : (Number.isFinite(b.max) ? b.max : -Infinity);
-        return bEdge - aEdge;
-      })[0];
+      bucket = [...arr].sort((a, b) =>
+        (b.min ?? b.max ?? -Infinity) - (a.min ?? a.max ?? -Infinity)
+      )[0];
     }
   }
 
   if (bucket) {
-    const hasMin = Number.isFinite(bucket.min);
-    const hasMax = Number.isFinite(bucket.max);
-    const min = hasMin ? Number(bucket.min) : Number.NEGATIVE_INFINITY;
-    const max = hasMax ? Number(bucket.max) : Number.POSITIVE_INFINITY;
-
+    const min = Number(bucket.min ?? Number.NEGATIVE_INFINITY);
+    const max = Number(bucket.max ?? Number.POSITIVE_INFINITY);
     return (valRaw) => {
-      const val = typeof valRaw === 'number' ? valRaw : parseFloat(valRaw);
-      if (!Number.isFinite(val)) return false;
-      return val >= min && val <= max;
+      const v = Number(valRaw);
+      return Number.isFinite(v) && v >= min && v <= max;
     };
   }
-
-  // No thresholds configured -> nothing matches
   return () => false;
 }
 
+// ------------------------------------------------------
+// component
+// ------------------------------------------------------
 export default function MapView() {
   const [rawLocations, setRawLocations] = useState([]);
   const [thresholds, setThresholds] = useState(defaultThresholds);
@@ -141,12 +152,11 @@ export default function MapView() {
 
   const [showCoverageHolesOnly, setShowCoverageHolesOnly] = useState(false);
 
-  // --- DEBUGGING: Log the projectId from URL ---
   useEffect(() => {
     console.log('Project ID from URL:', projectId);
   }, [projectId]);
 
-  // --- useEffect to fetch prediction data ---
+  // prediction fetch
   useEffect(() => {
     if (!isPredictionMode || !projectId) {
       setPredictionData(null);
@@ -154,14 +164,13 @@ export default function MapView() {
     }
 
     const fetchPredictions = async () => {
-      console.log(`Fetching predictions for project ${projectId} with metric ${selectedMetric}`);
       setPredictionLoading(true);
       try {
         const params = {
           projectId,
           metric: selectedMetric.toUpperCase(),
           pointsInsideBuilding: 0,
-          token: '', // Add empty token to satisfy the backend if it's not nullable
+          token: '',
         };
         const response = await mapViewApi.getPredictionLog(params);
         if (response.Status === 1 && response.Data) {
@@ -182,7 +191,7 @@ export default function MapView() {
     fetchPredictions();
   }, [isPredictionMode, projectId, selectedMetric]);
 
-  // Load thresholds and filter options
+  // thresholds and filter options
   useEffect(() => {
     const run = async () => {
       try {
@@ -222,7 +231,7 @@ export default function MapView() {
     run();
   }, []);
 
-  // Load session logs
+  // session logs
   useEffect(() => {
     if (sessionIds.length === 0) {
       setLoading(false);
@@ -240,9 +249,7 @@ export default function MapView() {
           mapViewApi.getNetworkLog({ session_id: sessionId }, { limit: 10000 })
         );
         const results = await Promise.all(promises);
-
         const allLogs = results.flatMap(resp => resp?.Data ?? resp?.data ?? resp ?? []);
-
         if (allLogs.length === 0) {
           toast.warn('No location data found for the selected sessions.');
           setRawLocations([]);
@@ -254,7 +261,6 @@ export default function MapView() {
                 log.lon ?? log.lng ?? log.Lng ?? log.longitude ?? log.Longitude
               );
               if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-
               return {
                 lat, lng, radius: 18,
                 timestamp: log.timestamp ?? log.time ?? log.created_at ?? log.createdAt,
@@ -274,14 +280,12 @@ export default function MapView() {
           setRawLocations(formatted);
         }
       } catch (err) {
-        console.error(err);
         toast.error(`Failed to fetch session data: ${err.message || 'Unknown error'}`);
         setError(`Failed to load data for session IDs: ${sessionIds.join(', ')}`);
       } finally {
         setLoading(false);
       }
     };
-
     fetchAllSessionLogs();
   }, [sessionIds, projectId]);
 
@@ -289,10 +293,15 @@ export default function MapView() {
     setFilters(prev => ({ ...prev, [filterName]: value }));
   };
 
+  // ------------------------------------------------------
+  // build locations
+  // ------------------------------------------------------
   const locationsForMap = useMemo(() => {
+    let filteredLocations = [];
+
     if (isPredictionMode) {
       if (!predictionData?.dataList) return [];
-      return predictionData.dataList.map(point => {
+      filteredLocations = predictionData.dataList.map(point => {
         const setting = predictionData.colorSetting?.find(c => point.prm >= c.min && point.prm <= c.max);
         return {
           lat: point.lat,
@@ -302,28 +311,20 @@ export default function MapView() {
           [selectedMetric]: point.prm,
         };
       });
+    } else {
+      filteredLocations = rawLocations;
+      if (filters.operator !== 'ALL') filteredLocations = filteredLocations.filter(loc => loc.operator === filters.operator);
+      if (filters.technology !== 'ALL') filteredLocations = filteredLocations.filter(loc => loc.technology === filters.technology);
+      if (filters.band !== 'ALL') filteredLocations = filteredLocations.filter(loc => loc.band === filters.band);
     }
 
-    let filteredLocations = rawLocations;
-
-    if (filters.operator !== 'ALL') {
-      filteredLocations = filteredLocations.filter(loc => loc.operator === filters.operator);
-    }
-    if (filters.technology !== 'ALL') {
-      filteredLocations = filteredLocations.filter(loc => loc.technology === filters.technology);
-    }
-    if (filters.band !== 'ALL') {
-      filteredLocations = filteredLocations.filter(loc => loc.band === filters.band);
-    }
-
-    // Apply "Coverage holes only" filter
     if (showCoverageHolesOnly) {
       const metricKey = normalizeMetricKey(selectedMetric);
-      const isHole = makeCoverageHolePredicate(metricKey, thresholds);
+      const isHole = makeCoverageHolePredicate(metricKey, thresholds, isPredictionMode, predictionData);
       filteredLocations = filteredLocations.filter(loc => isHole(loc[metricKey]));
     }
 
-    if (colorMode === 'path') {
+    if (colorMode === 'path' && !isPredictionMode) {
       return filteredLocations.map((loc, index, arr) => {
         let color = '#007BFF';
         if (index === 0) color = '#28a745';
@@ -347,6 +348,9 @@ export default function MapView() {
     return <div className="flex items-center justify-center h-screen text-red-500">{error}</div>;
   }
 
+  // ------------------------------------------------------
+  // render
+  // ------------------------------------------------------
   return (
     <div className="p-6 h-screen flex flex-col gap-4 bg-gray-50">
       <div className="flex justify-between items-start gap-2">
@@ -428,8 +432,7 @@ export default function MapView() {
             <button
               type="button"
               onClick={() => setColorMode('thresholds')}
-              className={`px-3 py-1 text-sm border rounded-l-md ${colorMode === 'thresholds' && !isPredictionMode ? 'bg-blue-600 text-white' : 'bg-white'}`}
-              disabled={isPredictionMode}
+              className={`px-3 py-1 text-sm border rounded-l-md ${colorMode === 'thresholds' ? 'bg-blue-600 text-white' : 'bg-white'}`}
               title="Color by metric thresholds"
             >
               Thresholds
@@ -437,8 +440,7 @@ export default function MapView() {
             <button
               type="button"
               onClick={() => setColorMode('path')}
-              className={`px-3 py-1 text-sm border ${colorMode === 'path' && !isPredictionMode ? 'bg-blue-600 text-white' : 'bg-white'}`}
-              disabled={isPredictionMode}
+              className={`px-3 py-1 text-sm border ${colorMode === 'path' ? 'bg-blue-600 text-white' : 'bg-white'}`}
               title="Show path from start (green) to end (red)"
             >
               Path
@@ -446,10 +448,7 @@ export default function MapView() {
             {projectId && (
               <button
                 type="button"
-                onClick={() => {
-                  console.log('Prediction button clicked. Current mode:', isPredictionMode);
-                  setIsPredictionMode(p => !p);
-                }}
+                onClick={() => setIsPredictionMode(p => !p)}
                 className={`px-3 py-1 text-sm border rounded-r-md ${isPredictionMode ? 'bg-green-600 text-white' : 'bg-white'}`}
                 title="Toggle prediction data view for this project"
               >
@@ -466,8 +465,7 @@ export default function MapView() {
             className="h-4 w-4"
             checked={showCoverageHolesOnly}
             onChange={(e) => setShowCoverageHolesOnly(e.target.checked)}
-            disabled={isPredictionMode}
-            title="Show only points that fall into the coverage hole bucket for the selected metric"
+            title="Show only points that fall into the coverage hole bucket"
           />
           <label htmlFor="holesOnly" className="text-sm font-medium">
             Coverage holes only
@@ -499,5 +497,3 @@ export default function MapView() {
     </div>
   );
 }
-
-//+1
