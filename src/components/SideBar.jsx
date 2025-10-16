@@ -11,8 +11,9 @@ const SideBar = ({ collapsed }) => {
     { icon: Map, text: 'Map View', path: '/mapview' },
     { icon: FolderPlus, text: 'Projects', path: '/create-project' },
     { icon: Users, text: 'Manage User', path: '/manage-users' },
-    { icon: Settings, text: 'Setting', path: '/settings' },
     { icon: ReceiptPoundSterling, text: 'GetReport', path: '/getreport' },
+    { icon: Settings, text: 'Setting', path: '/settings' },
+    
   ];
 
   return (

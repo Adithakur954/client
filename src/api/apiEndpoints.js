@@ -70,7 +70,7 @@ api.post("/api/MapView/CreateProjectWithPolygons", payload).then(r => r.data),
       
 
       getPredictionLog: (params) =>
-    api.get("/api/MapView/GetPredictionLog", { params }),
+    api.post("/api/MapView/GetPredictionLog", { params }),
 
  
   getNetworkLog: (sessionLike) => {
@@ -101,8 +101,8 @@ api.post("/api/MapView/CreateProjectWithPolygons", payload).then(r => r.data),
       params: { session_id: sid },
     });
   },
-  getPredictionLog: (params) =>
-    api.get("/api/MapView/GetPredictionLog", { params }),
+  // getPredictionLog: (params) =>
+  //   api.get("/api/MapView/GetPredictionLog", { params }),
 
   getProjectPolygons: (projectId) =>
     api.get(`/api/MapView/GetProjectPolygons?projectId=${projectId}`),

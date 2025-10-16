@@ -149,7 +149,7 @@ const MapWithMultipleCircles = ({
         <GoogleMap
             mapContainerStyle={mapContainerStyle}
             center={initialCenter}
-            zoom={12}
+           
             onLoad={onMapLoad}
             onIdle={onIdle}
             onClick={() => onMarkerClick?.(null)}

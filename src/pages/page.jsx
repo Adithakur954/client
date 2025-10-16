@@ -468,7 +468,7 @@ export default function MapView() {
             title="Show only points that fall into the coverage hole bucket"
           />
           <label htmlFor="holesOnly" className="text-sm font-medium">
-            Coverage holes only
+            Coverage holes
           </label>
         </div>
       </div>

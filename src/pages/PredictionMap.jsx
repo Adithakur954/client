@@ -1,5 +1,5 @@
 // src/pages/PredictionMap.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { GoogleMap, useJsApiLoader, Circle } from '@react-google-maps/api';
 import { toast } from 'react-toastify';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -14,6 +14,7 @@ const PredictionMapPage = () => {
     const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
     const [predictionData, setPredictionData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [map, setMap] = useState(null); // State to hold the map instance
 
     // --- FILTERS ---
     const [projectId, setProjectId] = useState(1); // Default to a project ID for demo
@@ -57,6 +58,30 @@ const PredictionMapPage = () => {
             color: item.color,
         })) || [];
     }, [coveragePerfGraph]);
+
+    // This effect will run when the map or data changes to fit the map to the data points.
+    useEffect(() => {
+        if (!map || !dataList || dataList.length === 0 || !window.google) return;
+
+        const bounds = new window.google.maps.LatLngBounds();
+        dataList.forEach(point => {
+            if (Number.isFinite(point.lat) && Number.isFinite(point.lon)) {
+                bounds.extend({ lat: point.lat, lng: point.lon });
+            }
+        });
+
+        if (!bounds.isEmpty()) {
+            map.fitBounds(bounds);
+            // Optional: prevent zooming in too close on a single point
+            const listener = window.google.maps.event.addListenerOnce(map, 'idle', () => {
+                if (map.getZoom() > 17) {
+                    map.setZoom(17);
+                }
+            });
+            // Clean up the listener
+            return () => window.google.maps.event.removeListener(listener);
+        }
+    }, [map, dataList]);
 
 
     if (loadError) return <div>Error loading map.</div>;
@@ -117,7 +142,8 @@ const PredictionMapPage = () => {
                         <GoogleMap
                             mapContainerStyle={MAP_CONTAINER_STYLE}
                             center={DEFAULT_CENTER}
-                            zoom={12}
+                            zoom={5}
+                            onLoad={setMap} // Set the map instance on load
                         >
                             {dataList.map((point, index) => (
                                 <Circle
