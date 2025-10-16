@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Upload, History, Map, Settings, Users} from 'lucide-react';
+import { LayoutDashboard, Upload, History, Map, Settings,FolderPlus, Users, ReceiptPoundSterling} from 'lucide-react';
 import VinfocomLogo from '../assets/vinfocom_logo.png';
 
 const SideBar = ({ collapsed }) => {
@@ -9,9 +9,10 @@ const SideBar = ({ collapsed }) => {
     { icon: Upload, text: 'Upload Data', path: '/upload-data' },
     { icon: History, text: 'Manage Drive Sessions', path: '/drive-test-sessions' },
     { icon: Map, text: 'Map View', path: '/mapview' },
-    
+    { icon: FolderPlus, text: 'Projects', path: '/create-project' },
     { icon: Users, text: 'Manage User', path: '/manage-users' },
     { icon: Settings, text: 'Setting', path: '/settings' },
+    { icon: ReceiptPoundSterling, text: 'GetReport', path: '/getreport' },
   ];
 
   return (
@@ -21,8 +22,8 @@ const SideBar = ({ collapsed }) => {
     >
       {/* Logo */}
       <div className="p-4 flex items-center justify-center border-b border-gray-700">
-        <img src={VinfocomLogo} alt="Vinfocom Logo" className="h-10" />
-        {!collapsed && <span className="ml-2 font-bold">Vinfocom</span>}
+        <img src={VinfocomLogo} alt="Netpulse Logo" className="h-10" />
+        {!collapsed && <span className="ml-2 font-bold">NetPulse</span>}
       </div>
 
       {/* Navigation */}

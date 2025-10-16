@@ -1,13 +1,12 @@
-// src/pages/MapView.jsx
+// src/pages/page.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useJsApiLoader } from '@react-google-maps/api';
 import { toast } from 'react-toastify';
 
 import MapWithMultipleCircles from '../components/MapwithMultipleCircle';
+import Spinner from '../components/common/Spinner';
 import { GOOGLE_MAPS_LOADER_OPTIONS } from '../lib/googleMapsLoader';
-
-// Adjust these to your actual paths
 import { mapViewApi, settingApi } from '../api/apiEndpoints';
 
 const METRICS = [
@@ -30,27 +29,171 @@ const defaultThresholds = {
   lte_bler: [],
 };
 
+const canonicalOperatorName = (raw) => {
+  if (!raw && raw !== 0) return 'Unknown';
+  let s = String(raw).trim();
+  s = s.replace(/^IND[-\s]*/i, '');
+  const lower = s.toLowerCase();
+  if (lower === '//////' || lower === '404011') return 'Unknown';
+  if (lower.includes('jio')) return 'JIO';
+  if (lower.includes('airtel')) return 'Airtel';
+  if (lower.includes('vodafone') || lower.startsWith('vi')) return 'Vi (Vodafone Idea)';
+  return s;
+};
+
+// Map the UI-selected metric to the underlying data/threshold key
+const METRIC_KEY_BY_SELECT = {
+  rsrp: 'rsrp',
+  rsrq: 'rsrq',
+  sinr: 'sinr',
+  'dl-throughput': 'dl_thpt',
+  'ul-throughput': 'ul_thpt',
+  mos: 'mos',
+  'lte-bler': 'lte_bler',
+};
+
+const normalizeMetricKey = (selectedMetric) =>
+  METRIC_KEY_BY_SELECT[selectedMetric] || selectedMetric;
+
+// Build a predicate that returns true when a value falls in the "coverage hole" bucket
+function makeCoverageHolePredicate(metricKey, thresholds) {
+  const lowerIsWorse = ['rsrp', 'rsrq', 'sinr', 'dl_thpt', 'ul_thpt', 'mos'].includes(metricKey);
+  const arr = thresholds?.[metricKey] || [];
+
+  const labStr = (x) => String(x ?? '').toLowerCase();
+
+  // Prefer an explicit bucket label mentioning "hole" or "no coverage"
+  let bucket = arr.find(x => {
+    const label = labStr(x.label || x.name || x.title);
+    return label.includes('hole') || label.includes('no coverage') || label.includes('nocoverage');
+  });
+
+  // Fallback: choose the worst bucket heuristically
+  if (!bucket && arr.length) {
+    if (lowerIsWorse) {
+      // Worst = bucket on the lowest end (smallest max/min)
+      bucket = [...arr].sort((a, b) => {
+        const aEdge = Number.isFinite(a.max) ? a.max : (Number.isFinite(a.min) ? a.min : Infinity);
+        const bEdge = Number.isFinite(b.max) ? b.max : (Number.isFinite(b.min) ? b.min : Infinity);
+        return aEdge - bEdge;
+      })[0];
+    } else {
+      // Higher is worse (e.g., BLER): choose the highest-end bucket
+      bucket = [...arr].sort((a, b) => {
+        const aEdge = Number.isFinite(a.min) ? a.min : (Number.isFinite(a.max) ? a.max : -Infinity);
+        const bEdge = Number.isFinite(b.min) ? b.min : (Number.isFinite(b.max) ? b.max : -Infinity);
+        return bEdge - aEdge;
+      })[0];
+    }
+  }
+
+  if (bucket) {
+    const hasMin = Number.isFinite(bucket.min);
+    const hasMax = Number.isFinite(bucket.max);
+    const min = hasMin ? Number(bucket.min) : Number.NEGATIVE_INFINITY;
+    const max = hasMax ? Number(bucket.max) : Number.POSITIVE_INFINITY;
+
+    return (valRaw) => {
+      const val = typeof valRaw === 'number' ? valRaw : parseFloat(valRaw);
+      if (!Number.isFinite(val)) return false;
+      return val >= min && val <= max;
+    };
+  }
+
+  // No thresholds configured -> nothing matches
+  return () => false;
+}
+
 export default function MapView() {
   const [rawLocations, setRawLocations] = useState([]);
   const [thresholds, setThresholds] = useState(defaultThresholds);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const [activeMarker, setActiveMarker] = useState(null);
   const [selectedMetric, setSelectedMetric] = useState('rsrp');
-  const [colorMode, setColorMode] = useState('thresholds'); // 'thresholds' | 'path'
+  const [colorMode, setColorMode] = useState('thresholds');
 
   const [searchParams] = useSearchParams();
-  const sessionId = useMemo(() => searchParams.get('session'), [searchParams]);
+  const sessionIds = useMemo(() => {
+    const sessionParam = searchParams.get('session');
+    return sessionParam ? sessionParam.split(',').filter(id => id) : [];
+  }, [searchParams]);
+
+  const projectId = useMemo(() => searchParams.get('project_id'), [searchParams]);
+  const [isPredictionMode, setIsPredictionMode] = useState(false);
+  const [predictionData, setPredictionData] = useState(null);
+  const [predictionLoading, setPredictionLoading] = useState(false);
 
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
-  // Load thresholds
+  const [filters, setFilters] = useState({
+    operator: 'ALL',
+    technology: 'ALL',
+    band: 'ALL',
+  });
+
+  const [filterOptions, setFilterOptions] = useState({
+    operators: [],
+    technologies: [],
+    bands: [],
+  });
+
+  const [showCoverageHolesOnly, setShowCoverageHolesOnly] = useState(false);
+
+  // --- DEBUGGING: Log the projectId from URL ---
+  useEffect(() => {
+    console.log('Project ID from URL:', projectId);
+  }, [projectId]);
+
+  // --- useEffect to fetch prediction data ---
+  useEffect(() => {
+    if (!isPredictionMode || !projectId) {
+      setPredictionData(null);
+      return;
+    }
+
+    const fetchPredictions = async () => {
+      console.log(`Fetching predictions for project ${projectId} with metric ${selectedMetric}`);
+      setPredictionLoading(true);
+      try {
+        const params = {
+          projectId,
+          metric: selectedMetric.toUpperCase(),
+          pointsInsideBuilding: 0,
+          token: '', // Add empty token to satisfy the backend if it's not nullable
+        };
+        const response = await mapViewApi.getPredictionLog(params);
+        if (response.Status === 1 && response.Data) {
+          setPredictionData(response.Data);
+          toast.success(`Loaded ${response.Data.dataList.length} prediction points.`);
+        } else {
+          toast.error(response.Message || 'Failed to fetch predictions.');
+          setPredictionData(null);
+        }
+      } catch (err) {
+        toast.error(`Error fetching prediction data: ${err.message}`);
+        setPredictionData(null);
+      } finally {
+        setPredictionLoading(false);
+      }
+    };
+
+    fetchPredictions();
+  }, [isPredictionMode, projectId, selectedMetric]);
+
+  // Load thresholds and filter options
   useEffect(() => {
     const run = async () => {
       try {
-        const res = await settingApi.getThresholdSettings();
-        const d = res?.Data;
+        const [thresholdRes, providersRes, techRes, bandsRes] = await Promise.all([
+          settingApi.getThresholdSettings(),
+          mapViewApi.getProviders(),
+          mapViewApi.getTechnologies(),
+          mapViewApi.getBands(),
+        ]);
+
+        const d = thresholdRes?.Data;
         if (d) {
           setThresholds({
             rsrp: JSON.parse(d.rsrp_json || '[]'),
@@ -62,8 +205,18 @@ export default function MapView() {
             lte_bler: JSON.parse(d.lte_bler_json || '[]'),
           });
         }
-      } catch {
-        // use fallback colors automatically
+
+        const rawOperators = providersRes || [];
+        const normalizedOperatorSet = new Set(rawOperators.map(op => canonicalOperatorName(op.name)));
+        const normalizedOperators = Array.from(normalizedOperatorSet).map(name => ({ id: name, name }));
+
+        setFilterOptions({
+          operators: normalizedOperators,
+          technologies: techRes || [],
+          bands: bandsRes || [],
+        });
+      } catch (e) {
+        toast.error('Failed to load map settings.');
       }
     };
     run();
@@ -71,98 +224,146 @@ export default function MapView() {
 
   // Load session logs
   useEffect(() => {
-    if (!sessionId) {
-      setError('No session ID provided.');
+    if (sessionIds.length === 0) {
       setLoading(false);
+      if (!projectId) {
+        setError('No session ID provided in URL.');
+      }
       return;
     }
 
-    const fetchSessionLogs = async () => {
+    const fetchAllSessionLogs = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        const resp = await mapViewApi.getNetworkLog({ session_id: sessionId }, { limit: 10000 });
-        const rows = resp?.Data ?? resp?.data ?? resp ?? [];
+        const promises = sessionIds.map(sessionId =>
+          mapViewApi.getNetworkLog({ session_id: sessionId }, { limit: 10000 })
+        );
+        const results = await Promise.all(promises);
 
-        if (!Array.isArray(rows) || rows.length === 0) {
-          toast.warn('No location data found for this session.');
+        const allLogs = results.flatMap(resp => resp?.Data ?? resp?.data ?? resp ?? []);
+
+        if (allLogs.length === 0) {
+          toast.warn('No location data found for the selected sessions.');
           setRawLocations([]);
-          return;
+        } else {
+          const formatted = allLogs
+            .map((log) => {
+              const lat = parseFloat(log.lat ?? log.Lat ?? log.latitude ?? log.Latitude);
+              const lng = parseFloat(
+                log.lon ?? log.lng ?? log.Lng ?? log.longitude ?? log.Longitude
+              );
+              if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+              return {
+                lat, lng, radius: 18,
+                timestamp: log.timestamp ?? log.time ?? log.created_at ?? log.createdAt,
+                rsrp: log.rsrp ?? log.RSRP ?? log.rsrp_dbm,
+                rsrq: log.rsrq ?? log.RSRQ,
+                sinr: log.sinr ?? log.SINR,
+                dl_thpt: log.dl_thpt ?? log.dl_tpt ?? log.DL ?? log.download ?? log.download_throughput,
+                ul_thpt: log.ul_thpt ?? log.ul_tpt ?? log.UL ?? log.upload ?? log.upload_throughput,
+                mos: log.mos ?? log.MOS,
+                lte_bler: log.lte_bler ?? log.LTE_BLER ?? log.bler,
+                operator: canonicalOperatorName(log.operator_name),
+                technology: log.technology,
+                band: log.band,
+              };
+            })
+            .filter(Boolean);
+          setRawLocations(formatted);
         }
-
-        const formatted = rows
-          .map((log) => {
-            const lat = parseFloat(log.lat ?? log.Lat ?? log.latitude ?? log.Latitude);
-            const lng = parseFloat(
-              log.lon ?? log.lng ?? log.Lng ?? log.longitude ?? log.Longitude
-            );
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-
-            return {
-              lat,
-              lng,
-              radius: 18,
-              timestamp: log.timestamp ?? log.time ?? log.created_at ?? log.createdAt,
-              rsrp: log.rsrp ?? log.RSRP ?? log.rsrp_dbm,
-              rsrq: log.rsrq ?? log.RSRQ,
-              sinr: log.sinr ?? log.SINR,
-              dl_thpt: log.dl_thpt ?? log.dl_tpt ?? log.DL ?? log.download ?? log.download_throughput,
-              ul_thpt: log.ul_thpt ?? log.ul_tpt ?? log.UL ?? log.upload ?? log.upload_throughput,
-              mos: log.mos ?? log.MOS,
-              lte_bler: log.lte_bler ?? log.LTE_BLER ?? log.bler,
-            };
-          })
-          .filter(Boolean);
-
-        setRawLocations(formatted);
       } catch (err) {
         console.error(err);
-        toast.error(`Failed to fetch session data: ${err?.message || 'Unknown error'}`);
-        setError(`Failed to load data for session ID: ${sessionId}`);
+        toast.error(`Failed to fetch session data: ${err.message || 'Unknown error'}`);
+        setError(`Failed to load data for session IDs: ${sessionIds.join(', ')}`);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSessionLogs();
-  }, [sessionId]);
+    fetchAllSessionLogs();
+  }, [sessionIds, projectId]);
 
-  // Apply color mode (thresholds vs path start/end)
-  const locations = useMemo(() => {
-    if (colorMode !== 'path') return rawLocations;
+  const handleFilterChange = (filterName, value) => {
+    setFilters(prev => ({ ...prev, [filterName]: value }));
+  };
 
-    // Override color: start green, end red, middle blue
-    return rawLocations.map((loc, index, arr) => {
-      let color = '#007BFF'; // middle
-      if (index === 0) color = '#28a745'; // start
-      if (index === arr.length - 1) color = '#dc3545'; // end
-      return { ...loc, color };
-    });
-  }, [rawLocations, colorMode]);
+  const locationsForMap = useMemo(() => {
+    if (isPredictionMode) {
+      if (!predictionData?.dataList) return [];
+      return predictionData.dataList.map(point => {
+        const setting = predictionData.colorSetting?.find(c => point.prm >= c.min && point.prm <= c.max);
+        return {
+          lat: point.lat,
+          lng: point.lon,
+          radius: 15,
+          color: setting ? setting.color : '#808080',
+          [selectedMetric]: point.prm,
+        };
+      });
+    }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900" />
-      </div>
-    );
-  }
+    let filteredLocations = rawLocations;
+
+    if (filters.operator !== 'ALL') {
+      filteredLocations = filteredLocations.filter(loc => loc.operator === filters.operator);
+    }
+    if (filters.technology !== 'ALL') {
+      filteredLocations = filteredLocations.filter(loc => loc.technology === filters.technology);
+    }
+    if (filters.band !== 'ALL') {
+      filteredLocations = filteredLocations.filter(loc => loc.band === filters.band);
+    }
+
+    // Apply "Coverage holes only" filter
+    if (showCoverageHolesOnly) {
+      const metricKey = normalizeMetricKey(selectedMetric);
+      const isHole = makeCoverageHolePredicate(metricKey, thresholds);
+      filteredLocations = filteredLocations.filter(loc => isHole(loc[metricKey]));
+    }
+
+    if (colorMode === 'path') {
+      return filteredLocations.map((loc, index, arr) => {
+        let color = '#007BFF';
+        if (index === 0) color = '#28a745';
+        if (index === arr.length - 1) color = '#dc3545';
+        return { ...loc, color };
+      });
+    }
+    return filteredLocations;
+  }, [
+    isPredictionMode,
+    predictionData,
+    rawLocations,
+    colorMode,
+    filters,
+    selectedMetric,
+    showCoverageHolesOnly,
+    thresholds,
+  ]);
+
   if (error) {
     return <div className="flex items-center justify-center h-screen text-red-500">{error}</div>;
   }
 
   return (
-    <div className="p-6 h-screen flex flex-col gap-4">
+    <div className="p-6 h-screen flex flex-col gap-4 bg-gray-50">
       <div className="flex justify-between items-start gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">Drive Session Map View</h1>
-          <p className="text-sm text-gray-500">Session ID: {sessionId}</p>
+          <h1 className="text-2xl font-semibold">
+            {isPredictionMode ? `Prediction View for Project ${projectId}` : 'Drive Session Map View'}
+          </h1>
+          <p className="text-sm text-gray-500">
+            {isPredictionMode ? 'Showing predicted signal values' : `Session ID(s): ${sessionIds.join(', ') || 'None'}`}
+          </p>
         </div>
-        <Link to="/drive-test-sessions" className="text-blue-500 hover:underline">
+        <Link to="/drive-test-sessions" className="text-blue-500 hover:underline flex-shrink-0">
           ← Back to Sessions
         </Link>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium">Metric</label>
           <select
@@ -177,12 +378,58 @@ export default function MapView() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">Color mode</label>
+          <label className="text-sm font-medium">Operator</label>
+          <select
+            className="border rounded px-2 py-1 text-sm"
+            value={filters.operator}
+            onChange={(e) => handleFilterChange('operator', e.target.value)}
+            disabled={isPredictionMode}
+          >
+            <option value="ALL">All</option>
+            {filterOptions.operators.map(op => (
+              <option key={op.id} value={op.name}>{op.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium">Technology</label>
+          <select
+            className="border rounded px-2 py-1 text-sm"
+            value={filters.technology}
+            onChange={(e) => handleFilterChange('technology', e.target.value)}
+            disabled={isPredictionMode}
+          >
+            <option value="ALL">All</option>
+            {filterOptions.technologies.map(tech => (
+              <option key={tech.id} value={tech.name}>{tech.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium">Band</label>
+          <select
+            className="border rounded px-2 py-1 text-sm"
+            value={filters.band}
+            onChange={(e) => handleFilterChange('band', e.target.value)}
+            disabled={isPredictionMode}
+          >
+            <option value="ALL">All</option>
+            {filterOptions.bands.map(band => (
+              <option key={band.id} value={band.name}>{band.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium">Color Mode</label>
           <div className="inline-flex rounded-md shadow-sm" role="group">
             <button
               type="button"
               onClick={() => setColorMode('thresholds')}
-              className={`px-3 py-1 text-sm border rounded-l ${colorMode === 'thresholds' ? 'bg-blue-600 text-white' : 'bg-white'}`}
+              className={`px-3 py-1 text-sm border rounded-l-md ${colorMode === 'thresholds' && !isPredictionMode ? 'bg-blue-600 text-white' : 'bg-white'}`}
+              disabled={isPredictionMode}
               title="Color by metric thresholds"
             >
               Thresholds
@@ -190,38 +437,67 @@ export default function MapView() {
             <button
               type="button"
               onClick={() => setColorMode('path')}
-              className={`px-3 py-1 text-sm border rounded-r ${colorMode === 'path' ? 'bg-blue-600 text-white' : 'bg-white'}`}
-              title="Start = green, End = red"
+              className={`px-3 py-1 text-sm border ${colorMode === 'path' && !isPredictionMode ? 'bg-blue-600 text-white' : 'bg-white'}`}
+              disabled={isPredictionMode}
+              title="Show path from start (green) to end (red)"
             >
               Path
             </button>
+            {projectId && (
+              <button
+                type="button"
+                onClick={() => {
+                  console.log('Prediction button clicked. Current mode:', isPredictionMode);
+                  setIsPredictionMode(p => !p);
+                }}
+                className={`px-3 py-1 text-sm border rounded-r-md ${isPredictionMode ? 'bg-green-600 text-white' : 'bg-white'}`}
+                title="Toggle prediction data view for this project"
+              >
+                Predictions
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="text-sm text-gray-600">
-          {colorMode === 'thresholds'
-            ? <>Colors reflect <span className="font-semibold">{METRICS.find(m => m.value === selectedMetric)?.label}</span> thresholds.</>
-            : <>The path starts <span className="text-green-600 font-semibold">green</span> and ends <span className="text-red-600 font-semibold">red</span>.</>}
+        <div className="flex items-center gap-2">
+          <input
+            id="holesOnly"
+            type="checkbox"
+            className="h-4 w-4"
+            checked={showCoverageHolesOnly}
+            onChange={(e) => setShowCoverageHolesOnly(e.target.checked)}
+            disabled={isPredictionMode}
+            title="Show only points that fall into the coverage hole bucket for the selected metric"
+          />
+          <label htmlFor="holesOnly" className="text-sm font-medium">
+            Coverage holes only
+          </label>
         </div>
       </div>
 
-      <div className="flex-grow rounded-lg border shadow-sm overflow-hidden">
-        {locations.length > 0 ? (
-          <MapWithMultipleCircles
-            isLoaded={isLoaded}
-            loadError={loadError}
-            locations={locations}
-            thresholds={thresholds}
-            selectedMetric={selectedMetric}
-            activeMarkerIndex={activeMarker}
-            onMarkerClick={setActiveMarker}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p>No valid location data to display.</p>
+      <div className="flex-grow rounded-lg border shadow-sm overflow-hidden relative">
+        {(loading || predictionLoading) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/70 z-10">
+            <Spinner />
+          </div>
+        )}
+        <MapWithMultipleCircles
+          isLoaded={isLoaded}
+          loadError={loadError}
+          locations={locationsForMap}
+          thresholds={thresholds}
+          selectedMetric={selectedMetric}
+          activeMarkerIndex={activeMarker}
+          onMarkerClick={setActiveMarker}
+        />
+        {locationsForMap.length === 0 && !loading && !predictionLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/70 pointer-events-none">
+            <p className="text-lg font-semibold text-gray-700">No data to display for the current selection.</p>
           </div>
         )}
       </div>
     </div>
   );
 }
+
+//+1

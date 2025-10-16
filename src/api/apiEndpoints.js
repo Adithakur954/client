@@ -4,7 +4,7 @@ import { api } from "./apiService";
 
 /* ---------------- AUTH ---------------- */
 export const authApi = {
-  checkStatus: () => api.get("/api/auth/status"), 
+  checkStatus: () => api.get("/api/auth/status"),
 };
 
 /* ---------------- ADMIN CONTROLLER ---------------- */
@@ -37,7 +37,8 @@ export const adminApi = {
 
   getSessions: () => api.get("/Admin/GetSessions"),
 
-  getAllNetworkLogs: (params) => api.get("/Admin/GetAllNetworkLogs", { params }),
+  getAllNetworkLogs: (params) =>
+    api.get("/Admin/GetAllNetworkLogs", { params }),
 
   // If your actual route is /Admin/DeleteSession?id=..., use that; the double segment looked suspicious
   deleteSession: (sessionId) =>
@@ -58,9 +59,20 @@ export const mapViewApi = {
   startSession: (data) => api.post("/api/MapView/start_session", data),
 
   endSession: (data) => api.post("/api/MapView/end_session", data),
+ createProjectWithPolygons: (payload) =>
+api.post("/api/MapView/CreateProjectWithPolygons", payload).then(r => r.data),
+  getAvailablePolygons: () => api.get("/api/MapView/GetAvailablePolygons"),
+  assignPolygonToProject: (polygonId, projectId) =>
+    api.post("/api/MapView/AssignPolygonToProject", null, {
+      params: { polygonId, projectId },
+    }),
 
-  
+      
 
+      getPredictionLog: (params) =>
+    api.get("/api/MapView/GetPredictionLog", { params }),
+
+ 
   getNetworkLog: (sessionLike) => {
     const extractId = (s) => {
       if (s == null) return "";
@@ -77,13 +89,23 @@ export const mapViewApi = {
       return String(s);
     };
     const sid = extractId(sessionLike);
-    console.log("[mapViewApi.getNetworkLog] input:", sessionLike, "-> sid:", sid, "typeof sid:", typeof sid);
-    return api.get("/api/MapView/GetNetworkLog", { params: { session_id: sid } });
+    console.log(
+      "[mapViewApi.getNetworkLog] input:",
+      sessionLike,
+      "-> sid:",
+      sid,
+      "typeof sid:",
+      typeof sid
+    );
+    return api.get("/api/MapView/GetNetworkLog", {
+      params: { session_id: sid },
+    });
   },
-  getPredictionLog: (params) => api.get("/api/MapView/GetPredictionLog", { params }),
+  getPredictionLog: (params) =>
+    api.get("/api/MapView/GetPredictionLog", { params }),
 
   getProjectPolygons: (projectId) =>
-    api.get(`/api/MapView/GetProjectPolygons`, { params: { projectId } }),
+    api.get(`/api/MapView/GetProjectPolygons?projectId=${projectId}`),
 
   getProjects: () => api.get("/api/MapView/GetProjects"),
   getBands: () => api.get("/api/MapView/GetBands"),
@@ -95,6 +117,7 @@ export const mapViewApi = {
 
   getProviders: () => api.get("/api/MapView/GetProviders"),
   getTechnologies: () => api.get("/api/MapView/GetTechnologies"),
+  savePolygon: (payload) => api.post("/api/MapView/SavePolygon", payload),
 };
 
 /* ---------------- HOME CONTROLLER ---------------- */
@@ -132,10 +155,12 @@ export const excelApi = {
     api.get("/ExcelUpload/DownloadExcel", { params: { FileType: fileType } }),
 
   getUploadedFiles: (type) =>
-    api.get(`/ExcelUpload/GetUploadedExcelFiles`, { params: { FileType: type } }),
+    api.get(`/ExcelUpload/GetUploadedExcelFiles`, {
+      params: { FileType: type },
+    }),
 
   getSessions: (fromDate, toDate) =>
-    api.get("/api/excel/sessions", {
+    api.get("/ExcelUpload/GetSessions", {
       params: {
         fromDate: fromDate.toISOString(),
         toDate: toDate.toISOString(),

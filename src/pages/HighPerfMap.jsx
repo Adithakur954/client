@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { toast } from "react-toastify";
 import MapSearchBox from "@/components/map/MapSearchBox";
+import { Save } from "lucide-react";
 
 // APIs
 import { adminApi, mapViewApi, settingApi } from "@/api/apiEndpoints";
@@ -19,6 +20,17 @@ import DrawingToolsLayer from "@/components/map/tools/DrawingToolsLayer";
 
 // UI
 import MapLegend from "@/components/map/MapLegend";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+
 
 // Utils
 import { loadSavedViewport, saveViewport } from "@/utils/viewport";
@@ -101,6 +113,8 @@ export default function HighPerfMap() {
   });
 
   const [analysis, setAnalysis] = useState(null);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [polygonName, setPolygonName] = useState("");
 
   const [visibleBounds, setVisibleBounds] = useState(null);
   const idleListenerRef = useRef(null);
@@ -215,10 +229,10 @@ export default function HighPerfMap() {
     setActiveFilters(filters);
     setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
     setSelectedSessionData(null);
-    setDrawnLogs([]);
+    setDrawnLogs([]); 
     setAnalysis(null);
     setUi((u) => ({ ...u, showLogsCircles: true }));
-  };
+};
 
   const handleClearFilters = useCallback(() => {
     setActiveFilters(null);
@@ -245,6 +259,78 @@ export default function HighPerfMap() {
     
   };
 
+  const handleSavePolygon = async () => {
+    if (!analysis) {
+      toast.warn("No analysis data to save.");
+      return;
+    }
+    if (!polygonName.trim()) {
+      toast.warn("Please provide a name for the polygon.");
+      return;
+    }
+    
+  
+    // Helper function to get coordinates based on shape type
+    const getCoordinatesFromGeometry = (geometry) => {
+      if (geometry.type === 'polygon' && geometry.polygon) {
+        return geometry.polygon.map(p => [p.lng, p.lat]);
+      }
+      if (geometry.type === 'rectangle' && geometry.rectangle) {
+        const { ne, sw } = geometry.rectangle;
+        return [
+          [sw.lng, ne.lat], [ne.lng, ne.lat],
+          [ne.lng, sw.lat], [sw.lng, sw.lat]
+        ];
+      }
+      if (geometry.type === 'circle' && geometry.circle) {
+        const { center, radius } = geometry.circle;
+        const points = [];
+        const numPoints = 32; // More points for a smoother circle
+        for (let i = 0; i < numPoints; i++) {
+          const angle = (i / numPoints) * 360;
+          const lat = center.lat + (radius / 111111) * Math.cos(angle * Math.PI / 180);
+          const lng = center.lng + (radius / (111111 * Math.cos(center.lat * Math.PI / 180))) * Math.sin(angle * Math.PI / 180);
+          points.push([lng, lat]);
+        }
+        return points;
+      }
+      return null;
+    };
+  
+    const coordinates = getCoordinatesFromGeometry(analysis.geometry);
+  
+    if (!coordinates) {
+      toast.error("Could not determine coordinates for the drawn shape.");
+      return;
+    }
+  
+    const logIds = analysis.logs ? analysis.logs.map(log => log.id).filter(id => id != null) : [];
+  
+    const payload = {
+      
+      name: polygonName,
+      coordinates: coordinates,
+      logIds: logIds,
+    };
+
+    console.log(payload);
+  
+    setIsLoading(true);
+    try {
+      const response = await mapViewApi.savePolygon(payload);
+      if (response.Status === 1) {
+        toast.success(`Polygon "${polygonName}" saved successfully!`);
+        setIsSaveDialogOpen(false);
+        setPolygonName("");
+      } else {
+        toast.error(response.Message || "Failed to save polygon.");
+      }
+    } catch (error) {
+      toast.error(`Error saving polygon: ${error.message || "An unknown error occurred."}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const handleDownloadStatsCsv = useCallback(() => {
     if (!analysis || !analysis.stats) {
@@ -381,7 +467,6 @@ export default function HighPerfMap() {
         polygonStats={analysis}
         onDownloadStatsCsv={handleDownloadStatsCsv}
         onDownloadRawCsv={handleDownloadRawCsv}
-        // moved here so the sidebar is controlled from the header
         onApplyFilters={handleApplyFilters}
         onClearFilters={handleClearFilters}
         initialFilters={activeFilters}
@@ -454,9 +539,15 @@ export default function HighPerfMap() {
 
         {analysis && (
           <div className="absolute bottom-4 left-4 z-30 bg-white/95 dark:bg-gray-900/95 rounded-lg shadow-xl p-4 min-w-[260px] border border-gray-200">
-            <div className="font-semibold mb-2 text-gray-800 dark:text-white flex items-center gap-2">
-              <span className="text-lg">📊</span>
-              Selection Stats
+            <div className="font-semibold mb-2 text-gray-800 dark:text-white flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <span className="text-lg">📊</span>
+                    Selection Stats
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setIsSaveDialogOpen(true)}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save
+                </Button>
             </div>
             <div className="text-sm text-gray-700 dark:text-gray-200 space-y-1.5">
               <div className="flex justify-between border-b border-gray-100 pb-1">
@@ -548,6 +639,34 @@ export default function HighPerfMap() {
             </div>
           </div>
         )}
+
+        <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Save Polygon Analysis</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">
+                            Name
+                        </Label>
+                        <Input
+                            id="name"
+                            value={polygonName}
+                            onChange={(e) => setPolygonName(e.target.value)}
+                            className="col-span-3"
+                            placeholder="e.g., Sector 15 Coverage Gap"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSavePolygon} disabled={!polygonName.trim() || isLoading}>
+                        {isLoading ? "Saving..." : "Save Polygon"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

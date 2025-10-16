@@ -20,6 +20,9 @@ import MapView from './pages/page';
 import AllLogsMapPage from './pages/AllMaplogpage';
 import HighPerfMap from "@/pages/HighPerfMap";
 import LogsCirclesPage from "@/pages/LogsCirclesPage";
+import Projects from './pages/Projects';
+import PredictionMapPage from './pages/PredictionMap';
+import GetReport from './pages/GetReport';
 
 // --- Route Components (Unchanged) ---
 const PrivateRoute = ({ children }) => {
@@ -82,6 +85,9 @@ function App() {
                         <Route path="/alllogs" element={<PrivateRoute><AllLogsMapPage /></PrivateRoute>} />
                         <Route path="/mapview" element={<PrivateRoute><HighPerfMap /></PrivateRoute>} />
                         <Route path="/logscircles" element={<PrivateRoute><LogsCirclesPage /></PrivateRoute>} />
+                         <Route path="/create-project" element={<PrivateRoute><Projects /></PrivateRoute>} />
+                         <Route path="/prediction-map" element={<PrivateRoute><PredictionMapPage /></PrivateRoute>} />
+                         <Route path="/getreport" element={<PrivateRoute><GetReport /></PrivateRoute>} />
                         <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                 

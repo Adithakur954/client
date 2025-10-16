@@ -51,9 +51,10 @@ function DialogContent({ children, showCloseButton = true, ...props }) {
               position: "absolute",
               top: "0.5rem",
               right: "0.5rem",
-              background: "transparent",
+              background: "white",
               border: "none",
               cursor: "pointer",
+              text: "black"
             }}
           >
             <XIcon size={16} />

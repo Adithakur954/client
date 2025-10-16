@@ -1,5 +1,3 @@
-
-
 // const API_BASE_URL = "http://192.168.1.70:5224";
 // const API_BASE_URL = "http://localhost:5224";
 const API_BASE_URL = "https://signaltrackers.onrender.com";
@@ -14,7 +12,7 @@ const apiService = async (endpoint, { body, params, ...customOptions } = {}) => 
       ...headers,
       ...customOptions.headers,
     },
-    credentials: "include", 
+    credentials: "include",
   };
 
   if (body) config.body = isFormData ? body : JSON.stringify(body);
@@ -41,9 +39,14 @@ const apiService = async (endpoint, { body, params, ...customOptions } = {}) => 
       );
     }
 
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) return response.json();
-    return response.blob(); // for files/HTML/redirect content
+    const responseText = await response.text();
+    try {
+      // Always try to parse as JSON first.
+      return JSON.parse(responseText);
+    } catch (e) {
+      // If it fails, it wasn't JSON, so return the raw text.
+      return responseText;
+    }
   } catch (error) {
     console.error(`API call to ${endpoint} failed:`, error);
     throw error;
