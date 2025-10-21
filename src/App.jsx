@@ -1,35 +1,37 @@
-import React from 'react'; // Removed useEffect as it's no longer needed here
+// src/App.jsx
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import AuthProvider, { useAuth } from './context/AuthContext';
 
-
 // --- Page Imports ---
 import LoginPage from './pages/Login';
 import DashboardPage from './pages/Dashboard';
-import MapViewPage from './pages/MapView';
+// import MapViewPage from './pages/MapView'; // This was likely the old 'page.jsx', renaming/removing
+import SimpleMapView from './pages/MapView'; // Renamed import for clarity (specific session view)
 import ManageUsersPage from './pages/ManageUser';
 import DriveTestSessionsPage from './pages/DriveTestSessions';
 import AppLayout from './components/layout/AppLayout';
 import UploadDataPage from './pages/UploadData';
 import SettingsPage from './pages/Setting';
-import ManageSessionPage from './pages/ManageSession';
-import MapView from './pages/page';
-import AllLogsMapPage from './pages/AllMaplogpage';
-import HighPerfMap from "@/pages/HighPerfMap";
-import LogsCirclesPage from "@/pages/LogsCirclesPage";
-import Projects from './pages/Projects';
+// import ManageSessionPage from './pages/ManageSession'; // This seems redundant with DriveTestSessionsPage
+// import MapView from './pages/page'; // Deprecated
+// import AllLogsMapPage from './pages/AllMaplogpage'; // This might be integrated into HighPerfMap or kept separate
+import HighPerfMap from "@/pages/HighPerfMap"; // The main map view with filters/drawing
+import LogsCirclesPage from "@/pages/LogsCirclesPage"; // Separate example page
+import ProjectsPage from './pages/Projects'; // Renamed import
 import PredictionMapPage from './pages/PredictionMap';
-import GetReport from './pages/GetReport';
+import GetReportPage from './pages/GetReport'; // Renamed import
 
-// --- Route Components (Unchanged) ---
+// --- Route Components ---
 const PrivateRoute = ({ children }) => {
     const { isAuthenticated } = useAuth();
     if (!isAuthenticated()) {
         return <Navigate to="/" replace />;
     }
+    // Pass children directly to AppLayout
     return <AppLayout>{children}</AppLayout>;
 };
 
@@ -46,51 +48,34 @@ const NotFoundPage = () => (
     </div>
 );
 
-// A new component to make the ToastContainer theme-aware
-// const ThemedToastContainer = () => {
-//     const { theme } = useTheme();
-//     return (
-//         <ToastContainer
-//             position="top-right"
-//             autoClose={3000}
-//             // The theme now dynamically updates when the context changes
-//             theme={theme === 'system' 
-//                 ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') 
-//                 : theme
-//             }
-//         />
-//     );
-// };
-
 function App() {
-    // The old useEffect for theme has been removed. The ThemeProvider now handles everything.
     return (
         <Router>
             <AuthProvider>
-                {/* Wrap the entire app in the ThemeProvider */}
-                
-                    
-                    <Routes>
-                        <Route path="/" element={<PublicRoute><LoginPage /></PublicRoute>} />
-                        
-                        {/* Private Routes */}
-                        <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-                        <Route path="/drive-test-sessions" element={<PrivateRoute><DriveTestSessionsPage /></PrivateRoute>} />
-                        <Route path="/map-view" element={<PrivateRoute><MapViewPage /></PrivateRoute>} />
-                        <Route path="/manage-users" element={<PrivateRoute><ManageUsersPage /></PrivateRoute>} />
-                        <Route path="/upload-data" element={<PrivateRoute><UploadDataPage /></PrivateRoute>} />
-                        <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
-                        <Route path="/manage-session" element={<PrivateRoute><ManageSessionPage /></PrivateRoute>} />
-                        <Route path="/map" element={<PrivateRoute><MapView /></PrivateRoute>} />
-                        <Route path="/alllogs" element={<PrivateRoute><AllLogsMapPage /></PrivateRoute>} />
-                        <Route path="/mapview" element={<PrivateRoute><HighPerfMap /></PrivateRoute>} />
-                        <Route path="/logscircles" element={<PrivateRoute><LogsCirclesPage /></PrivateRoute>} />
-                         <Route path="/create-project" element={<PrivateRoute><Projects /></PrivateRoute>} />
-                         <Route path="/prediction-map" element={<PrivateRoute><PredictionMapPage /></PrivateRoute>} />
-                         <Route path="/getreport" element={<PrivateRoute><GetReport /></PrivateRoute>} />
-                        <Route path="*" element={<NotFoundPage />} />
-                    </Routes>
-                
+                <ToastContainer position="top-right" autoClose={3000} theme="colored" />
+                <Routes>
+                    <Route path="/" element={<PublicRoute><LoginPage /></PublicRoute>} />
+
+                    {/* Private Routes - Wrap content with PrivateRoute */}
+                    <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+                    <Route path="/drive-test-sessions" element={<PrivateRoute><DriveTestSessionsPage /></PrivateRoute>} />
+                    {/* Main Map view with Filters & Drawing */}
+                    <Route path="/mapview" element={<PrivateRoute><HighPerfMap /></PrivateRoute>} />
+                     {/* Map view for specific session(s) from URL */}
+                    <Route path="/map" element={<PrivateRoute><SimpleMapView /></PrivateRoute>} />
+                    <Route path="/manage-users" element={<PrivateRoute><ManageUsersPage /></PrivateRoute>} />
+                    <Route path="/upload-data" element={<PrivateRoute><UploadDataPage /></PrivateRoute>} />
+                    <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+                    {/* <Route path="/manage-session" element={<PrivateRoute><ManageSessionPage /></PrivateRoute>} /> */}
+                    {/* <Route path="/alllogs" element={<PrivateRoute><AllLogsMapPage /></PrivateRoute>} /> */}
+                    <Route path="/logscircles" element={<PrivateRoute><LogsCirclesPage /></PrivateRoute>} />
+                    <Route path="/create-project" element={<PrivateRoute><ProjectsPage /></PrivateRoute>} />
+                    <Route path="/prediction-map" element={<PrivateRoute><PredictionMapPage /></PrivateRoute>} />
+                    <Route path="/getreport" element={<PrivateRoute><GetReportPage /></PrivateRoute>} />
+
+                    {/* Catch-all for Not Found */}
+                    <Route path="*" element={<NotFoundPage />} />
+                </Routes>
             </AuthProvider>
         </Router>
     );

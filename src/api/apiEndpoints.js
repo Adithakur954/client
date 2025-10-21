@@ -59,20 +59,19 @@ export const mapViewApi = {
   startSession: (data) => api.post("/api/MapView/start_session", data),
 
   endSession: (data) => api.post("/api/MapView/end_session", data),
- createProjectWithPolygons: (payload) =>
-api.post("/api/MapView/CreateProjectWithPolygons", payload).then(r => r.data),
+  createProjectWithPolygons: (payload) =>
+    api
+      .post("/api/MapView/CreateProjectWithPolygons", payload)
+      .then((r) => r.data),
   getAvailablePolygons: () => api.get("/api/MapView/GetAvailablePolygons"),
   assignPolygonToProject: (polygonId, projectId) =>
     api.post("/api/MapView/AssignPolygonToProject", null, {
       params: { polygonId, projectId },
     }),
 
-      
+  getPredictionLog: (params) =>
+    api.get("/api/MapView/GetPredictionLog", { params }), // yeh post hai get mein kar raha mai
 
-      getPredictionLog: (params) =>
-    api.post("/api/MapView/GetPredictionLog", { params }),
-
- 
   getNetworkLog: (sessionLike) => {
     const extractId = (s) => {
       if (s == null) return "";

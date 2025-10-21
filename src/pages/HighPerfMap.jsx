@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button";
 
 // Utils
 import { loadSavedViewport, saveViewport } from "@/utils/viewport";
-import { parseWKTToRings } from "@/utils/wkt";
+import {  parseWKTToCoordinates } from "@/utils/wkt";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
@@ -176,7 +176,7 @@ export default function HighPerfMap() {
         const parsed = (rows || []).map((r) => ({
           id: r.id,
           name: r.name,
-          rings: parseWKTToRings(r.wkt),
+          rings:  parseWKTToCoordinates(r.wkt),
         }));
         setProjectPolygons(parsed);
       } catch (err) {

@@ -77,22 +77,6 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
     </label>
   ))}
 </div>
-      {/* <select
-  multiple
-  value={selectedSessions.map(String)}   // ✅ ensures selections stay highlighted
-  onChange={(e) => {
-    const selected = Array.from(e.target.selectedOptions, opt => Number(opt.value));
-    setSelectedSessions(selected);
-  }}
-  className="w-full border rounded px-3 py-2 bg-white text-black"
-  size={5}  // shows few items at a time
->
-  {sessions.map((s) => (
-    <option key={s.value} value={s.value}>
-      {s.label}
-    </option>
-  ))}
-</select> */}
     </div>
   );
 };
@@ -122,6 +106,8 @@ const CreateProjectPage = () => {
       ]);
 
       setExistingProjects(Array.isArray(projectsRes?.Data) ? projectsRes.Data : []);
+
+      console.log(projectsRes)
       if (polygonsRes) {
         const shapeList = polygonsRes.Data ?? polygonsRes;
         setPolygons(shapeList.map((p) => ({ value: p.id, label: p.name })));
