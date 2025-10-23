@@ -216,11 +216,11 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
   }
 
   return (
-    <div className="max-h-60 overflow-y-auto bg-blue-700 rounded p-3 space-y-1">
+    <div className="max-h-60 overflow-y-auto bg-gray-700 rounded p-3 space-y-1">
       {sessions.map((s) => (
         <label
           key={s.value}
-          className="flex items-center space-x-2 cursor-pointer hover:bg-blue-600 rounded px-2 py-1"
+          className="flex items-center space-x-2 cursor-pointer hover:bg-gray-600 rounded px-2 py-1"
         >
           <input
             type="checkbox"
@@ -238,7 +238,7 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
     files.length ? (
       <div className="mt-4 space-y-2">
         {files.map((file, i) => (
-          <div key={i} className="flex items-center justify-between bg-blue-500 rounded px-3 py-2">
+          <div key={i} className="flex items-center justify-between bg-gray-500 rounded px-3 py-2">
             <div className="flex items-center gap-2">
               <File className="h-5 w-5 text-white" />
               <span>{file.name}</span>
@@ -262,7 +262,7 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
     <div
       {...getRootProps()}
       className={`p-8 border-2 border-dashed rounded-lg cursor-pointer text-center transition-colors ${
-        isActive ? "border-blue-800 bg-blue-200" : "border-white bg-blue-400"
+        isActive ? "border-gray-800 bg-blue-200" : "border-white bg-gray-400"
       }`}
     >
       <input {...getInputProps()} />
@@ -273,12 +273,12 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
   );
 
   return (
-    <div className="p-6 flex flex-col items-center bg-blue-600 text-white min-h-screen">
+    <div className="p-6 flex flex-col items-center bg-gray-700 text-white min-h-screen">
       <div className="max-w-4xl w-full">
         <h1 className="text-2xl font-semibold mb-4 text-center">Upload Data</h1>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-2 bg-blue-700 text-white rounded">
+          <TabsList className="grid grid-cols-2 bg-gray-700 text-white rounded">
             <TabsTrigger value="session">Upload Session Data</TabsTrigger>
             <TabsTrigger value="prediction">Upload Prediction Data</TabsTrigger>
           </TabsList>
@@ -348,7 +348,7 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
               <Button
                 onClick={handleFetchSessions}
                 disabled={sessionsLoading}
-                className="bg-white text-blue-700 hover:bg-blue-200"
+                className="bg-white text-gray-700 hover:bg-blue-200"
               >
                 {sessionsLoading ? <Spinner /> : "Fetch Sessions"}
               </Button>
@@ -386,7 +386,7 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
             onClick={handleUpload}
             disabled={loading}
             size="lg"
-            className="bg-white text-blue-700 hover:bg-blue-200"
+            className="bg-white text-gray-700 hover:bg-blue-200"
           >
             {loading ? <Spinner /> : "Upload & Process"}
           </Button>
@@ -396,7 +396,7 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
             }
             variant="outline"
             size="lg"
-            className="bg-white text-blue-700 hover:bg-blue-200"
+            className="bg-white text-gray-700 hover:bg-blue-200"
           >
             <Download className="mr-2 h-4 w-4" />
             Download Template
@@ -408,7 +408,7 @@ const SessionMultiDropdown = ({ sessions, selectedSessions, setSelectedSessions 
           <h2 className="text-xl font-semibold mb-4">
             Upload History for '{activeTab}'
           </h2>
-          <div className="border rounded-lg bg-blue-500">
+          <div className="border rounded-lg bg-gray-500">
             <Table>
               <TableHeader>
                 <TableRow>

@@ -12,7 +12,7 @@ const SideBar = ({ collapsed }) => { // Removed isMapview prop, layout handles h
         // Main Map View (Logs, Filters, Drawing)
         { icon: Map, text: 'Map View', path: '/mapview' },
         // Prediction Map View
-        { icon: BarChartHorizontal, text: 'Prediction Viewer', path: '/prediction-map'}, // Added Prediction Link
+        // { icon: BarChartHorizontal, text: 'Prediction Viewer', path: '/prediction-map'}, // Added Prediction Link
         { icon: FolderPlus, text: 'Projects', path: '/create-project' },
         { icon: Users, text: 'Manage User', path: '/manage-users' },
         { icon: ReceiptPoundSterling, text: 'Get Report', path: '/getreport' }, // Corrected case

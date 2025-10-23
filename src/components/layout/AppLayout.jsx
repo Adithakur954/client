@@ -1,20 +1,24 @@
 import React, { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import Header from "../Header";
 import SideBar from "../SideBar";
+import Header from "../Header"; // Import the standard header
 
 const AppLayout = ({ children }) => {
-  const { pathname } = useLocation();
   const [visible, setVisible] = useState(true);
+  const location = useLocation(); // Get the current location object
 
   const changeValue = () => {
     setVisible(!visible);
   };
 
-  const isMapview = pathname.includes("mapview");
+  // List of paths where the standard header should be hidden
+  const pathsWithoutHeader = ["/mapview", "/prediction-map", "/map"];
+
+  // Check if the current path starts with any of the paths in the list
+  const shouldShowHeader = !pathsWithoutHeader.some(path => location.pathname.startsWith(path));
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
       {/* Sidebar with accent edge */}
       <div
         className={`fixed left-0 top-0 h-full z-40 transform transition-transform duration-500 ease-in-out
@@ -39,16 +43,16 @@ const AppLayout = ({ children }) => {
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main content area */}
       <div
         className={`flex-1 flex flex-col transition-all duration-500 ease-in-out 
         ${visible ? "ml-[250px]" : "ml-0"}`}
       >
-        {/* ✅ ONLY render Header for non-map routes */}
-        {!isMapview && <Header className="sticky top-0 z-30 bg-white shadow" />}
-        
-        {/* ✅ Map routes will render their own headers */}
-        <main className={`flex-1 ${isMapview ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        {/* Conditionally render the standard header */}
+        {shouldShowHeader && <Header />}
+
+        {/* The main content for the page */}
+        <main className="flex-1 overflow-y-auto">
           {children || <Outlet />}
         </main>
       </div>
@@ -57,3 +61,5 @@ const AppLayout = ({ children }) => {
 };
 
 export default AppLayout;
+
+

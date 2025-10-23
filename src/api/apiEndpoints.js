@@ -70,7 +70,7 @@ export const mapViewApi = {
     }),
 
   getPredictionLog: (params) =>
-    api.get("/api/MapView/GetPredictionLog", { params }), // yeh post hai get mein kar raha mai
+    api.post("/api/MapView/GetPredictionLog", { params }), // yeh post hai get mein kar raha mai
 
   getNetworkLog: (sessionLike) => {
     const extractId = (s) => {

@@ -128,7 +128,7 @@ const CreateProjectPage = () => {
     }
     console.log(project)
     // Correctly constructs the URL with both `project_id` and `session` parameters.
-    navigate(`/map?project_id=${project.id}&session=${encodeURIComponent(project.ref_session_id || '')}`);
+    navigate(`/map?project_id=${project.id}&session=${encodeURIComponent(project.ref_session_id || '')}`, {predictionData: false});
   };
 
 

@@ -277,7 +277,7 @@ const MapWithMultipleCircles = ({
     if (!center) return 20;
     // Ensure metersPerPixel is imported or defined
     const mpp = typeof metersPerPixel === 'function' ? metersPerPixel(zoom, center.lat()) : 1;
-    return mpp * 4; // Adjust multiplier as needed for desired pixel size
+    return mpp * 6; // Adjust multiplier as needed for desired pixel size
   }, [map, zoom]);
 
 
