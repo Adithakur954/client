@@ -121,15 +121,35 @@ const CreateProjectPage = () => {
 
   // --- THIS IS THE MAIN FIX ---
   // It now accepts the whole project object to get both ID and session IDs.
+  // const handleViewOnMap = (project) => {
+  //   if (!project || !project.id) {
+  //       toast.warn("Project has no ID to view on map.");
+  //       return;
+  //   }
+  //   console.log(project)
+  //   // Correctly constructs the URL with both `project_id` and `session` parameters.
+  //   navigate(`/map?project_id=${project.id}&session=${encodeURIComponent(project.ref_session_id || '')}`, {predictionData: false});
+  // };
+
   const handleViewOnMap = (project) => {
-    if (!project || !project.id) {
-        toast.warn("Project has no ID to view on map.");
-        return;
-    }
-    console.log(project)
-    // Correctly constructs the URL with both `project_id` and `session` parameters.
-    navigate(`/map?project_id=${project.id}&session=${encodeURIComponent(project.ref_session_id || '')}`, {predictionData: false});
-  };
+  if (!project || !project.id) {
+    toast.warn("Project has no ID to view on map.");
+    return;
+  }
+  
+  console.log("Navigating with project:", project);
+  
+  // Navigate to unified map with both project and session
+  const params = new URLSearchParams({
+    project_id: project.id,
+  });
+  
+  if (project.ref_session_id) {
+    params.set("session", project.ref_session_id);
+  }
+  
+  navigate(`/unified-map?${params.toString()}`);
+};
 
 
   useEffect(() => {

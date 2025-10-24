@@ -16,6 +16,8 @@ import DriveTestSessionsPage from './pages/DriveTestSessions';
 import AppLayout from './components/layout/AppLayout';
 import UploadDataPage from './pages/UploadData';
 import SettingsPage from './pages/Setting';
+import UnifiedMapView from './pages/UnifiedMapView';
+
 // import ManageSessionPage from './pages/ManageSession'; // This seems redundant with DriveTestSessionsPage
 // import MapView from './pages/page'; // Deprecated
 // import AllLogsMapPage from './pages/AllMaplogpage'; // This might be integrated into HighPerfMap or kept separate
@@ -72,6 +74,8 @@ function App() {
                     <Route path="/create-project" element={<PrivateRoute><ProjectsPage /></PrivateRoute>} />
                     <Route path="/prediction-map" element={<PrivateRoute><PredictionMapPage /></PrivateRoute>} />
                     <Route path="/getreport" element={<PrivateRoute><GetReportPage /></PrivateRoute>} />
+                    <Route path="/unified-map" element={<PrivateRoute><UnifiedMapView /></PrivateRoute>} />
+                    
 
                     {/* Catch-all for Not Found */}
                     <Route path="*" element={<NotFoundPage />} />
