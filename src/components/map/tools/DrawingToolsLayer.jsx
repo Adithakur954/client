@@ -183,7 +183,7 @@ function pixelateShape(
   selectedMetric,
   thresholds,
   cellSizeMeters,
-  maxCells,
+  
   map,
   overlaysRef,
   colorizeCells
@@ -212,9 +212,7 @@ function pixelateShape(
   const rows = Math.max(1, Math.ceil(Math.abs(north - south) / stepLat));
   const totalCells = cols * rows;
 
-  if (totalCells > maxCells) {
-    toast.warn(`Grid too dense (${totalCells} cells). Capping at ${maxCells}.`);
-  }
+  
 
   let cellsDrawn = 0;
   let cellsWithLogs = 0;
@@ -222,7 +220,7 @@ function pixelateShape(
   for (let i = 0; i < rows; i++) {
     const lat = south + i * stepLat;
     for (let j = 0; j < cols; j++) {
-      if (cellsDrawn >= maxCells) break;
+      
       const lng = west + j * stepLng;
 
       const cellBounds = new gm.LatLngBounds(
@@ -272,12 +270,11 @@ function pixelateShape(
       overlaysRef.current.push(rect);
       cellsDrawn++;
     }
-    if (cellsDrawn >= maxCells) break;
-  }
+   }
 
   return {
     cellsDrawn,
-    totalCells: Math.min(totalCells, maxCells),
+    totalCells: cellsDrawn,
     cellsWithLogs,
   };
 }
@@ -331,7 +328,7 @@ export default function DrawingToolsLayer({
   thresholds,
   pixelateRect = false,
   cellSizeMeters = 100,
-  maxCells = 1500,
+  
   onSummary,
   onDrawingsChange,
   clearSignal = 0,
@@ -384,7 +381,7 @@ export default function DrawingToolsLayer({
       let gridInfo = null;
       if (pixelateRect) {
         const { cellsDrawn, cellsWithLogs } = pixelateShape(
-          type, overlay, logs || [], selectedMetric, thresholds, cellSizeMeters, maxCells, map, overlaysRef, colorizeCells
+          type, overlay, logs || [], selectedMetric, thresholds, cellSizeMeters, map, overlaysRef, colorizeCells
         );
         const singleCellArea = cellSizeMeters * cellSizeMeters;
         const totalGridAreaWithLogs = singleCellArea * cellsWithLogs;
@@ -418,7 +415,7 @@ export default function DrawingToolsLayer({
       dm.setMap(null);
       managerRef.current = null;
     };
-  }, [map, enabled, logs, selectedMetric, thresholds, pixelateRect, cellSizeMeters, maxCells, onSummary, onDrawingsChange, colorizeCells]);
+  }, [map, enabled, logs, selectedMetric, thresholds, pixelateRect, cellSizeMeters, onSummary, onDrawingsChange, colorizeCells]);
 
   useEffect(() => {
     if (!clearSignal) return;

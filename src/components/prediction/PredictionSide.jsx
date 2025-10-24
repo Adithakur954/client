@@ -8,7 +8,8 @@ import {
   MapPin,
   Activity,
   Eye,
-  EyeOff
+  EyeOff,
+  Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -36,17 +37,17 @@ const PanelSection = ({ title, icon: Icon, children, className }) => (
   </div>
 );
 
-const ToggleButton = ({ active, onToggle, activeText, inactiveText, disabled }) => (
+const ToggleButton = ({ active, onToggle, activeText, inactiveText, disabled, icon: Icon }) => (
   <button
     onClick={onToggle}
     disabled={disabled}
     className={`w-full px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
       active
-        ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+        ? "bg-green-600 hover:bg-green-700 text-white shadow-lg"
         : "bg-gray-600 hover:bg-gray-500 text-gray-200"
     } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
   >
-    {active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+    {Icon && <Icon className="h-4 w-4" />}
     {active ? activeText : inactiveText}
   </button>
 );
@@ -82,7 +83,7 @@ export default function PredictionSide({
   }, [isControlled, onOpenChange]);
 
   const sideClasses = useMemo(() => {
-    const base = "fixed top-0 h-full z-50 w-[90vw] sm:w-[380px] bg-gray-800 shadow-2xl transition-transform duration-200 ease-out";
+    const base = "fixed top-0 h-full z-50 w-[90vw] sm:w-[400px] bg-gray-800 shadow-2xl transition-transform duration-200 ease-out";
     if (position === "right") {
       return isOpen
         ? `${base} right-0 translate-x-0`
@@ -99,10 +100,18 @@ export default function PredictionSide({
   }, [reloadData, autoCloseOnApply, setOpen]);
 
   const handleNavigate = useCallback(() => {
+    console.log("🚀 Navigating to Sample Map");
+    console.log("   - Project ID:", projectId);
+    console.log("   - Session ID:", sessionId);
+    
     const q = new URLSearchParams();
     if (projectId) q.set("project_id", String(projectId));
     if (sessionId) q.set("session", String(sessionId));
-    navigate(`/map?${q.toString()}`);
+    
+    const finalUrl = `/map?${q.toString()}`;
+    console.log("   - Final URL:", finalUrl);
+    
+    navigate(finalUrl);
   }, [projectId, sessionId, navigate]);
 
   const togglePolygons = useCallback(() => {
@@ -135,7 +144,7 @@ export default function PredictionSide({
                 <SlidersHorizontal className="h-4 w-4 text-white" />
               </div>
               <h3 className="text-base font-semibold text-white">
-                Controls
+                Display Controls
               </h3>
             </div>
             <button
@@ -164,6 +173,13 @@ export default function PredictionSide({
                 className="w-full h-9 bg-gray-900 border-gray-600 text-white placeholder:text-gray-500"
                 placeholder="Enter Project ID"
               />
+              
+              {/* Debug Info */}
+              {sessionId && (
+                <div className="mt-2 p-2 bg-blue-900/30 rounded text-xs text-blue-300">
+                  <div>Session: {sessionId}</div>
+                </div>
+              )}
             </div>
           </PanelSection>
 
@@ -187,8 +203,8 @@ export default function PredictionSide({
           </PanelSection>
 
           {/* Display Options */}
-          <PanelSection title="Display Options" icon={MapPin}>
-            <div className="space-y-3">
+          <PanelSection title="Display Options" icon={Layers}>
+            <div className="space-y-4">
               {/* Show/Hide Polygons */}
               <div>
                 <Label className="text-xs font-medium text-gray-300 mb-2 block">
@@ -199,32 +215,58 @@ export default function PredictionSide({
                   onToggle={togglePolygons}
                   activeText="Polygons Visible"
                   inactiveText="Polygons Hidden"
+                  icon={showPolys ? Eye : EyeOff}
                 />
               </div>
 
-              {/* Filter Inside Polygons */}
+              {/* Divider */}
+              <div className="border-t border-gray-600 my-3"></div>
+
+              {/* Filter Points */}
               <div>
                 <Label className="text-xs font-medium text-gray-300 mb-2 block">
                   Point Filtering
                 </Label>
+                
+                {/* Current Status Display */}
+                <div className="mb-3 p-3 bg-gray-800 rounded-lg text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Current Mode:</span>
+                    <span className={`font-semibold ${onlyInside ? 'text-green-400' : 'text-blue-400'}`}>
+                      {onlyInside ? 'Filtered (Inside Only)' : 'All Points Visible'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Toggle Button */}
                 <ToggleButton
                   active={onlyInside}
                   onToggle={toggleInsideFilter}
-                  activeText="Inside Points Only"
-                  inactiveText="Show All Points"
+                  activeText="Show All Points"
+                  inactiveText="Filter Inside Polygons"
                   disabled={!showPolys}
+                  icon={Filter}
                 />
-                {onlyInside && showPolys && (
-                  <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
-                    <Filter className="h-3 w-3" />
-                    Filtering active - showing only points inside polygons
-                  </p>
-                )}
-                {!showPolys && (
-                  <p className="text-xs text-gray-400 mt-2">
-                    Enable polygons to use this filter
-                  </p>
-                )}
+                
+                {/* Helper Text */}
+                <div className="mt-3 text-xs">
+                  {!showPolys ? (
+                    <p className="text-gray-400 flex items-start gap-2">
+                      <span>⚠️</span>
+                      <span>Enable polygons first to use filtering</span>
+                    </p>
+                  ) : onlyInside ? (
+                    <p className="text-green-400 flex items-start gap-2">
+                      <span>✓</span>
+                      <span>Only showing points inside polygon boundaries</span>
+                    </p>
+                  ) : (
+                    <p className="text-blue-400 flex items-start gap-2">
+                      <span>✓</span>
+                      <span>Showing all points on the map</span>
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </PanelSection>
@@ -272,8 +314,15 @@ export default function PredictionSide({
               disabled={!projectId}
             >
               <ArrowRightLeft className="h-4 w-4 mr-2" />
-              View Sample Map
+              {sessionId ? `Back to Session ${sessionId}` : "View Sample Map"}
             </Button>
+            
+            {/* Debug Session Info */}
+            {!sessionId && (
+              <div className="text-xs text-gray-500 text-center pt-1">
+                No session linked
+              </div>
+            )}
           </div>
         </div>
       </div>

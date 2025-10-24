@@ -102,7 +102,7 @@ const CreateProjectPage = () => {
     try {
       const [projectsRes, polygonsRes] = await Promise.all([
         mapViewApi.getProjects(),
-         mapViewApi.getProjectPolygons(0),
+         mapViewApi.getAvailablePolygons(0),
       ]);
 
       setExistingProjects(Array.isArray(projectsRes?.Data) ? projectsRes.Data : []);

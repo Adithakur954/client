@@ -1,13 +1,11 @@
 // src/components/prediction/PredictionHeader.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, SlidersHorizontal, Search, XCircle } from "lucide-react"; // Removed unused icons
-// import { Label } from "@/components/ui/label"; // Removed unused
-import MapSideFilter from "./PredictionSide"; // Correct path
+import { LogOut, SlidersHorizontal, ChartBar } from "lucide-react";
+import MapSideFilter from "./PredictionSide";
 
 export default function PredictionHeader({
-  // Props for MapSideFilter integration
   projectId,
   setProjectId,
   metric,
@@ -17,45 +15,46 @@ export default function PredictionHeader({
   setShowPolys,
   onlyInside,
   setOnlyInside,
-  loading, // Pass loading state to disable Reload button
-
-  // Existing props (may need adjustment if some were only for drawing tools)
+  loading,
   ui,
   onUIChange,
-  // hasLogs, // Likely not needed here anymore
-  // polygonStats, // Likely not needed here anymore
-  // onDownloadStatsCsv, // Likely not needed here anymore
-  // onDownloadRawCsv, // Likely not needed here anymore
-  // initialFilters, // Likely not needed here anymore
   isSearchOpen,
   onSearchToggle,
+  // New props for details panel
+  showDetailsPanel,
+  onToggleDetailsPanel,
 }) {
   const { user, logout } = useAuth();
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  // Removed dropdown logic related to drawing tools
 
   return (
     <header className="h-16 bg-slate-900 text-white shadow flex items-center justify-between px-4 sm:px-6">
       {/* Left: Logo + Title */}
       <div className="flex items-center space-x-3">
-        {/* <img src={img} alt="Logo" className="h-9" /> */}
         <span className="font-semibold text-lg tracking-wide">Prediction Viewer</span>
       </div>
 
-      {/* Center: Placeholder or other controls if needed */}
+      {/* Center: Placeholder */}
       <div></div>
 
       {/* Right: Header controls + User */}
       <div className="flex items-center space-x-4">
-        {/* Removed Search Button - add back if needed */}
-        {/* <Button
+        {/* Toggle Details Panel Button */}
+        <Button
           size="sm"
-          onClick={onSearchToggle}
+          className={`${
+            showDetailsPanel 
+              ? "bg-green-600 hover:bg-green-700" 
+              : "bg-gray-600 hover:bg-gray-500"
+          } text-white`}
+          onClick={onToggleDetailsPanel}
+          title={showDetailsPanel ? "Hide analytics panel" : "Show analytics panel"}
         >
-          {isSearchOpen ? <XCircle/> : <Search /> }
-        </Button> */}
+          <ChartBar className="h-4 w-4 mr-2" />
+          {showDetailsPanel ? "Hide Analytics" : "Show Analytics"}
+        </Button>
 
+        {/* Open Filters Button */}
         <Button
           size="sm"
           className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -63,14 +62,13 @@ export default function PredictionHeader({
           title="Open filters & view options"
         >
           <SlidersHorizontal className="h-4 w-4 mr-2" />
-          {filtersOpen ? 'Close Filters' : 'Open Filters'}
+          Filters
         </Button>
 
-        {/* MapSideFilter now holds the prediction-specific controls */}
+        {/* MapSideFilter */}
         <MapSideFilter
           open={filtersOpen}
           onOpenChange={setFiltersOpen}
-          // Pass prediction-specific props
           projectId={projectId}
           setProjectId={setProjectId}
           metric={metric}
@@ -81,18 +79,22 @@ export default function PredictionHeader({
           onlyInside={onlyInside}
           setOnlyInside={setOnlyInside}
           loading={loading}
-          // Pass general UI props
           onUIChange={onUIChange}
           ui={ui}
-          // Configure appearance
-          position="left" // Or "right" if preferred
+          position="right"
           autoCloseOnApply={true}
         />
 
-        <p className="text-gray-300 text-sm">
+        <p className="text-gray-300 text-sm hidden md:block">
           Welcome,&nbsp;<span className="font-semibold text-white">{user?.name || "User"}</span>
         </p>
-        <Button onClick={logout} variant="default" size="sm" className="bg-gray-700 hover:bg-gray-600 text-white">
+        
+        <Button 
+          onClick={logout} 
+          variant="default" 
+          size="sm" 
+          className="bg-gray-700 hover:bg-gray-600 text-white"
+        >
           <LogOut className="h-4 w-4 mr-2" />
           Logout
         </Button>

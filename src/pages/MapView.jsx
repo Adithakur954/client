@@ -10,6 +10,8 @@ import Spinner from "../components/common/Spinner";
 import MapWithMultipleCircles from "../components/MapwithMultipleCircle";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 import MapViewSide from "@/components/MapView/MapViewSide";
+import NetworkPlannerMap from "@/components/NetworkPlannerMap";
+
 
 const defaultThresholds = {
   rsrp: [],
@@ -256,7 +258,7 @@ const SimpleMapView = () => {
           {selectedMetric.toUpperCase()} thresholds.
         </div>
 
-        {rawLocations.length > 0 ? (
+        {/* {rawLocations.length > 0 ? (
           <MapWithMultipleCircles
             isLoaded={isLoaded}
             loadError={loadError}
@@ -280,7 +282,39 @@ const SimpleMapView = () => {
               No valid location data to display for this session.
             </p>
           </div>
-        )}
+        )} */}
+
+        <div className="relative h-full w-full">
+  {/* Base Map Layer - Circles */}
+  {ui.showSectors ? (
+    <NetworkPlannerMap />
+  ) : rawLocations.length > 0 ? (
+    <MapWithMultipleCircles
+      isLoaded={isLoaded}
+      loadError={loadError}
+      locations={rawLocations}
+      thresholds={thresholds}
+      selectedMetric={selectedMetric}
+      activeMarkerIndex={activeMarker}
+      onMarkerClick={setActiveMarker}
+      options={{
+        mapTypeId:
+          ui.basemapStyle === "satellite" ||
+          ui.basemapStyle === "hybrid" ||
+          ui.basemapStyle === "terrain"
+            ? ui.basemapStyle
+            : "roadmap",
+      }}
+    />
+  ) : (
+    <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700">
+      <p className="text-gray-600 dark:text-gray-300">
+        No valid location data to display for this session.
+      </p>
+    </div>
+  )}
+</div>
+
       </div>
     </div>
   );

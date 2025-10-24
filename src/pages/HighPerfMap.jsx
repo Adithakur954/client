@@ -40,6 +40,17 @@ import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
 const MAP_CONTAINER_STYLE = { height: "calc(100vh - 64px)", width: "100%" };
+const coordinatesToWktPolygon = (coords) => {
+  if (!Array.isArray(coords) || coords.length < 3) {
+    return null; // Need at least 3 points for a polygon
+  }
+  // Format each point as "lng lat" and join with commas
+  const pointsString = coords.map(p => `${p.lng} ${p.lat}`).join(', ');
+  // Ensure the polygon is closed by repeating the first point at the end
+  const firstPointString = `${coords[0].lng} ${coords[0].lat}`;
+  // WKT format requires longitude first, then latitude
+  return `POLYGON((${pointsString}, ${firstPointString}))`;
+};
 
 const MAP_STYLES = {
   default: null,
@@ -259,76 +270,81 @@ export default function HighPerfMap() {
     
   };
 
-  const handleSavePolygon = async () => {
-    if (!analysis) {
-      toast.warn("No analysis data to save.");
+ const handleSavePolygon = async () => {
+    if (!analysis || !analysis.geometry) {
+      toast.warn("No analysis data or geometry found to save.");
       return;
     }
     if (!polygonName.trim()) {
       toast.warn("Please provide a name for the polygon.");
       return;
     }
-    
-  
-    // Helper function to get coordinates based on shape type
-    const getCoordinatesFromGeometry = (geometry) => {
-      if (geometry.type === 'polygon' && geometry.polygon) {
-        return geometry.polygon.map(p => [p.lng, p.lat]);
+
+    let wktString = null;
+    const geometry = analysis.geometry;
+
+    // Convert geometry coordinates to WKT based on type
+    if (geometry.type === 'polygon' && geometry.polygon) {
+      wktString = coordinatesToWktPolygon(geometry.polygon);
+    } else if (geometry.type === 'rectangle' && geometry.rectangle) {
+      // Convert rectangle bounds to a polygon coordinate array first
+      const { ne, sw } = geometry.rectangle;
+      const rectCoords = [
+        { lng: sw.lng, lat: ne.lat }, // Top-left
+        { lng: ne.lng, lat: ne.lat }, // Top-right
+        { lng: ne.lng, lat: sw.lat }, // Bottom-right
+        { lng: sw.lng, lat: sw.lat }, // Bottom-left
+        // Closing point is added by coordinatesToWktPolygon
+      ];
+      wktString = coordinatesToWktPolygon(rectCoords);
+    } else if (geometry.type === 'circle' && geometry.circle) {
+      // Approximate circle as a polygon for WKT
+      const { center, radius } = geometry.circle;
+      const circleCoords = [];
+      const numPoints = 32; // More points make a smoother circle approximation
+      for (let i = 0; i < numPoints; i++) {
+        const angle = (i / numPoints) * 360;
+        // Approximate degrees based on meters (latitude doesn't change much locally)
+        const latOffset = (radius / 111111) * Math.cos(angle * Math.PI / 180);
+        // Longitude offset depends on latitude
+        const lngOffset = (radius / (111111 * Math.cos(center.lat * Math.PI / 180))) * Math.sin(angle * Math.PI / 180);
+        circleCoords.push({ lat: center.lat + latOffset, lng: center.lng + lngOffset });
       }
-      if (geometry.type === 'rectangle' && geometry.rectangle) {
-        const { ne, sw } = geometry.rectangle;
-        return [
-          [sw.lng, ne.lat], [ne.lng, ne.lat],
-          [ne.lng, sw.lat], [sw.lng, sw.lat]
-        ];
-      }
-      if (geometry.type === 'circle' && geometry.circle) {
-        const { center, radius } = geometry.circle;
-        const points = [];
-        const numPoints = 32; // More points for a smoother circle
-        for (let i = 0; i < numPoints; i++) {
-          const angle = (i / numPoints) * 360;
-          const lat = center.lat + (radius / 111111) * Math.cos(angle * Math.PI / 180);
-          const lng = center.lng + (radius / (111111 * Math.cos(center.lat * Math.PI / 180))) * Math.sin(angle * Math.PI / 180);
-          points.push([lng, lat]);
-        }
-        return points;
-      }
-      return null;
-    };
-  
-    const coordinates = getCoordinatesFromGeometry(analysis.geometry);
-  
-    if (!coordinates) {
-      toast.error("Could not determine coordinates for the drawn shape.");
+       wktString = coordinatesToWktPolygon(circleCoords);
+    }
+
+    if (!wktString) {
+      toast.error("Could not convert the drawn shape to WKT format.");
       return;
     }
-  
-    const logIds = analysis.logs ? analysis.logs.map(log => log.id).filter(id => id != null) : [];
-  
+
+    // Prepare payload matching the C# controller
     const payload = {
-      
-      name: polygonName,
-      coordinates: coordinates,
-      logIds: logIds,
+      Name: polygonName,
+      WKT: wktString,
     };
 
-    console.log(payload);
-  
-    setIsLoading(true);
+    console.log("Sending payload to SavePolygon:", payload); // Log the payload
+
+    setIsLoading(true); // Indicate loading state
     try {
+      // Use the correct API endpoint function name
       const response = await mapViewApi.savePolygon(payload);
-      if (response.Status === 1) {
+      if (response && response.Status === 1) { // Check response structure
         toast.success(`Polygon "${polygonName}" saved successfully!`);
-        setIsSaveDialogOpen(false);
-        setPolygonName("");
+        setIsSaveDialogOpen(false); // Close dialog on success
+        setPolygonName(""); // Reset name field
+        // Optionally: Trigger a refresh of polygons if needed
       } else {
-        toast.error(response.Message || "Failed to save polygon.");
+        // Use message from response if available
+        toast.error(response?.Message || "Failed to save polygon. Check server logs.");
+        console.error("SavePolygon API Error:", response);
       }
     } catch (error) {
       toast.error(`Error saving polygon: ${error.message || "An unknown error occurred."}`);
+      console.error("SavePolygon Network/Catch Error:", error);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // End loading state
     }
   };
   

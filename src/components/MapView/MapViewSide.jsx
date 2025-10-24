@@ -67,8 +67,6 @@ export default function MapViewSide({
       : `${base} left-0 -translate-x-full`;
   }, [isOpen, position]);
 
-  
-
   const applyAndClose = () => {
     reloadData?.();
     if (autoCloseOnApply) setOpen(false);
@@ -78,11 +76,13 @@ export default function MapViewSide({
     const q = new URLSearchParams();
     if (projectId) {
       q.set("project", String(projectId));
-      navigate(`/prediction-map?project_id=${projectId}&session=${encodeURIComponent(sessionId)}`)
+      navigate(
+        `/prediction-map?project_id=${projectId}&session=${encodeURIComponent(
+          sessionId
+        )}`
+      );
     }
     if (sessionId) q.set("session", String(sessionId)); // CSV safe
-
-   
   };
 
   return (
@@ -96,7 +96,6 @@ export default function MapViewSide({
 
       <div className={sideClasses}>
         <div className="flex items-center justify-between p-3 border-b dark:border-slate-700">
-          
           <button
             className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
             onClick={() => setOpen(false)}
@@ -114,9 +113,7 @@ export default function MapViewSide({
                   type="number"
                   value={projectId ?? ""}
                   onChange={(e) =>
-                    setProjectId?.(
-                      e.target.value ? Number(e.target.value) : ""
-                    )
+                    setProjectId?.(e.target.value ? Number(e.target.value) : "")
                   }
                   className="w-full border rounded px-2 py-1 text-sm h-9 bg-slate-800 text-white border-slate-700"
                   placeholder="Enter Project ID"
@@ -149,13 +146,11 @@ export default function MapViewSide({
                     <SelectItem value="rsrp">RSRP</SelectItem>
                     <SelectItem value="rsrq">RSRQ</SelectItem>
                     <SelectItem value="sinr">SINR</SelectItem>
-                    
-                        <SelectItem value="dl_thpt">DL Throughput</SelectItem>
-                        <SelectItem value="ul_thpt">UL Throughput</SelectItem>
-                        <SelectItem value="mos">MOS</SelectItem>
-                        <SelectItem value="lte_bler">LTE BLER</SelectItem>
-                      
-                   
+
+                    <SelectItem value="dl_thpt">DL Throughput</SelectItem>
+                    <SelectItem value="ul_thpt">UL Throughput</SelectItem>
+                    <SelectItem value="mos">MOS</SelectItem>
+                    <SelectItem value="lte_bler">LTE BLER</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -208,9 +203,25 @@ export default function MapViewSide({
           </PanelSection>
 
           <PanelSection>
-            <button onClick={handleNavigate}>
+            <button
+              className="border-1 border-white rounded-md p-2 m-2"
+              onClick={handleNavigate}
+            >
               Show Prediction
             </button>
+            {/* Map Layers Section */}
+            <div className="space-y-2 text-sm border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ui.showSectors ?? false}
+                  onChange={(e) =>
+                    onUIChange({ showSectors: e.target.checked })
+                  }
+                />
+                Show Cell Sectors
+              </label>
+            </div>
           </PanelSection>
         </div>
 
@@ -223,8 +234,6 @@ export default function MapViewSide({
             <Filter className="h-4 w-4 mr-2" />
             {loading ? "Loading..." : "Apply & Reload"}
           </Button>
-
-          
         </div>
       </div>
     </>

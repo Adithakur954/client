@@ -14,8 +14,8 @@ import { Filter } from "lucide-react";
 // ================== CONFIG ==================
 const MAP_CONTAINER_STYLE = { height: "calc(100vh - 64px)", width: "100%" };
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
-const MAX_RENDER_POINTS = 3000;
-const MAX_RENDER_POLYGONS = 500;
+const MAX_RENDER_POINTS = 10000;
+const MAX_RENDER_POLYGONS = 2000;
 const DEBOUNCE_DELAY = 100;
 
 const MAP_STYLES = {
@@ -49,10 +49,7 @@ function throttle(func, limit) {
   };
 }
 
-// Improved radius calculation - smaller, more consistent circles
 function calculateRadius(zoom) {
-  // More aggressive scaling for smaller circles
-  // Formula: base size decreases exponentially with zoom
   if (zoom <= 8) return 40;
   if (zoom <= 10) return 20;
   if (zoom <= 12) return 10;
@@ -124,21 +121,30 @@ const isPointInViewport = (point, viewport) => {
     point.lon <= viewport.east;
 };
 
+// Enhanced point-in-polygon with debugging
 const isPointInPolygon = (point, polygon) => {
   const path = polygon?.paths?.[0];
-  if (!path) return false;
+  if (!path || !path.length) {
+    return false;
+  }
+  
+  // Point coordinates (using .lon for longitude)
+  const px = point.lon;
+  const py = point.lat;
   
   let inside = false;
   const len = path.length;
   
   for (let i = 0, j = len - 1; i < len; j = i++) {
-    const xi = path[i].lng, yi = path[i].lat;
-    const xj = path[j].lng, yj = path[j].lat;
+    const xi = path[i].lng;
+    const yi = path[i].lat;
+    const xj = path[j].lng;
+    const yj = path[j].lat;
     
-    if (((yi > point.lat) !== (yj > point.lat)) &&
-        (point.lon < (xj - xi) * (point.lat - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
+    const intersect = ((yi > py) !== (yj > py)) &&
+                     (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+    
+    if (intersect) inside = !inside;
   }
   
   return inside;
@@ -206,20 +212,30 @@ export default function PredictionMapPage() {
   const [metric, setMetric] = useState("rsrp");
   const [predictionData, setPredictionData] = useState(null);
   const [polygons, setPolygons] = useState([]);
-  const [showPolys, setShowPolys] = useState(false); // ✅ Default to false
+  const [showPolys, setShowPolys] = useState(false);
   const [onlyInside, setOnlyInside] = useState(false);
   const [uiToggles, setUiToggles] = useState({ basemapStyle: "roadmap" });
   const [viewport, setViewport] = useState(null);
   const [zoom, setZoom] = useState(12);
   const [isSideOpen, setIsSideOpen] = useState(false);
+  const [showDetailsPanel, setShowDetailsPanel] = useState(false);
 
   const mapRef = useRef(null);
   const listenersRef = useRef([]);
 
-  const sessionParam = useMemo(
-    () => searchParams.get("sessionId") ?? searchParams.get("session") ?? "",
-    [searchParams]
-  );
+  const sessionParam = useMemo(() => {
+  const sessionId = searchParams.get("sessionId") ?? searchParams.get("session") ?? "";
+  console.log("🔗 Session from URL:", sessionId);
+  console.log("🔗 Full URL params:", Object.fromEntries(searchParams.entries()));
+  return sessionId;
+}, [searchParams]);
+
+const projectParam = useMemo(()=>{
+  const project = searchParams.get("project_id");
+  console.log(project);
+  setProjectId(project);
+  return project;
+}, [searchParams])
 
   const { dataList, colorSetting } = useMemo(() => {
     return {
@@ -249,7 +265,6 @@ export default function PredictionMapPage() {
     };
   }, [colorSetting]);
 
-  // Calculate radius based on zoom
   const circleRadius = useMemo(() => {
     const radius = calculateRadius(zoom);
     console.log(`🔍 Zoom: ${zoom} → Radius: ${radius}m`);
@@ -338,11 +353,12 @@ export default function PredictionMapPage() {
     fetchPolygons();
   }, [fetchPredictionData, fetchPolygons]);
 
-  useEffect(() => {
-    if (projectId) {
-      reloadData();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(() => {
+  if (!projectId) return;
+  setPredictionData(null);
+  setPolygons([]);
+  reloadData();
+}, [projectId, metric, reloadData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const debouncedSetViewport = useMemo(
     () => debounce((vp) => {
@@ -398,11 +414,16 @@ export default function PredictionMapPage() {
     };
   }, []);
 
+  // Enhanced visible points calculation with detailed debugging
   const visiblePoints = useMemo(() => {
-    if (!viewport || !dataList.length) return [];
+    if (!viewport || !dataList.length) {
+      console.log("⚠️ No viewport or no data");
+      return [];
+    }
     
     const startTime = performance.now();
     
+    // Step 1: Filter by viewport
     let points = [];
     for (let i = 0; i < dataList.length; i++) {
       if (isPointInViewport(dataList[i], viewport)) {
@@ -410,24 +431,54 @@ export default function PredictionMapPage() {
       }
     }
     
-    if (onlyInside && showPolys && polygons.length) {
+    console.log(`📍 Step 1 - Points in viewport: ${points.length}`);
+    
+    // Step 2: Filter by polygon if needed
+    if (onlyInside && showPolys && polygons.length > 0) {
+      console.log(`🔍 FILTERING MODE ACTIVE`);
+      console.log(`   - Total polygons: ${polygons.length}`);
+      console.log(`   - Points to check: ${points.length}`);
+      
       const filtered = [];
+      let debugCount = 0;
+      
       for (let i = 0; i < points.length; i++) {
         const point = points[i];
+        let foundInside = false;
+        
         for (let j = 0; j < polygons.length; j++) {
           if (isPointInPolygon(point, polygons[j])) {
             filtered.push(point);
-            break;
+            foundInside = true;
+            debugCount++;
+            break; // Point is inside this polygon, no need to check others
           }
         }
+        
+        // Debug first few points
+        if (i < 3) {
+          console.log(`   Point ${i}: (${point.lat}, ${point.lon}) - Inside: ${foundInside}`);
+        }
       }
+      
+      console.log(`✅ Filtering complete:`);
+      console.log(`   - Points before filter: ${points.length}`);
+      console.log(`   - Points after filter: ${filtered.length}`);
+      console.log(`   - Points removed: ${points.length - filtered.length}`);
+      
       points = filtered;
+    } else {
+      console.log(`📊 Showing ALL points (no filter)`);
+      console.log(`   - onlyInside: ${onlyInside}`);
+      console.log(`   - showPolys: ${showPolys}`);
+      console.log(`   - polygons.length: ${polygons.length}`);
     }
     
     const result = points.slice(0, MAX_RENDER_POINTS);
     
     const endTime = performance.now();
     console.log(`⚡ Point filtering took ${(endTime - startTime).toFixed(2)}ms`);
+    console.log(`🎯 Final points to render: ${result.length}`);
     
     return result;
   }, [viewport, dataList, onlyInside, showPolys, polygons]);
@@ -501,6 +552,8 @@ export default function PredictionMapPage() {
         loading={loading}
         ui={uiToggles}
         onUIChange={setUiToggles}
+        showDetailsPanel={showDetailsPanel}
+        onToggleDetailsPanel={() => setShowDetailsPanel(!showDetailsPanel)}
       />
 
       <div className="px-4 pt-2">
@@ -541,7 +594,7 @@ export default function PredictionMapPage() {
             </div>
           )}
           
-          <div className="absolute bottom-4 left-4 bg-gray-800/95 rounded-lg px-4 py-3 text-xs shadow-xl border border-gray-600">
+          <div className="absolute bottom-4 left-4 bg-gray-800/95 rounded-lg px-4 py-3 text-xs shadow-xl border border-gray-600 max-w-xs">
             <div className="font-semibold text-gray-200 mb-2">Map Statistics</div>
             <div className="space-y-1">
               <div className="flex justify-between gap-6">
@@ -569,20 +622,28 @@ export default function PredictionMapPage() {
               {onlyInside && showPolys && (
                 <div className="text-green-400 text-xs mt-2 pt-2 border-t border-gray-600 flex items-center gap-1">
                   <Filter className="h-3 w-3" />
-                  <span>Inside only</span>
+                  <span>Filtering: Inside only</span>
+                </div>
+              )}
+              {!onlyInside && (
+                <div className="text-blue-400 text-xs mt-2 pt-2 border-t border-gray-600">
+                  Mode: Showing all points
                 </div>
               )}
             </div>
           </div>
         </div>
         
-        <div className="hidden lg:block w-1/3 flex-shrink-0 overflow-y-auto">
-          <PredictionDetailsPanel
-            predictionData={predictionData}
-            metric={metric}
-            loading={loading}
-          />
-        </div>
+        {showDetailsPanel && (
+          <div className="w-full lg:w-1/3 flex-shrink-0 overflow-hidden">
+            <PredictionDetailsPanel
+              predictionData={predictionData}
+              metric={metric}
+              loading={loading}
+              onClose={() => setShowDetailsPanel(false)}
+            />
+          </div>
+        )}
       </div>
 
       <PredictionSide
@@ -601,6 +662,7 @@ export default function PredictionMapPage() {
         onlyInside={onlyInside}
         setOnlyInside={setOnlyInside}
         sessionId={sessionParam}
+        
       />
     </div>
   );

@@ -60,9 +60,7 @@ export const mapViewApi = {
 
   endSession: (data) => api.post("/api/MapView/end_session", data),
   createProjectWithPolygons: (payload) =>
-    api
-      .post("/api/MapView/CreateProjectWithPolygons", payload)
-      .then((r) => r.data),
+    api.post("/api/MapView/CreateProjectWithPolygons", payload),
   getAvailablePolygons: () => api.get("/api/MapView/GetAvailablePolygons"),
   assignPolygonToProject: (polygonId, projectId) =>
     api.post("/api/MapView/AssignPolygonToProject", null, {

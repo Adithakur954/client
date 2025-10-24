@@ -224,52 +224,54 @@ const MapWithMultipleCircles = ({
   }, [locations, polygons]);
 
 
-  // Fit bounds effect (Keep existing logic, ensure polyPtCount works with new polygon structure)
-   useEffect(() => {
-        if (!map || !window?.google) return;
+  // Fit bounds once when map first loads and has data
+useEffect(() => {
+  if (!map || !window?.google) return;
+  if (!locations?.length && !polygons?.length) return;
 
-        const bounds = new window.google.maps.LatLngBounds();
-        let locCount = 0;
-        let polyPtCount = 0;
+  // Add a flag so it runs only once
+  if (map.__boundsFitted) return;
 
-        // Fit to locations
-        if (Array.isArray(locations) && locations.length) {
-            locations.forEach((loc) => {
-                if (Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
-                    bounds.extend({ lat: loc.lat, lng: loc.lng });
-                    locCount++;
-                }
-            });
-        }
+  const bounds = new window.google.maps.LatLngBounds();
+  let locCount = 0;
+  let polyPtCount = 0;
 
-        // Fit to polygons (using the parsed coordinates)
-        if (Array.isArray(polygons) && polygons.length) {
-            polygons.forEach((poly) => {
-                // 'coordinates' should be the array of {lat, lng} for the outer ring
-                if (Array.isArray(poly.coordinates)) {
-                    poly.coordinates.forEach((pt) => {
-                         if (Number.isFinite(pt.lat) && Number.isFinite(pt.lng)) {
-                             bounds.extend(pt);
-                             polyPtCount++;
-                         }
-                    });
-                }
-                // Optionally handle holes ('rawRings' structure) if needed for bounds
-            });
-        }
+  // Fit to locations
+  if (Array.isArray(locations) && locations.length) {
+    locations.forEach((loc) => {
+      if (Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+        bounds.extend({ lat: loc.lat, lng: loc.lng });
+        locCount++;
+      }
+    });
+  }
 
-        if (!bounds.isEmpty()) {
-            console.debug("[Map] Fitting bounds", { locCount, polyPtCount });
-            map.fitBounds(bounds);
-            const listener = window.google.maps.event.addListenerOnce(map, 'idle', () => {
-                if (map.getZoom() > 17) map.setZoom(17);
-                setZoom(map.getZoom() || 12);
-            });
-            return () => window.google.maps.event.removeListener(listener);
-        } else {
-            console.debug("[Map] Bounds empty");
-        }
-    }, [map, locations, polygons]); // Use polygons directly
+  // Fit to polygons (using the parsed coordinates)
+  if (Array.isArray(polygons) && polygons.length) {
+    polygons.forEach((poly) => {
+      if (Array.isArray(poly.coordinates)) {
+        poly.coordinates.forEach((pt) => {
+          if (Number.isFinite(pt.lat) && Number.isFinite(pt.lng)) {
+            bounds.extend(pt);
+            polyPtCount++;
+          }
+        });
+      }
+    });
+  }
+
+  if (!bounds.isEmpty()) {
+    console.debug("[Map] Fitting bounds once", { locCount, polyPtCount });
+    map.fitBounds(bounds);
+    map.__boundsFitted = true; // Mark as fitted once
+
+    const listener = window.google.maps.event.addListenerOnce(map, "idle", () => {
+      if (map.getZoom() > 17) map.setZoom(17);
+    });
+    return () => window.google.maps.event.removeListener(listener);
+  }
+}, [map, locations, polygons]);
+ // Use polygons directly
 
   const circleRadius = useMemo(() => {
     if (!map) return 20;
