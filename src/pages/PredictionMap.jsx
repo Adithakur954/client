@@ -1,329 +1,590 @@
 // src/pages/PredictionMap.jsx
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
-import { GoogleMap, useJsApiLoader, CircleF, PolygonF } from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader, Circle, Polygon } from "@react-google-maps/api";
 import { toast } from "react-toastify";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 import { mapViewApi } from "@/api/apiEndpoints";
 import Spinner from "@/components/common/Spinner";
 import PredictionDetailsPanel from "@/components/prediction/PredictionDetailsPanel";
 import PredictionHeader from "@/components/prediction/PredictionHeader";
-import PredictionSide from "@/components/prediction/PredictionSide"; // adjust path if needed
+import PredictionSide from "@/components/prediction/PredictionSide";
 import { useSearchParams } from "react-router-dom";
 import { Filter } from "lucide-react";
 
 // ================== CONFIG ==================
 const MAP_CONTAINER_STYLE = { height: "calc(100vh - 64px)", width: "100%" };
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
-const MAX_RENDER_POINTS = 5000;
-const MAX_RENDER_POLYGONS = 800;
+const MAX_RENDER_POINTS = 3000;
+const MAX_RENDER_POLYGONS = 500;
+const DEBOUNCE_DELAY = 100;
 
 const MAP_STYLES = {
-  default: null,
   clean: [
     { featureType: "poi", stylers: [{ visibility: "off" }] },
     { featureType: "transit", stylers: [{ visibility: "off" }] },
-    { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-    { elementType: "labels.text.stroke", stylers: [{ visibility: "off" }] },
-    { elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
-  ],
-  night: [
-    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-    { featureType: "water", stylers: [{ color: "#17263c" }] },
   ],
 };
 
-// ================== WKT PARSER ==================
+// ================== UTILITY FUNCTIONS ==================
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+function throttle(func, limit) {
+  let inThrottle;
+  return function(...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
+
+// Improved radius calculation - smaller, more consistent circles
+function calculateRadius(zoom) {
+  // More aggressive scaling for smaller circles
+  // Formula: base size decreases exponentially with zoom
+  if (zoom <= 8) return 40;
+  if (zoom <= 10) return 20;
+  if (zoom <= 12) return 10;
+  if (zoom <= 14) return 6;
+  if (zoom <= 16) return 4;
+  if (zoom <= 18) return 3;
+  return 2;
+}
+
 function parseWKTToPolygons(wkt) {
-  if (!wkt || typeof wkt !== "string") return [];
-  const s = wkt.trim().toUpperCase();
-  if (s.startsWith("POLYGON")) {
-    const inner = extractOuterParensContent(s, "POLYGON");
-    const rings = parseRings(inner);
-    return [{ paths: rings }];
-  }
-  if (s.startsWith("MULTIPOLYGON")) {
-    const inner = extractOuterParensContent(s, "MULTIPOLYGON");
-    const polyStrings = extractTopLevelGroups(inner);
-    const polys = [];
-    for (const ps of polyStrings) {
-      const innerPoly = stripOnePair(ps);
-      const rings = parseRings(innerPoly);
-      polys.push({ paths: rings });
-    }
-    return polys;
-  }
-  return [];
-}
-function extractOuterParensContent(text, type) {
-  const idx = text.indexOf(type);
-  if (idx === -1) return "";
-  const after = text.slice(idx + type.length).trim();
-  const start = after.indexOf("(");
-  let depth = 0;
-  for (let i = start; i < after.length; i++) {
-    if (after[i] === "(") depth++;
-    else if (after[i] === ")") depth--;
-    if (depth === 0) return after.slice(start + 1, i);
-  }
-  return "";
-}
-function extractTopLevelGroups(inner) {
-  const groups = [];
-  let depth = 0, start = -1;
-  for (let i = 0; i < inner.length; i++) {
-    if (inner[i] === "(") { if (depth === 0) start = i; depth++; }
-    else if (inner[i] === ")") {
-      depth--;
-      if (depth === 0 && start !== -1) groups.push(inner.slice(start, i + 1));
-    }
-  }
-  return groups;
-}
-function stripOnePair(s) {
-  return s.trim().startsWith("(") && s.endsWith(")") ? s.slice(1, -1) : s;
-}
-function parseRings(inner) {
-  const rings = [];
-  let depth = 0, start = -1;
-  for (let i = 0; i < inner.length; i++) {
-    if (inner[i] === "(") { if (depth === 0) start = i; depth++; }
-    else if (inner[i] === ")") {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        const ring = parseCoordsToRing(inner.slice(start + 1, i));
-        if (ring.length >= 3) rings.push(ring);
+  if (!wkt?.trim()) return [];
+  
+  try {
+    const cleaned = wkt.trim();
+    const isPolygon = cleaned.startsWith("POLYGON((");
+    const isMultiPolygon = cleaned.startsWith("MULTIPOLYGON(((");
+    
+    if (!isPolygon && !isMultiPolygon) return [];
+    
+    const coordsMatches = cleaned.matchAll(/\(\(([\d\s,.-]+)\)\)/g);
+    const polygons = [];
+    
+    for (const match of coordsMatches) {
+      const coords = match[1];
+      const points = coords.split(',').reduce((acc, coord) => {
+        const [lng, lat] = coord.trim().split(/\s+/);
+        const parsedLat = parseFloat(lat);
+        const parsedLng = parseFloat(lng);
+        
+        if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+          acc.push({ lat: parsedLat, lng: parsedLng });
+        }
+        return acc;
+      }, []);
+      
+      if (points.length >= 3) {
+        polygons.push({ paths: [points] });
       }
     }
+    
+    return polygons;
+  } catch (error) {
+    console.error("WKT parsing error:", error);
+    return [];
   }
-  return rings;
-}
-function parseCoordsToRing(ringStr) {
-  const points = ringStr.split(",").map(p => {
-    const [x, y] = p.trim().split(/\s+/).map(Number);
-    return { lat: y, lng: x };
-  }).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-  return points;
 }
 
-// ================== GEO & COLOR UTILS ==================
-const computeRingBbox = (ring = []) => {
-  let north = -Infinity, south = Infinity, east = -Infinity, west = Infinity;
-  ring.forEach(pt => {
-    north = Math.max(north, pt.lat);
-    south = Math.min(south, pt.lat);
-    east = Math.max(east, pt.lng);
-    west = Math.min(west, pt.lng);
-  });
+function computeBbox(points) {
+  if (!points?.length) return null;
+  
+  let north = -90, south = 90, east = -180, west = 180;
+  
+  for (let i = 0; i < points.length; i++) {
+    const pt = points[i];
+    if (pt.lat > north) north = pt.lat;
+    if (pt.lat < south) south = pt.lat;
+    if (pt.lng > east) east = pt.lng;
+    if (pt.lng < west) west = pt.lng;
+  }
+  
   return { north, south, east, west };
+}
+
+const isPointInViewport = (point, viewport) => {
+  return viewport && 
+    point.lat >= viewport.south && 
+    point.lat <= viewport.north &&
+    point.lon >= viewport.west && 
+    point.lon <= viewport.east;
 };
-const bboxIntersects = (a, b) => a && b ? !(a.west > b.east || a.east < b.west || a.south > b.north || a.north < b.south) : false;
-function pointInRing(pt, ring) {
+
+const isPointInPolygon = (point, polygon) => {
+  const path = polygon?.paths?.[0];
+  if (!path) return false;
+  
   let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const xi = ring[i].lng, yi = ring[i].lat, xj = ring[j].lng, yj = ring[j].lat;
-    const intersect = ((yi > pt.lat) !== (yj > pt.lat)) &&
-      (pt.lng < (xj - xi) * (pt.lat - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
+  const len = path.length;
+  
+  for (let i = 0, j = len - 1; i < len; j = i++) {
+    const xi = path[i].lng, yi = path[i].lat;
+    const xj = path[j].lng, yj = path[j].lat;
+    
+    if (((yi > point.lat) !== (yj > point.lat)) &&
+        (point.lon < (xj - xi) * (point.lat - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
   }
+  
   return inside;
-}
-function pointInPolygonWithHoles(point, paths) {
-  if (!paths?.length || !pointInRing(point, paths[0])) return false;
-  for (let i = 1; i < paths.length; i++) if (pointInRing(point, paths[i])) return false;
-  return true;
-}
-const compileColorScale = (settings = []) => {
-  const scale = settings.map(c => ({ min: +c.min, max: +c.max, color: c.color }))
-    .filter(c => !isNaN(c.min) && !isNaN(c.max)).sort((a, b) => a.min - b.min);
-  return v => (scale.find(s => v >= s.min && v <= s.max)?.color ?? "#999");
 };
 
-// ================== LAYERS ==================
-const CirclesLayer = memo(({ points, getColor, radius = 15 }) =>
-  points.map((p, i) =>
-    <CircleF key={p.id ?? i} center={{ lat: p.lat, lng: p.lon }}
-      radius={radius} options={{ fillColor: getColor(p.prm), strokeWeight: 0, fillOpacity: 0.8 }} />)
-);
-const PolygonsLayer = memo(({ polygons }) =>
-  polygons.flatMap((poly, i) =>
-    <PolygonF key={poly.uid ?? i} paths={poly.paths}
-      options={{ fillColor: "#4285F4", fillOpacity: 0.15, strokeColor: "#FF3D00", strokeWeight: 2 }} />)
-);
+// ================== OPTIMIZED LAYERS ==================
+const CirclesLayer = memo(({ points, getColor, radius }) => {
+  console.log(`🎨 Rendering ${points.length} circles with ${radius}m radius`);
+  
+  return (
+    <>
+      {points.map((p, idx) => (
+        <Circle
+          key={`circle-${p.id || idx}`}
+          center={{ lat: p.lat, lng: p.lon }}
+          radius={radius}
+          options={{
+            fillColor: getColor(p.prm),
+            strokeWeight: 0,
+            fillOpacity: 0.75,
+            clickable: false,
+            visible: true,
+          }}
+        />
+      ))}
+    </>
+  );
+});
 
-// ================== MAIN PAGE ==================
+CirclesLayer.displayName = 'CirclesLayer';
+
+const PolygonsLayer = memo(({ polygons }) => {
+  console.log(`🔷 Rendering ${polygons.length} polygons`);
+  
+  return (
+    <>
+      {polygons.map((poly, idx) => (
+        <Polygon
+          key={`poly-${poly.uid || idx}`}
+          paths={poly.paths[0]}
+          options={{
+            fillColor: "#4285F4",
+            fillOpacity: 0.15,
+            strokeColor: "#2563eb",
+            strokeWeight: 2,
+            strokeOpacity: 0.9,
+            clickable: false,
+            visible: true,
+          }}
+        />
+      ))}
+    </>
+  );
+});
+
+PolygonsLayer.displayName = 'PolygonsLayer';
+
+// ================== MAIN COMPONENT ==================
 export default function PredictionMapPage() {
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(false);
-  const [projectId, setProjectId] = useState(1);
-  const [metric, setMetric] = useState("rsrp"); // UI uses lowercase
+  const [projectId, setProjectId] = useState(8);
+  const [metric, setMetric] = useState("rsrp");
   const [predictionData, setPredictionData] = useState(null);
   const [polygons, setPolygons] = useState([]);
-  const [showPolys, setShowPolys] = useState(true);
+  const [showPolys, setShowPolys] = useState(false); // ✅ Default to false
   const [onlyInside, setOnlyInside] = useState(false);
-  const [uiToggles, setUiToggles] = useState({ basemapStyle: "clean" });
+  const [uiToggles, setUiToggles] = useState({ basemapStyle: "roadmap" });
   const [viewport, setViewport] = useState(null);
+  const [zoom, setZoom] = useState(12);
   const [isSideOpen, setIsSideOpen] = useState(false);
 
   const mapRef = useRef(null);
+  const listenersRef = useRef([]);
 
-  // Read project and session from URL (back-compat)
   const sessionParam = useMemo(
     () => searchParams.get("sessionId") ?? searchParams.get("session") ?? "",
     [searchParams]
   );
-  
-  useEffect(() => {
-    const p = searchParams.get("project_id") ?? searchParams.get("project");
-    if (p && Number(p) !== projectId) setProjectId(Number(p));
-  }, [searchParams]); // eslint-disable-line
 
-  const { dataList = [], colorSetting = [] } = predictionData || {};
-  const getColor = useMemo(() => compileColorScale(colorSetting), [colorSetting]);
+  const { dataList, colorSetting } = useMemo(() => {
+    return {
+      dataList: predictionData?.dataList || [],
+      colorSetting: predictionData?.colorSetting || []
+    };
+  }, [predictionData]);
+
+  const getColor = useMemo(() => {
+    const scale = colorSetting
+      .map(c => ({ min: +c.min, max: +c.max, color: c.color }))
+      .filter(c => !isNaN(c.min) && !isNaN(c.max))
+      .sort((a, b) => a.min - b.min);
+    
+    const cache = new Map();
+    
+    return (value) => {
+      if (cache.has(value)) return cache.get(value);
+      
+      const match = scale.find(s => value >= s.min && value <= s.max);
+      const color = match?.color || "#999";
+      
+      cache.set(value, color);
+      if (cache.size > 100) cache.clear();
+      
+      return color;
+    };
+  }, [colorSetting]);
+
+  // Calculate radius based on zoom
+  const circleRadius = useMemo(() => {
+    const radius = calculateRadius(zoom);
+    console.log(`🔍 Zoom: ${zoom} → Radius: ${radius}m`);
+    return radius;
+  }, [zoom]);
 
   const fetchPredictionData = useCallback(async () => {
-    if (!projectId) return toast.info("Enter Project ID");
+    if (!projectId) {
+      toast.info("Please enter a Project ID");
+      return;
+    }
+    
     setLoading(true);
-    console.log(sessionParam,"dta to checck sessionn")
     try {
       const res = await mapViewApi.getPredictionLog({
         projectId,
-        metric: String(metric).toUpperCase(), // API expects uppercase
+        metric: String(metric).toUpperCase(),
       });
+      
       if (res?.Status === 1 && res?.Data) {
         setPredictionData(res.Data);
         toast.success("Prediction data loaded");
-      } else toast.error(res?.Message || "No data");
-    } catch (e) {
-      toast.error(e.message);
+      } else {
+        toast.error(res?.Message || "No data available");
+      }
+    } catch (error) {
+      console.error("Prediction fetch error:", error);
+      toast.error(error.message || "Failed to load prediction data");
     } finally {
       setLoading(false);
     }
   }, [projectId, metric]);
 
   const fetchPolygons = useCallback(async () => {
+    if (!projectId) return;
+    
     try {
       const res = await mapViewApi.getProjectPolygons(projectId);
-      const items = Array.isArray(res?.Data) ? res.Data : [];
-      const parsed = items.flatMap((item, i) =>
-        parseWKTToPolygons(item.wkt).map((p, k) => ({
-          ...item, uid: `${i}-${k}`, paths: p.paths,
-          bbox: computeRingBbox(p.paths?.[0] || []),
-        }))
-      );
+      const items = Array.isArray(res) ? res : (Array.isArray(res?.Data) ? res.Data : []);
+      
+      if (items.length === 0) {
+        setPolygons([]);
+        return;
+      }
+      
+      const parsed = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const polygonData = parseWKTToPolygons(item.wkt);
+        
+        for (let k = 0; k < polygonData.length; k++) {
+          const p = polygonData[k];
+          parsed.push({
+            id: item.id,
+            name: item.name,
+            uid: `${item.id}-${k}`,
+            paths: p.paths,
+            bbox: computeBbox(p.paths[0]),
+          });
+        }
+      }
+      
       setPolygons(parsed);
-    } catch (e) {
-      console.error(e); toast.error("Failed to fetch polygons");
+      
+      if (parsed.length > 0 && mapRef.current && window.google) {
+        setTimeout(() => {
+          const bounds = new window.google.maps.LatLngBounds();
+          parsed.slice(0, 50).forEach(poly => {
+            poly.paths[0]?.slice(0, 10).forEach(point => {
+              bounds.extend(new window.google.maps.LatLng(point.lat, point.lng));
+            });
+          });
+          mapRef.current.fitBounds(bounds);
+        }, 300);
+        
+        toast.success(`${parsed.length} polygon(s) loaded`);
+      }
+    } catch (error) {
+      console.error("Polygon fetch error:", error);
+      toast.error("Failed to load polygons");
     }
   }, [projectId]);
 
   const reloadData = useCallback(() => {
-    // normalize project key in URL
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (projectId) {
-        next.set("project", String(projectId));
-        next.delete("projectId");
-      } else {
-        next.delete("project");
-        next.delete("projectId");
-      }
-      // preserve incoming session if present
-      if (sessionParam) {
-        next.set("session", sessionParam);
-        next.delete("sessionId");
-      }
-      return next;
-    });
     fetchPredictionData();
     fetchPolygons();
-  }, [fetchPredictionData, fetchPolygons, projectId, sessionParam, setSearchParams]);
+  }, [fetchPredictionData, fetchPolygons]);
 
   useEffect(() => {
-    // initial load (and when component mounts)
-    fetchPredictionData();
-    fetchPolygons();
-  }, []); // eslint-disable-line
+    if (projectId) {
+      reloadData();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleMapLoad = useCallback(map => {
+  const debouncedSetViewport = useMemo(
+    () => debounce((vp) => {
+      setViewport(vp);
+    }, DEBOUNCE_DELAY),
+    []
+  );
+
+  const throttledSetZoom = useMemo(
+    () => throttle((z) => {
+      setZoom(z);
+    }, 50),
+    []
+  );
+
+  const handleMapLoad = useCallback((map) => {
     mapRef.current = map;
+    
     const updateViewport = () => {
-      const b = map.getBounds(); if (!b) return;
-      const ne = b.getNorthEast(), sw = b.getSouthWest();
-      setViewport({ north: ne.lat(), south: sw.lat(), east: ne.lng(), west: sw.lng() });
+      const bounds = map.getBounds();
+      if (!bounds) return;
+      
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+      
+      debouncedSetViewport({
+        north: ne.lat(),
+        south: sw.lat(),
+        east: ne.lng(),
+        west: sw.lng(),
+      });
     };
-    map.addListener("idle", updateViewport);
+    
+    const updateZoom = () => {
+      const currentZoom = map.getZoom();
+      throttledSetZoom(currentZoom);
+    };
+    
+    const zoomListener = map.addListener("zoom_changed", updateZoom);
+    const idleListener = map.addListener("idle", updateViewport);
+    
+    listenersRef.current.push(zoomListener, idleListener);
+    
     updateViewport();
+    updateZoom();
+  }, [debouncedSetViewport, throttledSetZoom]);
+
+  useEffect(() => {
+    return () => {
+      listenersRef.current.forEach(listener => {
+        if (listener && listener.remove) listener.remove();
+      });
+    };
   }, []);
 
-  const visiblePolygons = useMemo(() =>
-    polygons.filter(p => bboxIntersects(p.bbox, viewport)).slice(0, MAX_RENDER_POLYGONS),
-    [viewport, polygons]
-  );
   const visiblePoints = useMemo(() => {
-    if (!viewport) return [];
-    let pts = dataList.filter(p => p.lat >= viewport.south && p.lat <= viewport.north);
-    if (onlyInside && visiblePolygons.length)
-      pts = pts.filter(pt => visiblePolygons.some(p => pointInPolygonWithHoles(pt, p.paths)));
-    return pts.slice(0, MAX_RENDER_POINTS);
-  }, [viewport, dataList, onlyInside, visiblePolygons]);
+    if (!viewport || !dataList.length) return [];
+    
+    const startTime = performance.now();
+    
+    let points = [];
+    for (let i = 0; i < dataList.length; i++) {
+      if (isPointInViewport(dataList[i], viewport)) {
+        points.push(dataList[i]);
+      }
+    }
+    
+    if (onlyInside && showPolys && polygons.length) {
+      const filtered = [];
+      for (let i = 0; i < points.length; i++) {
+        const point = points[i];
+        for (let j = 0; j < polygons.length; j++) {
+          if (isPointInPolygon(point, polygons[j])) {
+            filtered.push(point);
+            break;
+          }
+        }
+      }
+      points = filtered;
+    }
+    
+    const result = points.slice(0, MAX_RENDER_POINTS);
+    
+    const endTime = performance.now();
+    console.log(`⚡ Point filtering took ${(endTime - startTime).toFixed(2)}ms`);
+    
+    return result;
+  }, [viewport, dataList, onlyInside, showPolys, polygons]);
+
+  const visiblePolygons = useMemo(() => {
+    if (!showPolys || !polygons.length) return [];
+    
+    if (viewport) {
+      const visible = polygons.filter(poly => {
+        if (!poly.bbox) return true;
+        return !(poly.bbox.west > viewport.east || 
+                 poly.bbox.east < viewport.west || 
+                 poly.bbox.south > viewport.north || 
+                 poly.bbox.north < viewport.south);
+      });
+      return visible.slice(0, MAX_RENDER_POLYGONS);
+    }
+    
+    return polygons.slice(0, MAX_RENDER_POLYGONS);
+  }, [showPolys, polygons, viewport]);
 
   const mapOptions = useMemo(() => {
     const styleKey = uiToggles.basemapStyle || "roadmap";
-    const options = { disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy" };
-    if (["roadmap", "satellite", "terrain", "hybrid"].includes(styleKey))
-      options.mapTypeId = styleKey;
-    else if (MAP_STYLES[styleKey]) options.styles = MAP_STYLES[styleKey];
-    return options;
-  }, [uiToggles]);
+    return {
+      disableDefaultUI: false,
+      zoomControl: true,
+      streetViewControl: false,
+      fullscreenControl: true,
+      mapTypeControl: true,
+      gestureHandling: "greedy",
+      mapTypeId: ["roadmap", "satellite", "terrain", "hybrid"].includes(styleKey) 
+        ? styleKey 
+        : "roadmap",
+      styles: MAP_STYLES[styleKey] || null,
+      tilt: 0,
+      clickableIcons: false,
+    };
+  }, [uiToggles.basemapStyle]);
 
-  if (loadError) return <div>Error loading map</div>;
-  if (!isLoaded) return <div className="h-screen flex items-center justify-center"><Spinner /></div>;
+  if (loadError) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="text-center">
+          <p className="text-red-500 text-lg">Error loading maps</p>
+          <p className="text-sm text-gray-400 mt-2">{loadError.message}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-900">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-900">
       <PredictionHeader
-        projectId={projectId} setProjectId={setProjectId}
-        metric={metric} setMetric={setMetric}
+        projectId={projectId}
+        setProjectId={setProjectId}
+        metric={metric}
+        setMetric={setMetric}
         reloadData={reloadData}
-        showPolys={showPolys} setShowPolys={setShowPolys}
-        onlyInside={onlyInside} setOnlyInside={setOnlyInside}
-        loading={loading} ui={uiToggles} onUIChange={setUiToggles}
+        showPolys={showPolys}
+        setShowPolys={setShowPolys}
+        onlyInside={onlyInside}
+        setOnlyInside={setOnlyInside}
+        loading={loading}
+        ui={uiToggles}
+        onUIChange={setUiToggles}
       />
 
-      {/* Optional quick toggle for the drawer (mobile friendly) */}
       <div className="px-4 pt-2">
         <button
-          onClick={() => setIsSideOpen(v => !v)}
-          className="flex gap-1 items-center bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-md px-3 py-1"
+          onClick={() => setIsSideOpen(!isSideOpen)}
+          className="flex gap-2 items-center bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-3 py-2 shadow-lg transition-colors"
         >
-          <Filter className="h-4" />
-          {isSideOpen ? "Close Filters" : "Open Filters"}
+          <Filter className="h-4 w-4" />
+          {isSideOpen ? "Close" : "Open"} Controls
         </button>
       </div>
 
       <div className="flex-grow flex p-4 gap-4 overflow-hidden">
-        <div className="flex-grow rounded-lg border shadow-md overflow-hidden relative">
-          <GoogleMap mapContainerStyle={MAP_CONTAINER_STYLE}
-            center={DEFAULT_CENTER} zoom={12} onLoad={handleMapLoad}
-            options={mapOptions}>
-            {showPolys && <PolygonsLayer polygons={visiblePolygons} />}
-            <CirclesLayer points={visiblePoints} getColor={getColor} radius={15} />
+        <div className="flex-grow rounded-lg border border-gray-700 shadow-2xl overflow-hidden relative bg-white">
+          <GoogleMap
+            mapContainerStyle={MAP_CONTAINER_STYLE}
+            center={DEFAULT_CENTER}
+            zoom={12}
+            onLoad={handleMapLoad}
+            options={mapOptions}
+          >
+            {showPolys && visiblePolygons.length > 0 && (
+              <PolygonsLayer polygons={visiblePolygons} />
+            )}
+            
+            {visiblePoints.length > 0 && (
+              <CirclesLayer 
+                points={visiblePoints} 
+                getColor={getColor} 
+                radius={circleRadius} 
+              />
+            )}
           </GoogleMap>
-          {loading && <div className="absolute inset-0 flex items-center justify-center bg-white/60"><Spinner /></div>}
-          <div className="absolute bottom-2 left-2 bg-white/90 rounded px-2 py-1 text-xs shadow">
-            <div>Total points: {dataList.length} | Shown: {visiblePoints.length}</div>
-            <div>Total polygons: {polygons.length} | Shown: {visiblePolygons.length}</div>
+          
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/70 z-10">
+              <Spinner />
+            </div>
+          )}
+          
+          <div className="absolute bottom-4 left-4 bg-gray-800/95 rounded-lg px-4 py-3 text-xs shadow-xl border border-gray-600">
+            <div className="font-semibold text-gray-200 mb-2">Map Statistics</div>
+            <div className="space-y-1">
+              <div className="flex justify-between gap-6">
+                <span className="text-gray-400">Zoom:</span>
+                <span className="font-medium text-white">{zoom}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-gray-400">Radius:</span>
+                <span className="font-medium text-blue-400">{circleRadius}m</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-gray-400">Total Points:</span>
+                <span className="font-medium text-white">{dataList.length}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-gray-400">Visible:</span>
+                <span className="font-medium text-white">{visiblePoints.length}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-gray-400">Polygons:</span>
+                <span className="font-medium text-white">
+                  {showPolys ? `${visiblePolygons.length}/${polygons.length}` : "Hidden"}
+                </span>
+              </div>
+              {onlyInside && showPolys && (
+                <div className="text-green-400 text-xs mt-2 pt-2 border-t border-gray-600 flex items-center gap-1">
+                  <Filter className="h-3 w-3" />
+                  <span>Inside only</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <div className="w-full lg:w-1/3 flex-shrink-0 overflow-y-auto">
-          <PredictionDetailsPanel predictionData={predictionData} metric={metric} loading={loading} />
+        
+        <div className="hidden lg:block w-1/3 flex-shrink-0 overflow-y-auto">
+          <PredictionDetailsPanel
+            predictionData={predictionData}
+            metric={metric}
+            loading={loading}
+          />
         </div>
       </div>
 
-      {/* Drawer */}
       <PredictionSide
         open={isSideOpen}
         onOpenChange={setIsSideOpen}
@@ -339,7 +600,7 @@ export default function PredictionMapPage() {
         setShowPolys={setShowPolys}
         onlyInside={onlyInside}
         setOnlyInside={setOnlyInside}
-        sessionId={sessionParam} // preserve session(s) when navigating back
+        sessionId={sessionParam}
       />
     </div>
   );
