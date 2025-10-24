@@ -12,7 +12,6 @@ import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 import MapViewSide from "@/components/MapView/MapViewSide";
 import NetworkPlannerMap from "@/components/NetworkPlannerMap";
 
-
 const defaultThresholds = {
   rsrp: [],
   rsrq: [],
@@ -36,6 +35,8 @@ const canonicalOperatorName = (raw) => {
   return s;
 };
 
+const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 }; // fallback when no points
+
 const SimpleMapView = () => {
   const [rawLocations, setRawLocations] = useState([]);
   const [thresholds, setThresholds] = useState(defaultThresholds);
@@ -47,7 +48,7 @@ const SimpleMapView = () => {
   const [isSideOpen, setIsSideOpen] = useState(false);
   const [ui, setUi] = useState({ basemapStyle: "roadmap" });
 
-  // --- Read project + session from URL (supports projectId/sessionId too) ---
+  // --- Read project + session from URL ---
   const projectParam =
     searchParams.get("project_id") ?? searchParams.get("project") ?? "";
   const [projectId, setProjectId] = useState(projectParam ? Number(projectParam) : "");
@@ -62,8 +63,6 @@ const SimpleMapView = () => {
           .filter((id) => id)
       : [];
   }, [searchParams]);
-
-  
 
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
@@ -182,6 +181,26 @@ const SimpleMapView = () => {
     toast.info("Project updated in URL");
   }, [projectId, setSearchParams]);
 
+  // Compute map center (avg of points) or fallback
+  const mapCenter = useMemo(() => {
+    if (rawLocations.length === 0) return DEFAULT_CENTER;
+    const { lat, lng } = rawLocations.reduce(
+      (acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }),
+      { lat: 0, lng: 0 }
+    );
+    return { lat: lat / rawLocations.length, lng: lng / rawLocations.length };
+  }, [rawLocations]);
+
+  const mapOptions = useMemo(() => {
+    const style =
+      ui.basemapStyle === "satellite" ||
+      ui.basemapStyle === "hybrid" ||
+      ui.basemapStyle === "terrain"
+        ? ui.basemapStyle
+        : "roadmap";
+    return { mapTypeId: style };
+  }, [ui.basemapStyle]);
+
   // --- Loading & Error States ---
   if (!isLoaded)
     return (
@@ -247,74 +266,41 @@ const SimpleMapView = () => {
         position="left"
         projectId={projectId}
         setProjectId={setProjectId}
-        sessionId={sessionIds.join(",")}         // pass CSV for display and navigation
+        sessionId={sessionIds.join(",")}
         reloadData={reloadFromSidebar}
       />
 
       {/* Map */}
       <div className="flex-grow rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden relative">
         <div className="absolute bottom-2 left-2 z-10 bg-white/80 dark:bg-gray-800/80 p-1 px-2 rounded text-xs text-gray-600 dark:text-gray-300 shadow">
-          Showing {rawLocations.length} locations. Colors reflect{" "}
-          {selectedMetric.toUpperCase()} thresholds.
+          {rawLocations.length} points loaded. Colors reflect {selectedMetric.toUpperCase()} thresholds.
         </div>
 
-        {/* {rawLocations.length > 0 ? (
-          <MapWithMultipleCircles
-            isLoaded={isLoaded}
-            loadError={loadError}
-            locations={rawLocations}
-            thresholds={thresholds}
-            selectedMetric={selectedMetric}
-            activeMarkerIndex={activeMarker}
-            onMarkerClick={setActiveMarker}
-            options={{
-              mapTypeId:
-                ui.basemapStyle === "satellite" ||
-                ui.basemapStyle === "hybrid" ||
-                ui.basemapStyle === "terrain"
-                  ? ui.basemapStyle
-                  : "roadmap",
-            }}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700">
-            <p className="text-gray-600 dark:text-gray-300">
-              No valid location data to display for this session.
-            </p>
-          </div>
-        )} */}
-
         <div className="relative h-full w-full">
-  {/* Base Map Layer - Circles */}
-  {ui.showSectors ? (
-    <NetworkPlannerMap />
-  ) : rawLocations.length > 0 ? (
-    <MapWithMultipleCircles
-      isLoaded={isLoaded}
-      loadError={loadError}
-      locations={rawLocations}
-      thresholds={thresholds}
-      selectedMetric={selectedMetric}
-      activeMarkerIndex={activeMarker}
-      onMarkerClick={setActiveMarker}
-      options={{
-        mapTypeId:
-          ui.basemapStyle === "satellite" ||
-          ui.basemapStyle === "hybrid" ||
-          ui.basemapStyle === "terrain"
-            ? ui.basemapStyle
-            : "roadmap",
-      }}
-    />
-  ) : (
-    <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700">
-      <p className="text-gray-600 dark:text-gray-300">
-        No valid location data to display for this session.
-      </p>
-    </div>
-  )}
-</div>
-
+          {rawLocations.length > 0 || ui.showSectors ? (
+            <MapWithMultipleCircles
+              isLoaded={isLoaded}
+              loadError={loadError}
+              locations={rawLocations}
+              thresholds={thresholds}
+              selectedMetric={selectedMetric}
+              activeMarkerIndex={activeMarker}
+              onMarkerClick={setActiveMarker}
+              options={mapOptions}
+              center={mapCenter}           // used when no fit to bounds
+              defaultZoom={15}             // used when not fitting to points
+              fitToLocations={rawLocations.length > 0}
+            >
+              {ui.showSectors && <NetworkPlannerMap />}
+            </MapWithMultipleCircles>
+          ) : (
+            <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700">
+              <p className="text-gray-600 dark:text-gray-300">
+                No valid location data to display for this session.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
