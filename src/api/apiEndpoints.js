@@ -1,5 +1,66 @@
-// src/api/apiEndpoints.js
 
+// Existing imports...
+import axios from 'axios';
+
+// Python Flask Building Service URL
+const BUILDING_SERVICE_URL = 'http://localhost:5001';
+
+// Add this to your existing apiEndpoints.js
+export const buildingApi = {
+  /**
+   * Generate buildings from OpenStreetMap
+   * @param {Object} polygonData - Polygon geometry or WKT string
+   * @returns {Promise} - Building GeoJSON data
+   */
+  generateBuildings: async (polygonData) => {
+    try {
+      const response = await axios.post(
+        `${BUILDING_SERVICE_URL}/api/generate-buildings`,
+        polygonData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 180000, // 3 minutes timeout for large areas
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Building API Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Health check for Python service
+   */
+  healthCheck: async () => {
+    try {
+      const response = await axios.get(`${BUILDING_SERVICE_URL}/health`);
+      return response.data;
+    } catch (error) {
+      console.error('Building Service Health Check Failed:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Test endpoint with sample polygon
+   */
+  testPolygon: async () => {
+    try {
+      const response = await axios.get(`${BUILDING_SERVICE_URL}/api/test-polygon`);
+      return response.data;
+    } catch (error) {
+      console.error('Test Polygon Error:', error);
+      throw error;
+    }
+  }
+};
+
+//------------------------------------------------------------------------------------------------------------------------------//
+
+// src/api/apiEndpoints.js
 import { api } from "./apiService";
 
 /* ---------------- AUTH ---------------- */
@@ -61,7 +122,13 @@ export const mapViewApi = {
   endSession: (data) => api.post("/api/MapView/end_session", data),
   createProjectWithPolygons: (payload) =>
     api.post("/api/MapView/CreateProjectWithPolygons", payload),
-  getAvailablePolygons: () => api.get("/api/MapView/GetAvailablePolygons"),
+  getAvailablePolygons: (projectId) => {
+    // Handle optional parameter properly
+    const params = projectId !== undefined && projectId !== null 
+      ? { projectId } 
+      : {};
+    return api.get("/api/MapView/GetAvailablePolygons", { params });
+  },
   assignPolygonToProject: (polygonId, projectId) =>
     api.post("/api/MapView/AssignPolygonToProject", null, {
       params: { polygonId, projectId },

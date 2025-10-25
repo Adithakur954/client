@@ -1,6 +1,8 @@
 // const API_BASE_URL = "http://192.168.1.70:5224";
-// const API_BASE_URL = "http://localhost:5224";
-const API_BASE_URL = "https://signaltracker.onrender.com";
+// apiService.js
+
+const API_BASE_URL = "https://signaltrackers-1.onrender.com";
+// const API_BASE_URL = "https://signaltracker.onrender.com";
 const apiService = async (endpoint, { body, params, ...customOptions } = {}) => {
   const isFormData = body instanceof FormData;
   const headers = isFormData ? {} : { "Content-Type": "application/json" };
@@ -12,7 +14,7 @@ const apiService = async (endpoint, { body, params, ...customOptions } = {}) => 
       ...headers,
       ...customOptions.headers,
     },
-    credentials: "include",
+    credentials: "include", // Send cookies with request
   };
 
   if (body) config.body = isFormData ? body : JSON.stringify(body);
@@ -23,9 +25,19 @@ const apiService = async (endpoint, { body, params, ...customOptions } = {}) => 
   try {
     const response = await fetch(url.toString(), config);
 
+    // ✅ HANDLE 401 - Session Expired
     if (response.status === 401) {
       console.error("Unauthorized request. Session may have expired.");
-      // Optionally: auto-logout or redirect here
+      
+      // Clear session storage
+      sessionStorage.removeItem('user');
+      
+      // Redirect to login (only if not already on login page)
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+      
+      throw new Error('Session expired. Please login again.');
     }
 
     if (response.status === 204) return null;
@@ -41,10 +53,8 @@ const apiService = async (endpoint, { body, params, ...customOptions } = {}) => 
 
     const responseText = await response.text();
     try {
-      // Always try to parse as JSON first.
       return JSON.parse(responseText);
     } catch (e) {
-      // If it fails, it wasn't JSON, so return the raw text.
       return responseText;
     }
   } catch (error) {
