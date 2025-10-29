@@ -3,7 +3,7 @@ import {
   BarChart2, RefreshCw, Users, Car, Waypoints, FileText, 
   Wifi, Radio, Layers 
 } from 'lucide-react';
-import StatCard from '@/components/dashboard/StatCard';
+import StatCard from '@/components/dashboard/statCard';
 import MonthlySamplesChart from '@/components/dashboard/charts/MonthlySamplesChart';
 import OperatorNetworkChart from '@/components/dashboard/charts/OperatorNetworkChart';
 import NetworkDistributionChart from '@/components/dashboard/charts/NetworkDistributionChart';
