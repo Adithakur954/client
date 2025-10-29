@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import ChartFilterSettings from './ChartFilterSettings';
-import ChartCardSkeleton from './skeletons/chardCardSkeleton';
+import ChartCardSkeleton from './skeletons/ChardCardSkeleton';
 import { downloadCSVFromData, sanitizeFileName } from '@/utils/dashboardUtils';
 
 const ChartCard = ({ 

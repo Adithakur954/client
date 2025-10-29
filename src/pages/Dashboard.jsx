@@ -3,7 +3,7 @@ import {
   BarChart2, RefreshCw, Users, Car, Waypoints, FileText, 
   Wifi, Radio, Layers 
 } from 'lucide-react';
-import StatCard from '@/components/dashboard/statCard';
+import StatCard from '@/components/dashboard/StatCard';
 import MonthlySamplesChart from '@/components/dashboard/charts/MonthlySamplesChart';
 import OperatorNetworkChart from '@/components/dashboard/charts/OperatorNetworkChart';
 import NetworkDistributionChart from '@/components/dashboard/charts/NetworkDistributionChart';
@@ -12,7 +12,7 @@ import BandDistributionChart from '@/components/dashboard/charts/BandDistributio
 import HandsetPerformanceChart from '@/components/dashboard/charts/HandsetPerformanceChart';
 import CoverageRankingChart from '@/components/dashboard/charts/CoverageRankingChart';
 import QualityRankingChart from '@/components/dashboard/charts/QualityRankingChart';
-import StatCardSkeleton from '@/components/dashboard/skeletons/statCardSkeleton';
+import StatCardSkeleton from '@/components/dashboard/skeletons/StatCardSkeleton';
 import { 
   useTotals, 
   useOperatorsAndNetworks, 
