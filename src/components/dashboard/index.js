@@ -5,7 +5,7 @@ export { default as MetricSelectorSettings } from './MetricSelectorSettings';
 
 // Skeletons
 export { default as StatCardSkeleton } from './skeletons/StatCardSkeleton';
-export { default as ChartCardSkeleton } from './skeletons/ChartCardSkeleton';
+export { default as ChartCardSkeleton } from './skeletons/chardCardSkeleton';
 
 // Charts
 export { default as MonthlySamplesChart } from './charts/MonthlySamplesChart';
