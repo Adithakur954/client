@@ -19,6 +19,7 @@ export default function LogCirclesLayer({
   renderVisibleOnly = true,
   canvasRadiusPx = (zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2))),
   maxDraw = 60000,
+  coverageHoleOnly = false, // ✅ Filter to show only coverage holes
 }) {
   const [logs, setLogs] = useState([]);
   const heatmapRef = useRef(null);
@@ -48,7 +49,7 @@ export default function LogCirclesLayer({
     filters?.band,
   ]);
 
-  // Fetch logs when map or filterSignature changes (not on every parent re-render)
+  // Fetch logs when map or filterSignature changes
   useEffect(() => {
     if (!filters || !map || !filterSignature) return;
 
@@ -100,9 +101,35 @@ export default function LogCirclesLayer({
     };
   }, [map, filterSignature, setIsLoading]);
 
-  // Parse & prep
+  // ✅ Filter logs for coverage holes if checkbox is enabled
+  const filteredLogs = useMemo(() => {
+    if (!coverageHoleOnly) {
+      return logs;
+    }
+
+    const threshold = thresholds.coveragehole || -110;
+    const filtered = logs.filter((log) => {
+      const rsrp = parseFloat(log.rsrp);
+      return !isNaN(rsrp) && rsrp < threshold;
+    });
+
+    return filtered;
+  }, [logs, coverageHoleOnly, thresholds]);
+
+  // ✅ Show info toast when coverage hole filter is active
+  useEffect(() => {
+    if (coverageHoleOnly && filteredLogs.length > 0 && logs.length > 0) {
+      const threshold = thresholds.coveragehole || -110;
+      toast.info(
+        `Showing ${filteredLogs.length} coverage holes (RSRP < ${threshold} dBm) out of ${logs.length} total logs`,
+        { autoClose: 3000 }
+      );
+    }
+  }, [coverageHoleOnly, filteredLogs.length, logs.length, thresholds.coveragehole]);
+
+  // Parse & prep (use filteredLogs)
   const processed = useMemo(() => {
-    return (logs || [])
+    return (filteredLogs || [])
       .map((l, i) => {
         const lat = parseFloat(l.lat);
         const lng = parseFloat(l.lon ?? l.lng);
@@ -115,7 +142,7 @@ export default function LogCirclesLayer({
         };
       })
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-  }, [logs, field]);
+  }, [filteredLogs, field]);
 
   // Viewport filter
   const visibleProcessed = useMemo(() => {
@@ -131,6 +158,7 @@ export default function LogCirclesLayer({
     });
   }, [processed, renderVisibleOnly, visibleBounds]);
 
+  // Color points based on selected metric (not coverage hole)
   const pointsForCanvas = useMemo(() => {
     return visibleProcessed.map((p) => ({
       lat: p.lat,

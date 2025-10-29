@@ -1,228 +1,296 @@
+// src/api/apiEndpoints.js
+import { api } from "./apiService"; // C# Backend
+import { pythonApi } from "./pythonApiService"; // Python Backend
 
-// Existing imports...
-import axios from 'axios';
+/**
+ * ============================================
+ * PYTHON BACKEND APIs (Port 5000)
+ * ============================================
+ */
 
-// Python Flask Building Service URL
-const BUILDING_SERVICE_URL = 'http://localhost:5001';
+export const generalApi = {
+  healthCheck: async () => {
+    try {
+      const response = await pythonApi.get('/health');
+      return response;
+    } catch (error) {
+      console.error('Python backend health check failed:', error);
+      throw error;
+    }
+  },
 
-// Add this to your existing apiEndpoints.js
+  getInfo: async () => {
+    try {
+      const response = await pythonApi.get('/');
+      return response;
+    } catch (error) {
+      console.error('API Info Error:', error);
+      throw error;
+    }
+  },
+};
+
 export const buildingApi = {
-  /**
-   * Generate buildings from OpenStreetMap
-   * @param {Object} polygonData - Polygon geometry or WKT string
-   * @returns {Promise} - Building GeoJSON data
-   */
   generateBuildings: async (polygonData) => {
     try {
-      const response = await axios.post(
-        `${BUILDING_SERVICE_URL}/api/generate-buildings`,
-        polygonData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          timeout: 180000, // 3 minutes timeout for large areas
-        }
-      );
-      return response.data;
+      const response = await pythonApi.post('/api/buildings/generate', polygonData);
+      return response;
     } catch (error) {
       console.error('Building API Error:', error);
       throw error;
     }
   },
 
-  /**
-   * Health check for Python service
-   */
   healthCheck: async () => {
     try {
-      const response = await axios.get(`${BUILDING_SERVICE_URL}/health`);
-      return response.data;
+      const response = await pythonApi.get('/api/buildings/health');
+      return response;
     } catch (error) {
-      console.error('Building Service Health Check Failed:', error);
+      console.error('Building service health check failed:', error);
+      throw error;
+    }
+  },
+};
+
+export const cellSiteApi = {
+  uploadSite: async (formData) => {
+    try {
+      const response = await pythonApi.post('/api/cell-site/upload', formData, {
+        // Add timeout for large files
+        signal: AbortSignal.timeout(300000), // 5 minutes
+      });
+      return response;
+    } catch (error) {
+      console.error('Cell Site upload error:', error);
       throw error;
     }
   },
 
-  /**
-   * Test endpoint with sample polygon
-   */
-  testPolygon: async () => {
+  downloadFile: (outputDir, filename) => {
+    const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:5000";
+    const url = `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`;
+    window.open(url, '_blank');
+  },
+
+  downloadFileBlob: async (outputDir, filename) => {
     try {
-      const response = await axios.get(`${BUILDING_SERVICE_URL}/api/test-polygon`);
-      return response.data;
+      const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:5000";
+      const response = await fetch(
+        `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      return blob;
     } catch (error) {
-      console.error('Test Polygon Error:', error);
+      console.error('Download error:', error);
       throw error;
     }
-  }
+  },
+
+  listOutputs: async (outputDir) => {
+    try {
+      const response = await pythonApi.get(`/api/cell-site/outputs/${outputDir}`);
+      return response;
+    } catch (error) {
+      console.error('List outputs error:', error);
+      throw error;
+    }
+  },
+
+  healthCheck: async () => {
+    try {
+      const response = await pythonApi.get('/api/cell-site/health');
+      return response;
+    } catch (error) {
+      console.error('Cell Site health check failed:', error);
+      throw error;
+    }
+  },
 };
 
-//------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * ============================================
+ * C# BACKEND APIs (Port 5224)
+ * ============================================
+ */
 
-// src/api/apiEndpoints.js
-import { api } from "./apiService";
-
-/* ---------------- AUTH ---------------- */
 export const authApi = {
   checkStatus: () => api.get("/api/auth/status"),
 };
 
-/* ---------------- ADMIN CONTROLLER ---------------- */
 export const adminApi = {
   getReactDashboardData: () => api.get("/Admin/GetReactDashboardData"),
   getDashboardGraphData: () => api.get("/Admin/GetDashboardGraphData"),
   getAllUsers: (filters) => api.post("/Admin/GetAllUsers", filters),
   getUsers: (params) => api.get("/Admin/GetUsers", { params }),
-
   getOnlineUsers: () => api.get("/Admin/GetOnlineUsers"),
-
   getOperatorCoverageRanking: ({ min, max }) =>
     api.get("/Admin/GetOperatorCoverageRanking", { params: { min, max } }),
-
   getOperatorQualityRanking: ({ min, max }) =>
     api.get("/Admin/GetOperatorQualityRanking", { params: { min, max } }),
-
   getUserById: (userId) => {
     const formData = new FormData();
     formData.append("UserID", userId);
     formData.append("token", "");
     return api.post("/Admin/GetUser", formData);
   },
-
   saveUserDetails: (data) => api.post("/Admin/SaveUserDetails", data),
   deleteUser: (id) => api.post(`/Admin/DeleteUser?id=${id}`),
-
   userResetPassword: (data) => api.post("/Admin/UserResetPassword", data),
   changePassword: (data) => api.post("/Admin/ChangePassword", data),
-
   getSessions: () => api.get("/Admin/GetSessions"),
-
-  getAllNetworkLogs: (params) =>
-    api.get("/Admin/GetAllNetworkLogs", { params }),
-
-  // If your actual route is /Admin/DeleteSession?id=..., use that; the double segment looked suspicious
+  getAllNetworkLogs: (params) => api.get("/Admin/GetAllNetworkLogs", { params }),
   deleteSession: (sessionId) =>
     api.delete(`/Admin/DeleteSession?id=${parseInt(sessionId, 10)}`),
-
-  // IMPORTANT: pass filters via params for GET
   getSessionsByFilter: (filters) =>
     api.get("/Admin/GetSessionsByDateRange", { params: filters }),
 };
 
-/* ---------------- MAP VIEW CONTROLLER ---------------- */
 export const mapViewApi = {
+  // ==================== User & Session Management ====================
   signup: (user) => api.post("/api/MapView/user_signup", user),
-
-  getLogsByDateRange: (filters) =>
-    api.get("/api/MapView/GetLogsByDateRange", { params: filters }),
-
   startSession: (data) => api.post("/api/MapView/start_session", data),
-
   endSession: (data) => api.post("/api/MapView/end_session", data),
-  createProjectWithPolygons: (payload) =>
-    api.post("/api/MapView/CreateProjectWithPolygons", payload),
+
+  // ==================== Polygon Management ====================
+  getProjectPolygons: (projectId) =>
+    api.get(`/api/MapView/GetProjectPolygons?projectId=${projectId}`),
+  
+  savePolygon: (payload) => api.post("/api/MapView/SavePolygon", payload),
+  
+  savePolygonWithLogs: (payload) => 
+    api.post("/api/MapView/SavePolygonWithLogs", payload),
+  
   getAvailablePolygons: (projectId) => {
-    // Handle optional parameter properly
     const params = projectId !== undefined && projectId !== null 
       ? { projectId } 
       : {};
     return api.get("/api/MapView/GetAvailablePolygons", { params });
   },
+  
+  getPolygonLogCount: (polygonId, from, to) =>
+    api.get("/api/MapView/GetPolygonLogCount", { 
+      params: { polygonId, from, to } 
+    }),
+  
+  listSavedPolygons: (projectId, limit = 200, offset = 0) =>
+    api.get("/api/MapView/ListSavedPolygons", { 
+      params: { projectId, limit, offset } 
+    }),
+  
   assignPolygonToProject: (polygonId, projectId) =>
     api.post("/api/MapView/AssignPolygonToProject", null, {
       params: { polygonId, projectId },
     }),
 
-  getPredictionLog: (params) =>
-    api.get("/api/MapView/GetPredictionLog", { params }), // yeh post hai get mein kar raha mai
+  // ==================== Project Management ====================
+  getProjects: () => api.get("/api/MapView/GetProjects"),
+  
+  createProjectWithPolygons: (payload) =>
+    api.post("/api/MapView/CreateProjectWithPolygons", payload),
 
+  // ==================== Network Logs ====================
   getNetworkLog: (sessionLike) => {
     const extractId = (s) => {
       if (s == null) return "";
       if (typeof s === "object") {
-        const sid =
-          s.session_id ??
-          s.id ??
-          s.SessionID ??
-          s.ID ??
-          s.value ??
+        const sid = s.session_id ?? s.id ?? s.SessionID ?? s.ID ?? s.value ??
           (s.params && s.params.session_id);
         return sid != null ? String(sid) : "";
       }
       return String(s);
     };
     const sid = extractId(sessionLike);
-    console.log(
-      "[mapViewApi.getNetworkLog] input:",
-      sessionLike,
-      "-> sid:",
-      sid,
-      "typeof sid:",
-      typeof sid
-    );
-    return api.get("/api/MapView/GetNetworkLog", {
-      params: { session_id: sid },
-    });
+    return api.get("/api/MapView/GetNetworkLog", { params: { session_id: sid } });
   },
-  // getPredictionLog: (params) =>
-  //   api.get("/api/MapView/GetPredictionLog", { params }),
-
-  getProjectPolygons: (projectId) =>
-    api.get(`/api/MapView/GetProjectPolygons?projectId=${projectId}`),
-
-  getProjects: () => api.get("/api/MapView/GetProjects"),
-  getBands: () => api.get("/api/MapView/GetBands"),
-
-  // Let the browser set the boundary automatically; do not set Content-Type manually
-  uploadImage: (formData) => api.post("/api/MapView/UploadImage", formData),
-
+  
+  getLogsByDateRange: (filters) =>
+    api.get("/api/MapView/GetLogsByDateRange", { params: filters }),
+  
   logNetwork: (data) => api.post("/api/MapView/log_networkAsync", data),
 
+  // ==================== Filter Options ====================
   getProviders: () => api.get("/api/MapView/GetProviders"),
+  
   getTechnologies: () => api.get("/api/MapView/GetTechnologies"),
-  savePolygon: (payload) => api.post("/api/MapView/SavePolygon", payload),
+  
+  getBands: () => api.get("/api/MapView/GetBands"),
+
+  // ==================== Prediction Data ====================
+  getPredictionLog: (params) => 
+    api.get("/api/MapView/GetPredictionLog", { params }),
+  
+  getPredictionLogPost: (payload) => 
+    api.post("/api/MapView/GetPredictionLog", payload),
+  
+  getPredictionDataForBuildings: (projectId, metric) =>
+    api.get("/api/MapView/GetPredictionDataForSelectedBuildingPolygonsRaw", { 
+      params: { projectId, metric } 
+    }),
+
+  // ==================== Site Prediction ====================
+  uploadSitePredictionCsv: (formData) =>
+    api.post("/api/MapView/UploadSitePredictionCsv", formData),
+  
+  getSitePrediction: (params) =>
+    api.get("/api/MapView/GetSitePrediction", { params }),
+  
+  assignSitePredictionToProject: (projectId, siteIds) => {
+    const params = new URLSearchParams();
+    params.append('projectId', projectId);
+    siteIds.forEach(id => params.append('siteIds', id));
+    return api.post(`/api/MapView/AssignExistingSitePredictionToProject?${params.toString()}`);
+  },
+
+  // ==================== ML Site Data ====================
+  getSiteNoMl: (params) =>
+    api.get("/api/MapView/GetSiteNoMl", { params }),
+  
+  getSiteMl: (params) =>
+    api.get("/api/MapView/GetSiteMl", { params }),
+
+  // ==================== Image Upload ====================
+  uploadImage: (formData) => api.post("/api/MapView/UploadImage", formData),
+  
+  uploadImageLegacy: (formData) => 
+    api.post("/api/MapView/UploadImageLegacy", formData),
 };
 
-/* ---------------- HOME CONTROLLER ---------------- */
 export const homeApi = {
   login: (credentials) => api.post("/Home/UserLogin", credentials),
-
   getStateInfo: () => api.post("/Home/GetStateIformation"),
-
   forgotPassword: (data) => api.post("/Home/GetUserForgotPassword", data),
-
   resetPassword: (data) => api.post("/Home/ForgotResetPassword", data),
-
-  // Your controller Logout currently returns a Redirect (HTML). GET is safer here.
-  // If you keep POST on the frontend, add [HttpPost] to the controller method.
   logout: (ip) => api.get("/Home/Logout", { params: { IP: ip || "" } }),
-
   getLoggedUser: (ip) => api.post("/Home/GetLoggedUser", { ip }),
-
-  // Controller is [HttpGet], so call GET here
   getMasterUserTypes: () => api.get("/Home/GetMasterUserTypes"),
 };
 
-/* ---------------- SETTING CONTROLLER ---------------- */
 export const settingApi = {
   checkSession: () => api.get("/api/Setting/CheckSession"),
   getThresholdSettings: () => api.get("/api/Setting/GetThresholdSettings"),
   saveThreshold: (payload) => api.post("/api/Setting/SaveThreshold", payload),
 };
 
-/* ---------------- EXCEL UPLOAD CONTROLLER ---------------- */
 export const excelApi = {
   uploadFile: (formData) => api.post("/ExcelUpload/UploadExcelFile", formData),
-
   downloadTemplate: (fileType) =>
     api.get("/ExcelUpload/DownloadExcel", { params: { FileType: fileType } }),
-
   getUploadedFiles: (type) =>
-    api.get(`/ExcelUpload/GetUploadedExcelFiles`, {
-      params: { FileType: type },
-    }),
-
+    api.get(`/ExcelUpload/GetUploadedExcelFiles`, { params: { FileType: type } }),
   getSessions: (fromDate, toDate) =>
     api.get("/ExcelUpload/GetSessions", {
       params: {
@@ -230,4 +298,56 @@ export const excelApi = {
         toDate: toDate.toISOString(),
       },
     }),
+};
+
+/**
+ * ============================================
+ * UTILITY FUNCTIONS
+ * ============================================
+ */
+
+export const checkAllServices = async () => {
+  try {
+    const [pythonHealth, csharpHealth] = await Promise.allSettled([
+      generalApi.healthCheck(),
+      authApi.checkStatus(),
+    ]);
+
+    return {
+      python: {
+        healthy: pythonHealth.status === 'fulfilled',
+        data: pythonHealth.value,
+        error: pythonHealth.reason?.message,
+      },
+      csharp: {
+        healthy: csharpHealth.status === 'fulfilled',
+        data: csharpHealth.value,
+        error: csharpHealth.reason?.message,
+      },
+    };
+  } catch (error) {
+    console.error('Service check failed:', error);
+    return {
+      python: { healthy: false, error: error.message },
+      csharp: { healthy: false, error: error.message },
+    };
+  }
+};
+
+export default {
+  // Python APIs
+  generalApi,
+  buildingApi,
+  cellSiteApi,
+  
+  // C# APIs
+  authApi,
+  adminApi,
+  mapViewApi,
+  homeApi,
+  settingApi,
+  excelApi,
+  
+  // Utilities
+  checkAllServices,
 };

@@ -12,10 +12,6 @@ import {
 } from "@/components/ui/select";
 import { mapViewApi } from "@/api/apiEndpoints";
 
-/**
- * Floating sidebar that manages Filters, Layers, and Basemap.
- * NOTE: Drawing tools have been moved to the Header for better UX.
- */
 
 const getYesterday = () => {
   const d = new Date();
@@ -30,6 +26,7 @@ const defaultFilters = {
   technology: "ALL",
   band: "ALL",
   measureIn: "rsrp",
+  coverageHoleOnly: false, // ✅ Added default value
 };
 
 // Normalize carrier/provider names from API
@@ -58,16 +55,15 @@ const PanelSection = ({ title, children }) => (
 export default function MapSidebarFloating({
   onApplyFilters,
   onClearFilters,
-  onUIChange, // still provided for Layers/Basemap toggles
-  ui,         // read UI toggles (layers, basemap) from parent
+  onUIChange,
+  ui,
   initialFilters,
-  position = "left", // "left" | "right"
+  position = "left",
   autoCloseOnApply = true,
-
-  // NEW: controlled open state + option to hide trigger
   open: controlledOpen,
   onOpenChange,
   hideTrigger = false,
+  thresholds = {}, // ✅ Added to get coverage hole threshold
 }) {
   // Controlled/uncontrolled open handling
   const [internalOpen, setInternalOpen] = useState(false);
@@ -82,7 +78,7 @@ export default function MapSidebarFloating({
   const [providers, setProviders] = useState([]);
   const [technologies, setTechnologies] = useState([]);
   const [bands, setBands] = useState([]);
-  const [projects, setProjects] = useState([]); // not used in UI but kept for future extension
+  const [projects, setProjects] = useState([]);
 
   // If parent provides initialFilters, merge them once on mount/changes
   const hasActiveFilters = isObjectNonEmpty(initialFilters);
@@ -147,6 +143,7 @@ export default function MapSidebarFloating({
 
   // Clear & Close
   const clearAndClose = () => {
+    setFilters(defaultFilters); // ✅ Reset to default filters
     onClearFilters?.();
     setOpen(false);
   };
@@ -272,6 +269,26 @@ export default function MapSidebarFloating({
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* ✅ Coverage Hole Filter Checkbox */}
+              <div className="pt-2">
+                <label className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={filters.coverageHoleOnly || false}
+                    onChange={(e) => handleFilterChange("coverageHoleOnly", e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                      Show Coverage Holes Only
+                    </div>
+                    <div className="text-xs text-amber-700 dark:text-amber-300">
+                      Display only logs with RSRP &lt; {thresholds.coveragehole || -110} dBm
+                    </div>
+                  </div>
+                </label>
+              </div>
             </div>
           </PanelSection>
 
@@ -283,7 +300,7 @@ export default function MapSidebarFloating({
                   type="checkbox"
                   checked={ui?.showSessions}
                   onChange={(e) => onUIChange?.({ showSessions: e.target.checked })}
-                  disabled={hasActiveFilters} // sessions visible only when no filters
+                  disabled={hasActiveFilters}
                 />
                 Session Markers (when no filters)
               </label>
@@ -338,13 +355,9 @@ export default function MapSidebarFloating({
                 <SelectItem value="roadmap">Default (Roadmap)</SelectItem>
                 <SelectItem value="satellite">Satellite</SelectItem>
                 <SelectItem value="hybrid">Hybrid</SelectItem>
-                
               </SelectContent>
             </Select>
           </PanelSection>
-
-          {/* Drawing & Analysis moved to Header */}
-          {/* Intentionally removed from sidebar for a simpler workflow */}
         </div>
 
         {/* Footer with Clear/Apply */}

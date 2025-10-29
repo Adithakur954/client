@@ -86,16 +86,13 @@ const CoverageHoleForm = ({ value, setValue, onClose }) => {
 
     const handleChange = (val) => {
         setInputValue(val);
-
-        // Convert only when value parses cleanly as number
         const num = Number(val);
         if (!isNaN(num)) {
-            // enforce negative
             setValue(num < 0 ? num : -Math.abs(num));
         }
     };
 
-     return (
+    return (
         <div className="mt-4 p-4 border rounded-lg bg-muted/40 dark:bg-slate-800">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Edit Coverage Hole Threshold</h3>
@@ -123,6 +120,7 @@ const SettingsPage = () => {
     const [loading, setLoading] = useState(true);
     const [activeParam, setActiveParam] = useState(null);
 
+    // ✅ FIXED: Match backend property names exactly
     const PARAMETERS = {
         rsrp: "RSRP",
         rsrq: "RSRQ",
@@ -132,7 +130,7 @@ const SettingsPage = () => {
         volte_call: "VoLTE Call",
         lte_bler: "LTE BLER",
         mos: "MOS",
-        coverage_hole: "Coverage Hole"
+        coveragehole: "Coverage Hole"  // ✅ Removed underscore
     };
 
     // --- Fetch Threshold Settings ---
@@ -148,8 +146,8 @@ const SettingsPage = () => {
                     const parsedData = {};
 
                     for (const key in PARAMETERS) {
-                        if (key === "coverage_hole") {
-                            parsedData[key] = Number(data.coverage_hole_json) || -110;
+                        if (key === "coveragehole") {  // ✅ Fixed
+                            parsedData[key] = Number(data.coveragehole_json) || -110;
                         } else {
                             const jsonString = data[`${key}_json`];
                             let parsed = [];
@@ -177,7 +175,6 @@ const SettingsPage = () => {
         fetchThresholds();
     }, []);
 
-    // --- Update Local State ---
     const updateParamData = (paramKey, newData) => {
         setThresholds(prev => ({
             ...prev,
@@ -185,7 +182,7 @@ const SettingsPage = () => {
         }));
     };
 
-    // --- Save Settings to Backend ---
+    // ✅ FIXED: Save Settings with correct property names
     const handleSaveChanges = async () => {
         if (!thresholds) return;
         setLoading(true);
@@ -193,16 +190,18 @@ const SettingsPage = () => {
             const payload = { id: thresholds.id };
 
             for (const key in PARAMETERS) {
-                if (key === "coverage_hole") {
-                    payload[`${key}_json`] = thresholds[key] ?? -110;
+                if (key === "coveragehole") {  // ✅ Fixed
+                    payload.coveragehole_json = String(thresholds[key] ?? -110);
+                } else if (key === "volte_call") {  // ✅ Special case - no _json suffix
+                    payload.volte_call = JSON.stringify(thresholds[key] || []);
                 } else {
                     payload[`${key}_json`] = JSON.stringify(thresholds[key] || []);
                 }
             }
 
-            console.log(payload)
+            console.log("Payload being sent:", payload);
             const response = await settingApi.saveThreshold(payload);
-            console.log(response);
+            console.log("Response:", response);
 
             if (response && response.Status === 1) {
                 toast.success("Thresholds saved successfully!");
@@ -220,7 +219,7 @@ const SettingsPage = () => {
     if (loading || !thresholds) return <Spinner />;
 
     return (
-        <div className="container mx-auto bg-gray-800 text-white h-full w-full space-y-8 p-4">
+        <div className="bg-gray-800 text-white h-full w-full space-y-8 p-4">
             <h1 className="text-3xl font-bold">Settings</h1>
             <Card>
                 <CardHeader>
@@ -243,10 +242,10 @@ const SettingsPage = () => {
                     </div>
 
                     {activeParam && (
-                        activeParam === "coverage_hole" ? (
+                        activeParam === "coveragehole" ? (  // ✅ Fixed
                             <CoverageHoleForm
-                                value={thresholds.coverage_hole}
-                                setValue={(val) => updateParamData("coverage_hole", val)}
+                                value={thresholds.coveragehole}  // ✅ Fixed
+                                setValue={(val) => updateParamData("coveragehole", val)}  // ✅ Fixed
                                 onClose={() => setActiveParam(null)}
                             />
                         ) : (

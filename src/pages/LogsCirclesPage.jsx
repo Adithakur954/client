@@ -10,13 +10,14 @@ const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
 const MAP_CONTAINER_STYLE = { height: "100vh", width: "100%" };
 
-// Ensure your loader options include: libraries: ["drawing", "geometry", "visualization"]
 export default function LogsCirclesPage() {
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
   const [map, setMap] = useState(null);
   const [thresholds, setThresholds] = useState({});
   const [selectedMetric, setSelectedMetric] = useState("rsrp");
+  const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false); // ✅ Coverage hole filter
+  
   const [filters, setFilters] = useState({
     startDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
     endDate: new Date(),
@@ -28,7 +29,6 @@ export default function LogsCirclesPage() {
   const [drawnLogs, setDrawnLogs] = useState([]);
   const [analysis, setAnalysis] = useState(null);
 
-  // Drawing UI (page-local)
   const [drawUi, setDrawUi] = useState({
     enabled: false,
     pixelateRect: false,
@@ -53,6 +53,7 @@ export default function LogsCirclesPage() {
             ul_thpt: JSON.parse(d.ul_thpt_json || "[]"),
             mos: JSON.parse(d.mos_json || "[]"),
             lte_bler: JSON.parse(d.lte_bler_json || "[]"),
+            coveragehole: parseFloat(d.coveragehole_json) || -110, // ✅ Coverage hole threshold
           });
         }
       } catch {}
@@ -97,14 +98,15 @@ export default function LogsCirclesPage() {
           padding: 12,
           boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
           minWidth: 280,
+          maxWidth: 320,
         }}
       >
-        <label>
+        <label style={{ display: "block", marginBottom: 8 }}>
           Metric:
           <select
             value={selectedMetric}
             onChange={(e) => setSelectedMetric(e.target.value)}
-            style={{ marginLeft: 6 }}
+            style={{ marginLeft: 6, width: "100%" }}
           >
             <option value="rsrp">RSRP</option>
             <option value="rsrq">RSRQ</option>
@@ -116,6 +118,30 @@ export default function LogsCirclesPage() {
           </select>
         </label>
 
+        {/* ✅ Coverage Hole Filter Checkbox */}
+        <label 
+          style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: 6, 
+            marginBottom: 8,
+            padding: "8px",
+            background: "#fef3c7",
+            borderRadius: 6,
+            border: "1px solid #fbbf24",
+            cursor: "pointer"
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showCoverageHoleOnly}
+            onChange={(e) => setShowCoverageHoleOnly(e.target.checked)}
+          />
+          <span style={{ fontSize: 13, fontWeight: 500 }}>
+            Show only coverage holes (RSRP &lt; {thresholds.coveragehole || -110} dBm)
+          </span>
+        </label>
+
         <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             onClick={() => setDrawUi((d) => ({ ...d, enabled: !d.enabled }))}
@@ -125,6 +151,7 @@ export default function LogsCirclesPage() {
               background: drawUi.enabled ? "#2563eb" : "#e5e7eb",
               color: drawUi.enabled ? "white" : "#111827",
               border: "none",
+              cursor: "pointer",
             }}
             title="Enable drawing tools"
           >
@@ -138,6 +165,7 @@ export default function LogsCirclesPage() {
               borderRadius: 6,
               background: "#f3f4f6",
               border: "1px solid #e5e7eb",
+              cursor: "pointer",
             }}
             title="Clear drawn shapes"
           >
@@ -149,6 +177,7 @@ export default function LogsCirclesPage() {
               type="checkbox"
               checked={drawUi.pixelateRect}
               onChange={(e) => setDrawUi((d) => ({ ...d, pixelateRect: e.target.checked }))}
+              disabled={!drawUi.enabled}
             />
             Pixelate rectangle
           </label>
@@ -163,6 +192,7 @@ export default function LogsCirclesPage() {
               onChange={(e) =>
                 setDrawUi((d) => ({ ...d, cellSizeMeters: Math.max(10, Number(e.target.value || 100)) }))
               }
+              disabled={!drawUi.enabled}
               style={{ width: 80 }}
             />
           </label>
@@ -193,6 +223,7 @@ export default function LogsCirclesPage() {
           canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
           maxDraw={70000}
           onLogsLoaded={(list) => setDrawnLogs(Array.isArray(list) ? list : [])}
+          coverageHoleOnly={showCoverageHoleOnly} // ✅ Pass filter to layer
         />
 
         {drawUi.enabled && (

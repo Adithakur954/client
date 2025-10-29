@@ -1,8 +1,9 @@
-// const API_BASE_URL = "http://192.168.1.70:5224";
-// apiService.js
+// src/api/apiService.js
 
-const API_BASE_URL = "https://signaltrackers-1.onrender.com";
-// const API_BASE_URL = "https://signaltracker.onrender.com";
+// Use environment variable or fallback to localhost
+// const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL || "http://localhost:5224";
+const API_BASE_URL =  "https://signaltrackers-1.onrender.com";
+
 const apiService = async (endpoint, { body, params, ...customOptions } = {}) => {
   const isFormData = body instanceof FormData;
   const headers = isFormData ? {} : { "Content-Type": "application/json" };
@@ -73,3 +74,6 @@ export const api = {
   delete: (endpoint, options = {}) =>
     apiService(endpoint, { ...options, method: "DELETE" }),
 };
+
+// Export the base URL for reference
+export const CSHARP_BASE_URL = API_BASE_URL;

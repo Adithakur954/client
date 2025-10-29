@@ -9,10 +9,11 @@ import { mapViewApi, settingApi } from "../api/apiEndpoints";
 import Spinner from "../components/common/Spinner";
 import MapWithMultipleCircles from "../components/MapwithMultipleCircle";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
-import NetworkPlannerMap from "@/components/NetworkPlannerMap";
 import UnifiedMapSidebar from "@/components/UnifiedMapSidebar";
+import SiteMarkers from "@/components/SiteMarkers";
+import NetworkSectors from "@/components/NetworkSectors";
+import { useSiteData } from "@/hooks/useSiteData";
 
-// ================== CONSTANTS ==================
 const defaultThresholds = {
   rsrp: [],
   rsrq: [],
@@ -25,7 +26,6 @@ const defaultThresholds = {
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
-// ================== UTILITY FUNCTIONS ==================
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
@@ -130,7 +130,6 @@ function canonicalOperatorName(raw) {
   return s;
 }
 
-// Get color from threshold settings
 function getColorFromValue(value, thresholds) {
   if (!thresholds || thresholds.length === 0) return "#999999";
   
@@ -141,46 +140,39 @@ function getColorFromValue(value, thresholds) {
     }
   }
   
-  return "#999999"; // Default gray if no match
+  return "#999999";
 }
 
-// ================== MAIN COMPONENT ==================
 const UnifiedMapView = () => {
-  // ============ STATE MANAGEMENT ============
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Map data
   const [locations, setLocations] = useState([]);
   const [thresholds, setThresholds] = useState(defaultThresholds);
   const [predictionColorSettings, setPredictionColorSettings] = useState([]);
   const [polygons, setPolygons] = useState([]);
   
-  // UI Controls
   const [isSideOpen, setIsSideOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState("rsrp");
   const [ui, setUi] = useState({ basemapStyle: "roadmap" });
   const [viewport, setViewport] = useState(null);
   
-  // ============ TWO TOGGLES WITH ENABLE/DISABLE ============
   const [enableDataToggle, setEnableDataToggle] = useState(true);
-  const [dataToggle, setDataToggle] = useState("sample"); // "sample" | "prediction"
+  const [dataToggle, setDataToggle] = useState("sample");
   
   const [enableSiteToggle, setEnableSiteToggle] = useState(false);
-  const [siteToggle, setSiteToggle] = useState("sites"); // "sites" | "sites-prediction"
+  const [siteToggle, setSiteToggle] = useState("NoML");
   
-  // Polygon controls
   const [showPolygons, setShowPolygons] = useState(false);
   const [onlyInsidePolygons, setOnlyInsidePolygons] = useState(false);
   
-  // Site display options
   const [showSiteMarkers, setShowSiteMarkers] = useState(true);
   const [showSiteSectors, setShowSiteSectors] = useState(true);
-  const [useGeneratedSites, setUseGeneratedSites] = useState(false);
-  const [siteGridSize, setSiteGridSize] = useState(5);
+
+  const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false);
+  const [coverageHoleThreshold, setCoverageHoleThreshold] = useState(-110);
   
-  // ============ READ PROJECT & SESSION FROM URL ============
   const projectId = useMemo(() => {
     const param = searchParams.get("project_id") ?? searchParams.get("project") ?? "";
     return param ? Number(param) : null;
@@ -196,7 +188,22 @@ const UnifiedMapView = () => {
   const mapRef = useRef(null);
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
-  // ============ LOAD THRESHOLDS ============
+  const { 
+    siteData, 
+    loading: siteLoading, 
+    error: siteError, 
+    refetch: refetchSites,
+    isEmpty: siteDataIsEmpty
+  } = useSiteData({
+    enableSiteToggle,
+    siteToggle,
+    projectId,
+    sessionIds,
+    autoFetch: true,
+  });
+
+  const isLoading = loading || siteLoading;
+
   useEffect(() => {
     const loadThresholds = async () => {
       try {
@@ -220,7 +227,24 @@ const UnifiedMapView = () => {
     loadThresholds();
   }, []);
 
-  // ============ FETCH POLYGONS ============
+  useEffect(() => {
+    const loadThreshold = async () => {
+      try {
+        const res = await settingApi.getThresholdSettings();
+        if (res?.Data?.coveragehole_json) {
+          const threshold = parseFloat(res.Data.coveragehole_json);
+          if (!isNaN(threshold)) {
+            setCoverageHoleThreshold(threshold);
+            console.log(`✅ Loaded coverage hole threshold: ${threshold} dBm`);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load coverage hole threshold:", error);
+      }
+    };
+    loadThreshold();
+  }, []);
+
   const fetchPolygons = useCallback(async () => {
     if (!projectId) return;
     
@@ -268,7 +292,6 @@ const UnifiedMapView = () => {
     }
   }, [projectId, showPolygons, fetchPolygons]);
 
-  // ============ FETCH SAMPLE DATA ============
   const fetchSampleData = useCallback(async () => {
     if (sessionIds.length === 0) {
       toast.warn("No session ID provided for sample data");
@@ -318,6 +341,7 @@ const UnifiedMapView = () => {
           .filter(Boolean);
         
         setLocations(formatted);
+        console.log(`✅ Loaded ${formatted.length} sample points`);
         toast.success(`${formatted.length} sample points loaded`);
       }
     } catch (err) {
@@ -329,7 +353,6 @@ const UnifiedMapView = () => {
     }
   }, [sessionIds]);
 
-  // ============ FETCH PREDICTION DATA ============
   const fetchPredictionData = useCallback(async () => {
     if (!projectId) {
       toast.warn("Please provide a project ID for prediction data");
@@ -369,6 +392,7 @@ const UnifiedMapView = () => {
 
         setLocations(formatted);
         setPredictionColorSettings(colorSettings);
+        console.log(`✅ Loaded ${formatted.length} prediction points`);
         toast.success(`${formatted.length} prediction points loaded`);
       } else {
         toast.error(res?.Message || "No prediction data available");
@@ -383,9 +407,7 @@ const UnifiedMapView = () => {
     }
   }, [projectId, selectedMetric]);
 
-  // ============ LOAD DATA BASED ON TOGGLES ============
   useEffect(() => {
-    // Only fetch if toggle is enabled
     if (!enableDataToggle && !enableSiteToggle) {
       setLocations([]);
       setLoading(false);
@@ -393,14 +415,11 @@ const UnifiedMapView = () => {
     }
 
     if (enableSiteToggle && siteToggle === "sites") {
-      // Sites only - no data circles
       setLocations([]);
       setLoading(false);
     } else if (enableSiteToggle && siteToggle === "sites-prediction") {
-      // Sites + Prediction - always use prediction
       fetchPredictionData();
     } else if (enableDataToggle) {
-      // Data toggle is active
       if (dataToggle === "sample") {
         fetchSampleData();
       } else {
@@ -416,7 +435,6 @@ const UnifiedMapView = () => {
     fetchPredictionData
   ]);
 
-  // ============ MAP VIEWPORT TRACKING ============
   const debouncedSetViewport = useMemo(
     () => debounce((vp) => setViewport(vp), 150),
     []
@@ -448,12 +466,15 @@ const UnifiedMapView = () => {
     };
   }, [debouncedSetViewport]);
 
-  // ============ UI HANDLERS ============
   const handleUIChange = useCallback((changes) => {
     setUi((prev) => ({ ...prev, ...changes }));
   }, []);
 
   const reloadData = useCallback(() => {
+    if (enableSiteToggle) {
+      refetchSites();
+    }
+    
     if (enableSiteToggle && siteToggle === "sites-prediction") {
       fetchPredictionData();
     } else if (enableDataToggle) {
@@ -476,14 +497,19 @@ const UnifiedMapView = () => {
     showPolygons,
     fetchSampleData,
     fetchPredictionData,
-    fetchPolygons
+    fetchPolygons,
+    refetchSites
   ]);
 
-  // ============ CUSTOM THRESHOLDS ============
+  const handleSiteClick = useCallback((site) => {
+    console.log('Site clicked:', site);
+  }, []);
+
+  const handleSectorClick = useCallback((sector) => {
+    console.log('Sector clicked:', sector);
+  }, []);
+
   const effectiveThresholds = useMemo(() => {
-    // Use prediction color settings when:
-    // 1. Toggle 2 is "sites-prediction", OR
-    // 2. Toggle 1 is "prediction" and we have prediction colors
     const usePredictionColors = 
       (enableSiteToggle && siteToggle === "sites-prediction") || 
       (enableDataToggle && dataToggle === "prediction" && predictionColorSettings.length > 0);
@@ -512,7 +538,6 @@ const UnifiedMapView = () => {
     selectedMetric
   ]);
 
-  // ============ POLYGON HEATMAP CALCULATION ============
   const polygonsWithColors = useMemo(() => {
     if (!onlyInsidePolygons || !showPolygons || polygons.length === 0 || locations.length === 0) {
       return polygons.map(poly => ({
@@ -529,20 +554,18 @@ const UnifiedMapView = () => {
     const currentThresholds = effectiveThresholds[selectedMetric] || [];
     
     return polygons.map(poly => {
-      // Find all points inside this polygon
       const pointsInside = locations.filter(point => isPointInPolygon(point, poly));
       
       if (pointsInside.length === 0) {
         return {
           ...poly,
-          fillColor: "#cccccc", // Gray for polygons with no data
+          fillColor: "#cccccc",
           fillOpacity: 0.3,
           pointCount: 0,
           avgValue: null,
         };
       }
 
-      // Calculate average metric value
       const values = pointsInside
         .map(point => point[selectedMetric])
         .filter(val => val !== null && val !== undefined && !isNaN(val));
@@ -565,7 +588,7 @@ const UnifiedMapView = () => {
       return {
         ...poly,
         fillColor: color,
-        fillOpacity: 0.7, // Higher opacity for heatmap effect
+        fillOpacity: 0.7,
         strokeWeight: 2,
         pointCount: pointsInside.length,
         avgValue: avgValue,
@@ -573,19 +596,49 @@ const UnifiedMapView = () => {
     });
   }, [onlyInsidePolygons, showPolygons, polygons, locations, selectedMetric, effectiveThresholds]);
 
-  // ============ FILTERED LOCATIONS ============
   const filteredLocations = useMemo(() => {
-    // When heatmap mode is active, hide the individual points
+    let result = locations;
+
+    if (showCoverageHoleOnly && result.length > 0) {
+      console.log(`🔴 Coverage hole filter active: RSRP < ${coverageHoleThreshold} dBm`);
+      
+      const beforeCount = result.length;
+      result = result.filter(location => {
+        const rsrp = parseFloat(location.rsrp);
+        const isCoverageHole = !isNaN(rsrp) && rsrp < coverageHoleThreshold;
+        return isCoverageHole;
+      });
+      
+      console.log(`  Filtered to ${result.length} coverage holes (from ${beforeCount} total)`);
+      
+      if (result.length > 0) {
+        toast.info(
+          `🔴 ${result.length} coverage holes found (RSRP < ${coverageHoleThreshold} dBm)`,
+          { autoClose: 3000 }
+        );
+      } else if (beforeCount > 0) {
+        toast.warn(
+          `No coverage holes found with RSRP < ${coverageHoleThreshold} dBm`,
+          { autoClose: 3000 }
+        );
+      }
+    }
+
     if (onlyInsidePolygons && showPolygons && polygons.length > 0) {
       console.log("🔇 Hiding individual points - showing polygon heatmap instead");
       return [];
     }
     
-    // Otherwise show all points
-    return locations;
-  }, [locations, onlyInsidePolygons, showPolygons, polygons]);
+    return result;
+  }, [
+    locations, 
+    showCoverageHoleOnly, 
+    coverageHoleThreshold, 
+    onlyInsidePolygons, 
+    showPolygons, 
+    polygons.length
+  ]);
 
-  // ============ VISIBLE POLYGONS (viewport filter) ============
   const visiblePolygons = useMemo(() => {
     if (!showPolygons || polygonsWithColors.length === 0) return [];
     
@@ -602,7 +655,6 @@ const UnifiedMapView = () => {
     return polygonsWithColors;
   }, [showPolygons, polygonsWithColors, viewport]);
 
-  // ============ COMPUTE MAP CENTER ============
   const mapCenter = useMemo(() => {
     if (locations.length === 0) return DEFAULT_CENTER;
     const { lat, lng } = locations.reduce(
@@ -620,19 +672,14 @@ const UnifiedMapView = () => {
     return { mapTypeId: style };
   }, [ui.basemapStyle]);
 
-  // ============ DETERMINE WHAT TO SHOW ============
   const showDataCircles = 
     (enableDataToggle && !enableSiteToggle) || 
     (enableSiteToggle && siteToggle === "sites-prediction");
-    
-  const showSiteLayer = enableSiteToggle;
 
-  // Count polygons with data
   const polygonsWithData = useMemo(() => {
     return polygonsWithColors.filter(p => p.pointCount > 0).length;
   }, [polygonsWithColors]);
 
-  // ============ LOADING & ERROR STATES ============
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -649,10 +696,8 @@ const UnifiedMapView = () => {
     );
   }
 
-  // ============ RENDER ============
   return (
     <div className="p-4 md:p-6 h-screen flex flex-col bg-gray-50 dark:bg-gray-800">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
         <h1 className="text-xl md:text-2xl font-semibold dark:text-white">
           Unified Map View
@@ -678,97 +723,90 @@ const UnifiedMapView = () => {
         </div>
       </div>
 
-      {/* Sidebar */}
       <UnifiedMapSidebar
         open={isSideOpen}
         onOpenChange={setIsSideOpen}
-        // Toggle 1 with enable/disable
         enableDataToggle={enableDataToggle}
         setEnableDataToggle={setEnableDataToggle}
         dataToggle={dataToggle}
         setDataToggle={setDataToggle}
-        // Toggle 2 with enable/disable
         enableSiteToggle={enableSiteToggle}
         setEnableSiteToggle={setEnableSiteToggle}
         siteToggle={siteToggle}
         setSiteToggle={setSiteToggle}
-        // Read-only info
         projectId={projectId}
         sessionIds={sessionIds}
-        // Metric
         metric={selectedMetric}
         setMetric={setSelectedMetric}
-        // UI
+        showCoverageHoleOnly={showCoverageHoleOnly}
+        setShowCoverageHoleOnly={setShowCoverageHoleOnly}
+        coverageHoleThreshold={coverageHoleThreshold}
+        setCoverageHoleThreshold={setCoverageHoleThreshold}
         ui={ui}
         onUIChange={handleUIChange}
-        // Polygon controls
         showPolygons={showPolygons}
         setShowPolygons={setShowPolygons}
         onlyInsidePolygons={onlyInsidePolygons}
         setOnlyInsidePolygons={setOnlyInsidePolygons}
         polygonCount={polygons.length}
-        // Site controls
         showSiteMarkers={showSiteMarkers}
         setShowSiteMarkers={setShowSiteMarkers}
         showSiteSectors={showSiteSectors}
         setShowSiteSectors={setShowSiteSectors}
-        useGeneratedSites={useGeneratedSites}
-        setUseGeneratedSites={setUseGeneratedSites}
-        siteGridSize={siteGridSize}
-        setSiteGridSize={setSiteGridSize}
-        // Actions
-        loading={loading}
+        loading={isLoading}
         reloadData={reloadData}
       />
 
-      {/* Map Container */}
       <div className="flex-grow rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden relative">
-        {/* Info Badge */}
         <div className="absolute bottom-2 left-2 z-10 bg-white/90 dark:bg-gray-800/90 p-2 px-3 rounded text-xs text-gray-700 dark:text-gray-300 shadow-lg space-y-1 max-w-xs">
-          <div className="font-semibold">
-            {!enableDataToggle && !enableSiteToggle && "⚠️ All Layers Disabled"}
-            {enableDataToggle && !enableSiteToggle && (dataToggle === "sample" ? "📊 Sample Data" : "🔮 Prediction Data")}
-            {!enableDataToggle && enableSiteToggle && (siteToggle === "sites" ? "🗼 Sites Only" : "🗼 Sites + Prediction")}
-            {enableDataToggle && enableSiteToggle && "📊 Data + Sites"}
-          </div>
-          
-          {onlyInsidePolygons && showPolygons && polygons.length > 0 ? (
-            <>
-              <div className="text-green-600 dark:text-green-400 font-semibold">
-                🎨 Heatmap Mode Active
-              </div>
-              <div>{locations.length} total points</div>
-              <div>{polygonsWithData}/{polygons.length} polygons with data</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-300 dark:border-gray-600">
-                Colors show avg {selectedMetric.toUpperCase()} values
-              </div>
-            </>
-          ) : showDataCircles && filteredLocations.length > 0 ? (
-            <div>{filteredLocations.length} points • {selectedMetric.toUpperCase()}</div>
-          ) : null}
-          
-          {showSiteLayer && (
-            <div className="text-purple-600 dark:text-purple-400">
-              🗼 {useGeneratedSites ? `${siteGridSize}×${siteGridSize} grid` : "Hardcoded sites"}
+          {enableDataToggle && (
+            <div className="font-semibold">
+              📊 {dataToggle === "sample" ? "Sample" : "Prediction"} Data
+              {filteredLocations.length > 0 && (
+                <span className="ml-1">({filteredLocations.length} points)</span>
+              )}
             </div>
           )}
           
-          {showPolygons && !onlyInsidePolygons && polygons.length > 0 && (
+          {enableSiteToggle && (
+            <div className="text-purple-600 dark:text-purple-400 font-semibold">
+              🗼 Sites ({siteToggle})
+              {!siteDataIsEmpty && (
+                <span className="ml-1">({siteData.length} records)</span>
+              )}
+            </div>
+          )}
+          
+          {showCoverageHoleOnly && (
+            <div className="text-red-600 dark:text-red-400 font-semibold">
+              🔴 Coverage Holes &lt; {coverageHoleThreshold} dBm
+            </div>
+          )}
+          
+          {showPolygons && polygons.length > 0 && (
             <div className="text-blue-600 dark:text-blue-400">
-              📐 {visiblePolygons.length} polygon(s) visible
+              📐 {onlyInsidePolygons ? 'Heatmap Mode' : `${visiblePolygons.length} Polygons`}
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="text-yellow-600 dark:text-yellow-400 animate-pulse">
+              ⏳ Loading...
             </div>
           )}
         </div>
 
-        {/* Map */}
         <div className="relative h-full w-full">
-          {loading ? (
+          {isLoading && locations.length === 0 && siteData.length === 0 ? (
             <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700">
               <Spinner />
             </div>
-          ) : error ? (
+          ) : error || siteError ? (
             <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700">
-              <p className="text-red-500">{error}</p>
+              <div className="text-center space-y-2">
+                {error && <p className="text-red-500">Data Error: {error}</p>}
+                {siteError && <p className="text-red-500">Site Error: {siteError.message}</p>}
+              </div>
             </div>
           ) : (
             <MapWithMultipleCircles
@@ -785,7 +823,6 @@ const UnifiedMapView = () => {
               fitToLocations={showDataCircles && filteredLocations.length > 0}
               onLoad={handleMapLoad}
             >
-              {/* Polygons Layer with Heatmap Colors */}
               {showPolygons && visiblePolygons.length > 0 && visiblePolygons.map((poly) => (
                 <Polygon
                   key={poly.uid}
@@ -810,14 +847,23 @@ const UnifiedMapView = () => {
                 />
               ))}
 
-              {/* Sites Layer */}
-              {showSiteLayer && (
-                <NetworkPlannerMap
-                  showSectors={showSiteSectors}
+              {enableSiteToggle && showSiteMarkers && (
+                <SiteMarkers
+                  sites={siteData}
                   showMarkers={showSiteMarkers}
+                  circleRadius={50}
+                  onSiteClick={handleSiteClick}
                   viewport={viewport}
-                  useGeneratedData={useGeneratedSites}
-                  gridSize={siteGridSize}
+                />
+              )}
+
+              {enableSiteToggle && showSiteSectors && (
+                <NetworkSectors
+                  sectors={siteData}
+                  showSectors={showSiteSectors}
+                  defaultRadius={220}
+                  onSectorClick={handleSectorClick}
+                  viewport={viewport}
                 />
               )}
             </MapWithMultipleCircles>

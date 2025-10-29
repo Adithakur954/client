@@ -43,7 +43,11 @@ function DialogContent({ children, showCloseButton = true, ...props }) {
   return (
     <DialogPortal>
       <DialogOverlay />
-      <DialogPrimitive.Content style={basicContentStyle} {...props}>
+      <DialogPrimitive.Content 
+        style={basicContentStyle} 
+        aria-describedby={props['aria-describedby'] === undefined ? undefined : props['aria-describedby']}
+        {...props}
+      >
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -88,10 +92,26 @@ function DialogTitle(props) {
 }
 
 function DialogDescription(props) {
+  const { srOnly, ...restProps } = props;
+  
   return (
     <DialogPrimitive.Description
-      style={{ fontSize: "0.875rem", color: "#666" }}
-      {...props}
+      style={{ 
+        fontSize: "0.875rem", 
+        color: "#666",
+        ...(srOnly && {
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          borderWidth: 0,
+        })
+      }}
+      {...restProps}
     />
   );
 }

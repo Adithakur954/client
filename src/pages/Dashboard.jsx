@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { toast } from "react-toastify";
 import { adminApi } from "../api/apiEndpoints";
-import Spinner from "../components/common/Spinner";
 
 import {
   ResponsiveContainer,
@@ -13,12 +12,11 @@ import {
 } from "recharts";
 
 import {
-  Users, Car, Waypoints, FileText, Wifi, BarChart2, RadioTower, MoreVertical, Settings as SettingsIcon
+  Users, Car, Waypoints, FileText, Wifi, BarChart2, MoreVertical, Settings as SettingsIcon
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const CHART_COLORS = ['#60A5FA', '#34D399', '#F59E0B', '#A78BFA', '#F472B6', '#FBBF24', '#22D3EE', '#F87171', '#4ADE80', '#93C5FD'];
@@ -73,7 +71,7 @@ const mergeOperatorAverages = (raw, { nameKey = 'name', avgKey = 'value', weight
   const acc = new Map();
   for (const item of raw) {
     const name = canonicalOperatorName(item?.[nameKey]);
-    const avg = ensureNegative(item?.[avgKey]);
+    const avg = toNumber(item?.[avgKey]); // Don't ensure negative here
     const w = Number(item?.[weightKey]);
     if (!Number.isFinite(avg)) continue;
     const curr = acc.get(name) || { sum: 0, w: 0 };
@@ -88,7 +86,7 @@ const mergeOperatorAverages = (raw, { nameKey = 'name', avgKey = 'value', weight
   }
   return [...acc.entries()]
     .map(([name, { sum, w }]) => ({ name, value: w ? sum / w : 0 }))
-    .sort((a, b) => a.value - b.value);
+    .sort((a, b) => b.value - a.value);
 };
 
 const normalizeArray = (arr, nameKeys = ["name"], valueKeys = ["value"]) => {
@@ -104,10 +102,7 @@ const normalizePayload = (resp) => {
   const payload = resp?.Data ?? resp?.data ?? resp ?? {};
   if (typeof payload === "string") return null;
 
-  const operatorWiseSamplesRaw =
-    payload.operatorWiseSamples ??
-    payload.samplesByAlphaLong ??
-    [];
+  const operatorWiseSamplesRaw = payload.operatorWiseSamples ?? payload.samplesByAlphaLong ?? [];
   const operatorWiseSamplesMerged = mergeOperatorCounts(
     normalizeArray(operatorWiseSamplesRaw, ["name", "m_alpha_long"], ["value", "count"]),
     { nameKey: 'name', valueKey: 'value' }
@@ -123,12 +118,68 @@ const normalizePayload = (resp) => {
     payload.monthlySampleCounts, ["month"], ["count"]
   );
 
-  const avgRsrpRaw =
-    payload.avgRsrpPerOperator ?? payload.avgRsrpSinrPerOperator_bar ?? [];
+  // RSRP
+  const avgRsrpRaw = payload.avgRsrpPerOperator ?? [];
   const avgRsrpPre = normalizeArray(avgRsrpRaw, ["name", "Operator"], ["value", "AvgRSRP"]);
   const avgRsrpPerOperator = mergeOperatorAverages(avgRsrpPre, {
     nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
   }).map(x => ({ ...x, value: ensureNegative(x.value) }));
+
+  // RSRQ
+  const avgRsrqRaw = payload.avgRsrqPerOperator ?? [];
+  const avgRsrqPre = normalizeArray(avgRsrqRaw, ["name"], ["value"]);
+  const avgRsrqPerOperator = mergeOperatorAverages(avgRsrqPre, {
+    nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
+  }).map(x => ({ ...x, value: ensureNegative(x.value) }));
+
+  // SINR
+  const avgSinrRaw = payload.avgSinrPerOperator ?? [];
+  const avgSinrPre = normalizeArray(avgSinrRaw, ["name"], ["value"]);
+  const avgSinrPerOperator = mergeOperatorAverages(avgSinrPre, {
+    nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
+  });
+
+  // MOS
+  const avgMosRaw = payload.avgMosPerOperator ?? [];
+  const avgMosPre = normalizeArray(avgMosRaw, ["name"], ["value"]);
+  const avgMosPerOperator = mergeOperatorAverages(avgMosPre, {
+    nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
+  });
+
+  // Jitter
+  const avgJitterRaw = payload.avgJitterPerOperator ?? [];
+  const avgJitterPre = normalizeArray(avgJitterRaw, ["name"], ["value"]);
+  const avgJitterPerOperator = mergeOperatorAverages(avgJitterPre, {
+    nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
+  });
+
+  // Latency
+  const avgLatencyRaw = payload.avgLatencyPerOperator ?? [];
+  const avgLatencyPre = normalizeArray(avgLatencyRaw, ["name"], ["value"]);
+  const avgLatencyPerOperator = mergeOperatorAverages(avgLatencyPre, {
+    nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
+  });
+
+  // Packet Loss
+  const avgPacketLossRaw = payload.avgPacketLossPerOperator ?? [];
+  const avgPacketLossPre = normalizeArray(avgPacketLossRaw, ["name"], ["value"]);
+  const avgPacketLossPerOperator = mergeOperatorAverages(avgPacketLossPre, {
+    nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
+  });
+
+  // DL Throughput
+  const avgDlTptRaw = payload.avgDlTptPerOperator ?? [];
+  const avgDlTptPre = normalizeArray(avgDlTptRaw, ["name"], ["value"]);
+  const avgDlTptPerOperator = mergeOperatorAverages(avgDlTptPre, {
+    nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
+  });
+
+  // UL Throughput
+  const avgUlTptRaw = payload.avgUlTptPerOperator ?? [];
+  const avgUlTptPre = normalizeArray(avgUlTptRaw, ["name"], ["value"]);
+  const avgUlTptPerOperator = mergeOperatorAverages(avgUlTptPre, {
+    nameKey: 'name', avgKey: 'value', weightKey: 'sampleCount'
+  });
 
   const bandDistribution = normalizeArray(
     payload.bandDistribution ?? payload.bandDistribution_pie,
@@ -140,12 +191,12 @@ const normalizePayload = (resp) => {
     ["name", "Make"], ["value", "Avg"]
   ).map(x => ({ ...x, value: ensureNegative(x.value) }));
 
-
   const handsetWiseAvg_bar = (payload.handsetWiseAvg_bar ?? []).map((x) => ({
-  Make: String(x?.Make ?? ''),
-  Avg: ensureNegative(x?.Avg),       // keep Avg negative
-  Samples: toNumber(x?.Samples),     // keep samples for tooltip
-}));
+    Make: String(x?.Make ?? ''),
+    Avg: ensureNegative(x?.Avg),
+    Samples: toNumber(x?.Samples),
+  }));
+
   return {
     totals: {
       users: toNumber(payload.totalUsers),
@@ -160,10 +211,150 @@ const normalizePayload = (resp) => {
     operatorWiseSamples: operatorWiseSamplesMerged,
     networkTypeDistribution,
     avgRsrpPerOperator,
+    avgRsrqPerOperator,
+    avgSinrPerOperator,
+    avgMosPerOperator,
+    avgJitterPerOperator,
+    avgLatencyPerOperator,
+    avgPacketLossPerOperator,
+    avgDlTptPerOperator,
+    avgUlTptPerOperator,
     bandDistribution,
     handsetDistribution,
     handsetWiseAvg_bar
   };
+};
+
+// Helper to get metric data based on selection
+const getMetricData = (metric, data) => {
+  const configs = {
+    rsrp: {
+      data: data?.avgRsrpPerOperator ?? [],
+      label: 'Avg RSRP',
+      unit: 'dBm',
+      domain: [-120, -60],
+      colorFn: getRSRPPointColor,
+    },
+    rsrq: {
+      data: data?.avgRsrqPerOperator ?? [],
+      label: 'Avg RSRQ',
+      unit: 'dB',
+      domain: [-20, -3],
+      colorFn: (v) => (v < -15 ? '#ef4444' : v < -10 ? '#f59e0b' : v < -8 ? '#60a5fa' : '#10b981'),
+    },
+    sinr: {
+      data: data?.avgSinrPerOperator ?? [],
+      label: 'Avg SINR',
+      unit: 'dB',
+      domain: [-5, 30],
+      colorFn: (v) => (v < 0 ? '#ef4444' : v < 10 ? '#f59e0b' : v < 20 ? '#60a5fa' : '#10b981'),
+    },
+    mos: {
+      data: data?.avgMosPerOperator ?? [],
+      label: 'Avg MOS',
+      unit: '',
+      domain: [1, 5],
+      colorFn: (v) => (v < 2 ? '#ef4444' : v < 3 ? '#f59e0b' : v < 4 ? '#60a5fa' : '#10b981'),
+    },
+    jitter: {
+      data: data?.avgJitterPerOperator ?? [],
+      label: 'Avg Jitter',
+      unit: 'ms',
+      domain: [0, 'auto'],
+      colorFn: (v) => (v > 30 ? '#ef4444' : v > 20 ? '#f59e0b' : v > 10 ? '#60a5fa' : '#10b981'),
+    },
+    latency: {
+      data: data?.avgLatencyPerOperator ?? [],
+      label: 'Avg Latency',
+      unit: 'ms',
+      domain: [0, 'auto'],
+      colorFn: (v) => (v > 100 ? '#ef4444' : v > 50 ? '#f59e0b' : v > 20 ? '#60a5fa' : '#10b981'),
+    },
+    packetLoss: {
+      data: data?.avgPacketLossPerOperator ?? [],
+      label: 'Avg Packet Loss',
+      unit: '%',
+      domain: [0, 'auto'],
+      colorFn: (v) => (v > 5 ? '#ef4444' : v > 2 ? '#f59e0b' : v > 0.5 ? '#60a5fa' : '#10b981'),
+    },
+    dlTpt: {
+      data: data?.avgDlTptPerOperator ?? [],
+      label: 'Avg DL Throughput',
+      unit: 'Mbps',
+      domain: [0, 'auto'],
+      colorFn: (v) => (v < 10 ? '#ef4444' : v < 50 ? '#f59e0b' : v < 100 ? '#60a5fa' : '#10b981'),
+    },
+    ulTpt: {
+      data: data?.avgUlTptPerOperator ?? [],
+      label: 'Avg UL Throughput',
+      unit: 'Mbps',
+      domain: [0, 'auto'],
+      colorFn: (v) => (v < 5 ? '#ef4444' : v < 20 ? '#f59e0b' : v < 50 ? '#60a5fa' : '#10b981'),
+    },
+  };
+  
+  return configs[metric] || configs.rsrp;
+};
+
+// Network Type Filter Settings Component
+const NetworkTypeFilterSettings = ({ value, onChange }) => (
+  <div className="space-y-3 text-sm">
+    <div className="font-medium text-gray-700">Network Type Filter</div>
+    <div className="space-y-2">
+      {['All', '5G', '4G', '3G', '2G'].map((type) => (
+        <label key={type} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+          <input
+            type="radio"
+            name="networkType"
+            value={type}
+            checked={value === type}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-4 h-4 text-blue-600"
+          />
+          <span className="text-gray-700">{type}</span>
+        </label>
+      ))}
+    </div>
+  </div>
+);
+
+// Metric Selector Settings Component
+const MetricSelectorSettings = ({ value, onChange }) => {
+  const metrics = [
+    { value: 'rsrp', label: 'RSRP (dBm)', desc: 'Reference Signal Received Power' },
+    { value: 'rsrq', label: 'RSRQ (dB)', desc: 'Reference Signal Received Quality' },
+    { value: 'sinr', label: 'SINR (dB)', desc: 'Signal to Interference plus Noise Ratio' },
+    { value: 'mos', label: 'MOS', desc: 'Mean Opinion Score (1-5)' },
+    { value: 'jitter', label: 'Jitter (ms)', desc: 'Variation in packet delay' },
+    { value: 'latency', label: 'Latency (ms)', desc: 'Round-trip time' },
+    { value: 'packetLoss', label: 'Packet Loss (%)', desc: 'Percentage of lost packets' },
+    { value: 'dlTpt', label: 'DL Throughput (Mbps)', desc: 'Download Speed' },
+    { value: 'ulTpt', label: 'UL Throughput (Mbps)', desc: 'Upload Speed' },
+  ];
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="font-medium text-gray-700">Select Metric</div>
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        {metrics.map((metric) => (
+          <label key={metric.value} className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+            <input
+              type="radio"
+              name="metric"
+              value={metric.value}
+              checked={value === metric.value}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-4 h-4 text-blue-600 mt-1"
+            />
+            <div className="flex-1">
+              <div className="text-gray-700 font-medium">{metric.label}</div>
+              <div className="text-xs text-gray-500">{metric.desc}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const buildRanking = (raw, { nameKey = 'name', countKey = 'count' } = {}) => {
@@ -180,36 +371,12 @@ const buildRanking = (raw, { nameKey = 'name', countKey = 'count' } = {}) => {
   return arr.map((x, i) => ({ ...x, rank: i + 1, label: `#${i + 1} ${x.name}` }));
 };
 
-// Neutral tooltip style (no dark/light dependency)
 const tooltipStyle = {
   backgroundColor: '#ffffff',
   border: '1px solid #e5e7eb',
   color: '#111827'
 };
 
-// Label at end of bar for RSRP
-const RSRPValueLabel = ({ x = 0, y = 0, width = 0, height = 0, value }) => {
-  const midY = y + height / 2;
-  const barEndX = width >= 0 ? x + width : x;
-  const dx = width >= 0 ? 8 : -8;
-  const anchor = width >= 0 ? 'start' : 'end';
-  const val = Number.isFinite(Number(value)) ? Number(value).toFixed(1) : value;
-  return (
-    <text
-      x={barEndX + dx}
-      y={midY}
-      fill="#111827"
-      dominantBaseline="middle"
-      textAnchor={anchor}
-      fontSize={12}
-      fontWeight={600}
-    >
-      {`${val} dBm`}
-    </text>
-  );
-};
-
-// ---------- Utility: export PNG/CSV ----------
 const downloadCSVFromData = (data = [], filename = 'data.csv') => {
   if (!Array.isArray(data) || data.length === 0) {
     toast.info("No data to export");
@@ -248,7 +415,6 @@ const downloadCSVFromData = (data = [], filename = 'data.csv') => {
 
 const sanitizeFileName = (s = 'chart') => s.replace(/[^\w\d-_]+/g, '_').slice(0, 64);
 
-// ------------------------ Reusable Cards ------------------------
 const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
   const cardRef = useRef(null);
   const [showTable, setShowTable] = useState(false);
@@ -274,7 +440,6 @@ const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
     downloadCSVFromData(dataset, `${sanitizeFileName(exportFileName || title || 'chart')}.csv`);
   };
 
-  // default table columns: show all primitive keys
   const columns = React.useMemo(() => {
     if (!Array.isArray(dataset) || dataset.length === 0) return [];
     const keys = Array.from(
@@ -293,7 +458,7 @@ const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
     <Card className="bg-white text-gray-900 border-gray-200 shadow-sm">
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle className="text/base font-semibold text-gray-800">{title}</CardTitle>
+          <CardTitle className="text-base font-semibold text-gray-800">{title}</CardTitle>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="p-1 rounded-full hover:bg-gray-100">
@@ -350,7 +515,6 @@ const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
           </div>
         )}
 
-        {/* Settings dialog, opened from chart menu */}
         {settings && (
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogContent className="sm:max-w-md">
@@ -384,6 +548,7 @@ const ChartCard = ({ title, dataset, children, exportFileName, settings }) => {
     </Card>
   );
 };
+
 const PageLoadProgress = () => {
   const [pct, setPct] = React.useState(0);
 
@@ -408,7 +573,6 @@ const PageLoadProgress = () => {
             className="relative bg-blue-600 h-full transition-[width] duration-200 ease-in-out"
             style={{ width: `${pct}%` }}
           >
-            {/* Striped filler overlay */}
             <div
               className="absolute inset-0 opacity-40"
               style={{
@@ -422,8 +586,6 @@ const PageLoadProgress = () => {
           </div>
         </div>
         <div className="mt-2 text-sm text-gray-500 text-center">Loading dashboard…</div>
-
-        {/* Keyframes for the stripe animation */}
         <style>
           {`
             @keyframes moveStripes {
@@ -436,8 +598,8 @@ const PageLoadProgress = () => {
     </div>
   );
 };
-// KPI card: responsive, overflow-safe text
-const StatCard = ({ title, value, icon: Icon, color, progress }) => (
+
+const StatCard = ({ title, value, icon: Icon, color }) => (
   <Card className="bg-white text-gray-900 border-gray-200 shadow-sm">
     <CardContent className="p-4 min-w-0">
       <div className="flex items-center gap-3">
@@ -451,20 +613,21 @@ const StatCard = ({ title, value, icon: Icon, color, progress }) => (
           <p className="text-xs md:text-sm text-gray-500 truncate">{title}</p>
         </div>
       </div>
-
-      {typeof progress === 'number' && (
-        <div className="mt-3">
-          <ProgressBar value={progress} color={color} height="h-2" />
-          <div className="mt-1 text-[11px] text-gray-500">{progress}%</div>
-        </div>
-      )}
     </CardContent>
   </Card>
 );
 
-// ------------------------ Page (with SWR) ------------------------
+// ======================== MAIN COMPONENT ========================
 const DashboardPage = () => {
-  // Applied settings (drive SWR keys) + Draft settings (edited in dialog)
+  // Network type filter state
+  const [networkTypeFilter, setNetworkTypeFilter] = useState('All');
+  const [draftNetworkType, setDraftNetworkType] = useState('All');
+
+  // Metric selector state
+  const [selectedMetric, setSelectedMetric] = useState('rsrp');
+  const [draftMetric, setDraftMetric] = useState('rsrp');
+
+  // RSRP/RSRQ range settings
   const [settings, setSettings] = useState({
     rsrpMin: -95, rsrpMax: 0,
     rsrqMin: -10, rsrqMax: 0,
@@ -472,17 +635,22 @@ const DashboardPage = () => {
   const [draft, setDraft] = useState(settings);
   useEffect(() => setDraft(settings), [settings]);
 
-  // Base dashboard payload via SWR (fetches both endpoints concurrently)
+  // Base dashboard payload via SWR
   const fetchDashboard = async () => {
     try {
+      const params = new URLSearchParams();
+      if (networkTypeFilter && networkTypeFilter !== 'All') {
+        params.append('networkType', networkTypeFilter);
+      }
+      
+      const queryString = params.toString();
+      const suffix = queryString ? `?${queryString}` : '';
+
       const [statsResp, graphsResp] = await Promise.all([
-        adminApi.getReactDashboardData(),
+        adminApi.getReactDashboardData(suffix),
         adminApi.getDashboardGraphData(),
-        
       ]);
-      console.log('statsResp', statsResp);
-      console.log('graphsResp', graphsResp);
-      // console.log('onlineUsersResp', onlineUsersResp);
+      
       const merged = { ...(statsResp?.Data ?? statsResp ?? {}), ...(graphsResp?.Data ?? graphsResp ?? {}) };
       const normalized = normalizePayload({ Data: merged });
       console.log('normalized dashboard', normalized);
@@ -498,14 +666,14 @@ const DashboardPage = () => {
     error: dashError,
     isLoading: isDashLoading,
     mutate: refreshDashboard,
-  } = useSWR('dashboard:core', fetchDashboard, {
+  } = useSWR(['dashboard:core', networkTypeFilter], fetchDashboard, {
     keepPreviousData: true,
     dedupingInterval: 60_000,
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
   });
 
-  // Ranking data via SWR (keys depend on applied settings)
+  // Ranking data via SWR
   const fetchCoverageRank = async ([, min, max]) => {
     try {
       const resp = await adminApi.getOperatorCoverageRanking({ min, max });
@@ -516,6 +684,7 @@ const DashboardPage = () => {
       throw err;
     }
   };
+
   const fetchQualityRank = async ([, min, max]) => {
     try {
       const resp = await adminApi.getOperatorQualityRanking({ min, max });
@@ -531,7 +700,6 @@ const DashboardPage = () => {
     data: coverageRank = [],
     error: covError,
     isLoading: isCoverageLoading,
-    mutate: refreshCoverage,
   } = useSWR(['rank:coverage', settings.rsrpMin, settings.rsrpMax], fetchCoverageRank, {
     keepPreviousData: true,
     dedupingInterval: 15_000,
@@ -543,7 +711,6 @@ const DashboardPage = () => {
     data: qualityRank = [],
     error: qualError,
     isLoading: isQualityLoading,
-    mutate: refreshQuality,
   } = useSWR(['rank:quality', settings.rsrqMin, settings.rsrqMax], fetchQualityRank, {
     keepPreviousData: true,
     dedupingInterval: 15_000,
@@ -551,40 +718,25 @@ const DashboardPage = () => {
     revalidateOnReconnect: true,
   });
 
-  const percent = (part, total) => {
-  const a = toNumber(part, 0);
-  const b = toNumber(total, 0);
-  return b > 0 ? Math.round((a / b) * 100) : 0;
-};
   const stats = useMemo(() => {
-  if (!data?.totals) return [];
-  return [
-    { title: "Users", value: data.totals.users, icon: Users, color: "bg-purple-600" },
-    { title: "Total Drive Sessions", value: data.totals.sessions, icon: Car, color: "bg-teal-600" },
-   {
-    title: "Online Sessions",
-    value: data.totals.onlineSessions,
-    icon: Waypoints,
-    color: "bg-orange-600",
-    
-  },
-  
-    { title: "Total Samples", value: data.totals.samples, icon: FileText, color: "bg-amber-600" },
-    { title: "Operators", value: data.totals.operators, icon: Wifi, color: "bg-sky-600" },
-    { title: "Technologies", value: data.totals.technologies, icon: BarChart2, color: "bg-pink-600" },
-  ];
-}, [data]);
+    if (!data?.totals) return [];
+    return [
+      { title: "Users", value: data.totals.users, icon: Users, color: "bg-purple-600" },
+      { title: "Total Drive Sessions", value: data.totals.sessions, icon: Car, color: "bg-teal-600" },
+      { title: "Online Sessions", value: data.totals.onlineSessions, icon: Waypoints, color: "bg-orange-600" },
+      { title: "Total Samples", value: data.totals.samples, icon: FileText, color: "bg-amber-600" },
+      { title: "Operators", value: data.totals.operators, icon: Wifi, color: "bg-sky-600" },
+      { title: "Technologies", value: data.totals.technologies, icon: BarChart2, color: "bg-pink-600" },
+    ];
+  }, [data]);
 
   const applySettings = () => {
     if (draft.rsrpMin > draft.rsrpMax) return toast.warn("RSRP: Min cannot be greater than Max");
     if (draft.rsrqMin > draft.rsrqMax) return toast.warn("RSRQ: Min cannot be greater than Max");
     setSettings(draft);
-    // Optionally force revalidate immediately:
-    // refreshCoverage();
-    // refreshQuality();
   };
 
- if (isDashLoading) return <PageLoadProgress />;
+  if (isDashLoading) return <PageLoadProgress />;
   if (dashError) return <div className="p-6 text-red-600">Failed to load dashboard data.</div>;
   if (!data) return <div className="p-6 text-red-600">Failed to load dashboard data.</div>;
 
@@ -623,8 +775,22 @@ const DashboardPage = () => {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Operator wise Samples */}
-        <ChartCard title="Operator wise Samples" dataset={data.operatorWiseSamples} exportFileName="operator_samples">
+        {/* Operator wise Samples WITH NETWORK TYPE FILTER */}
+        <ChartCard 
+          title={`Operator wise Samples${networkTypeFilter !== 'All' ? ` (${networkTypeFilter})` : ''}`}
+          dataset={data.operatorWiseSamples} 
+          exportFileName={`operator_samples_${networkTypeFilter}`}
+          settings={{
+            title: 'Network Type Filter',
+            render: () => (
+              <NetworkTypeFilterSettings 
+                value={draftNetworkType} 
+                onChange={setDraftNetworkType} 
+              />
+            ),
+            onApply: () => setNetworkTypeFilter(draftNetworkType)
+          }}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.operatorWiseSamples} layout="vertical" margin={{ top: 12, right: 40, left: 10, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.06)" />
@@ -656,18 +822,83 @@ const DashboardPage = () => {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Avg RSRP per Operator */}
-        <ChartCard title="Avg RSRP (dBm) Per Operator" dataset={data.avgRsrpPerOperator} exportFileName="avg_rsrp_per_operator">
+        {/* DYNAMIC METRIC PER OPERATOR WITH NETWORK TYPE FILTER */}
+        <ChartCard 
+          title={`${getMetricData(selectedMetric, data).label} Per Operator${networkTypeFilter !== 'All' ? ` (${networkTypeFilter})` : ''}`}
+          dataset={getMetricData(selectedMetric, data).data} 
+          exportFileName={`avg_${selectedMetric}_per_operator_${networkTypeFilter}`}
+          settings={{
+            title: 'Metric & Filter Settings',
+            render: () => (
+              <div className="space-y-4">
+                <MetricSelectorSettings 
+                  value={draftMetric} 
+                  onChange={setDraftMetric} 
+                />
+                <div className="border-t pt-4">
+                  <NetworkTypeFilterSettings 
+                    value={draftNetworkType} 
+                    onChange={setDraftNetworkType} 
+                  />
+                </div>
+              </div>
+            ),
+            onApply: () => {
+              setSelectedMetric(draftMetric);
+              setNetworkTypeFilter(draftNetworkType);
+            }
+          }}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.avgRsrpPerOperator} layout="vertical" margin={{ top: 12, right: 40, left: 10, bottom: 8 }}>
+            <BarChart 
+              data={getMetricData(selectedMetric, data).data} 
+              layout="vertical" 
+              margin={{ top: 12, right: 60, left: 10, bottom: 8 }}
+            >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.06)" />
-              <XAxis type="number" domain={[-120, -60]} tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(v) => `${v} dBm`} />
+              <XAxis 
+                type="number" 
+                domain={getMetricData(selectedMetric, data).domain}
+                tick={{ fill: '#6b7280', fontSize: 11 }} 
+                tickFormatter={(v) => `${v} ${getMetricData(selectedMetric, data).unit}`}
+              />
               <YAxis dataKey="name" type="category" width={140} tick={{ fill: '#111827', fontSize: 12 }} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${Number(v).toFixed(1)} dBm`, 'Avg RSRP']} />
-              <Bar dataKey="value" name="RSRP" radius={[0, 6, 6, 0]}>
-                <LabelList dataKey="value" content={RSRPValueLabel} />
-                {data.avgRsrpPerOperator.map((entry, index) => (
-                  <Cell key={`cell-rsrp-${index}`} fill={getRSRPPointColor(entry.value)} />
+              <Tooltip 
+                contentStyle={tooltipStyle} 
+                formatter={(v) => [
+                  `${Number(v).toFixed(2)} ${getMetricData(selectedMetric, data).unit}`, 
+                  getMetricData(selectedMetric, data).label
+                ]} 
+              />
+              <Bar dataKey="value" name={getMetricData(selectedMetric, data).label} radius={[0, 6, 6, 0]}>
+                <LabelList 
+                  dataKey="value" 
+                  content={({ x = 0, y = 0, width = 0, height = 0, value }) => {
+                    const midY = y + height / 2;
+                    const barEndX = width >= 0 ? x + width : x;
+                    const dx = width >= 0 ? 8 : -8;
+                    const anchor = width >= 0 ? 'start' : 'end';
+                    const val = Number.isFinite(Number(value)) ? Number(value).toFixed(1) : value;
+                    return (
+                      <text
+                        x={barEndX + dx}
+                        y={midY}
+                        fill="#111827"
+                        dominantBaseline="middle"
+                        textAnchor={anchor}
+                        fontSize={12}
+                        fontWeight={600}
+                      >
+                        {`${val} ${getMetricData(selectedMetric, data).unit}`}
+                      </text>
+                    );
+                  }}
+                />
+                {getMetricData(selectedMetric, data).data.map((entry, index) => (
+                  <Cell 
+                    key={`cell-metric-${index}`} 
+                    fill={getMetricData(selectedMetric, data).colorFn(entry.value)} 
+                  />
                 ))}
               </Bar>
             </BarChart>
@@ -697,7 +928,6 @@ const DashboardPage = () => {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data.handsetWiseAvg_bar}
-              
               layout="vertical"
               margin={{ top: 12, right: 40, left: 10, bottom: 8 }}
               barCategoryGap="25%"
@@ -705,8 +935,8 @@ const DashboardPage = () => {
             >
               <ReferenceArea x1={-120} x2={-105} fill="#ef4444" fillOpacity={0.06} />
               <ReferenceArea x1={-105} x2={-95} fill="#f59e0b" fillOpacity={0.06} />
-              <ReferenceArea x1={-95}  x2={-85} fill="#60a5fa" fillOpacity={0.06} />
-              <ReferenceArea x1={-85}  x2={-60} fill="#10b981" fillOpacity={0.06} />
+              <ReferenceArea x1={-95} x2={-85} fill="#60a5fa" fillOpacity={0.06} />
+              <ReferenceArea x1={-85} x2={-60} fill="#10b981" fillOpacity={0.06} />
 
               <XAxis
                 type="number"
@@ -722,11 +952,11 @@ const DashboardPage = () => {
               />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(v, name, { payload }) => [`${Number(v).toFixed(1)} dBm`, 'Avg RSRP']}
-        labelFormatter={(label, payload) => {
-          const item = payload?.[0]?.payload;
-          return item ? `${label} • ${item.Samples?.toLocaleString()} samples` : label;
-        }}
+                formatter={(v) => [`${Number(v).toFixed(1)} dBm`, 'Avg RSRP']}
+                labelFormatter={(label, payload) => {
+                  const item = payload?.[0]?.payload;
+                  return item ? `${label} • ${item.Samples?.toLocaleString()} samples` : label;
+                }}
               />
 
               <Bar
@@ -737,34 +967,9 @@ const DashboardPage = () => {
                 animationDuration={650}
                 background={{ fill: 'rgba(0,0,0,0.06)', radius: [0, 8, 8, 0] }}
               >
-                <LabelList
-                  dataKey="value"
-                  content={({ x = 0, y = 0, width = 0, height = 0, value }) => {
-                    const midY = y + height / 2;
-                    const barEndX = x + width;
-                    return (
-                      <text
-                        x={barEndX + 8}
-                        y={midY}
-                        fill="#111827"
-                        dominantBaseline="middle"
-                        textAnchor="start"
-                        fontSize={12}
-                        fontWeight={600}
-                      >
-                        
-                      </text>
-                    );
-                  }}
-                />
-                {(data?.handsetDistribution ?? [])
-                  .map(d => ({ ...d, value: Number(d.value) > 0 ? -Number(d.value) : Number(d.value) }))
-                  .sort((a, b) => a.value - b.value)
-                  .slice(0, 12)
-                  .map((entry, index) => (
-                    <Cell key={`cell-handset-${index}`} fill={getRSRPPointColor(entry.Avg)} />
-                  ))
-                }
+                {(data?.handsetWiseAvg_bar ?? []).map((entry, index) => (
+                  <Cell key={`cell-handset-${index}`} fill={getRSRPPointColor(entry.Avg)} />
+                ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -805,7 +1010,6 @@ const DashboardPage = () => {
             onApply: applySettings
           }}
         >
-          <div className="absolute inset-0 pointer-events-none" />
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={coverageRank}

@@ -13,3 +13,24 @@ body {
   @apply bg-gray-900 text-gray-200;
 }
 .no-scrollbar::-webkit-scrollbar { display: none; }  
+
+//-----------------------------------------------------------------------------------------------------------------//
+
+/* Add to your global CSS or as a style tag */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}

@@ -19,6 +19,7 @@ export default function MapHeader({
   initialFilters,
   isSearchOpen,
   onSearchToggle,
+  thresholds ={}
 }) {
   const { user, logout } = useAuth();
   const [dropOpen, setDropOpen] = useState(false);
@@ -211,6 +212,7 @@ export default function MapHeader({
           initialFilters={initialFilters}
           position="left"
           autoCloseOnApply={true}
+           thresholds={thresholds}
         />
         
         <p className="text-gray-300 text-sm">

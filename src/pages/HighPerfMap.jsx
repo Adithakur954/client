@@ -126,6 +126,7 @@ export default function HighPerfMap() {
   const [analysis, setAnalysis] = useState(null);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [polygonName, setPolygonName] = useState("");
+  const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false);
 
   const [visibleBounds, setVisibleBounds] = useState(null);
   const idleListenerRef = useRef(null);
@@ -137,6 +138,7 @@ export default function HighPerfMap() {
     const fetchThresholds = async () => {
       try {
         const res = await settingApi.getThresholdSettings();
+        console.log(res);
         if (res?.Data) {
           const d = res.Data;
           setThresholds({
@@ -147,6 +149,7 @@ export default function HighPerfMap() {
             ul_thpt: JSON.parse(d.ul_thpt_json || "[]"),
             mos: JSON.parse(d.mos_json || "[]"),
             lte_bler: JSON.parse(d.lte_bler_json || "[]"),
+            coveragehole: parseFloat(d.coveragehole_json) || -110, 
           });
         }
       } catch {
@@ -243,6 +246,7 @@ export default function HighPerfMap() {
     setDrawnLogs([]); 
     setAnalysis(null);
     setUi((u) => ({ ...u, showLogsCircles: true }));
+    setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
 };
 
   const handleClearFilters = useCallback(() => {
@@ -488,6 +492,7 @@ export default function HighPerfMap() {
         initialFilters={activeFilters}
         isSearchOpen={isSearchOpen}
         onSearchToggle={() => setIsSearchOpen(prev => !prev)}
+        thresholds={thresholds}
       />
 
       <div className="relative flex-1">
@@ -523,6 +528,7 @@ export default function HighPerfMap() {
               renderVisibleOnly={ui.renderVisibleLogsOnly}
               canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
               maxDraw={80000}
+               coverageHoleOnly={showCoverageHoleOnly}
               />
           )}
 
