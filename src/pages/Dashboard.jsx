@@ -12,7 +12,7 @@ import BandDistributionChart from '@/components/dashboard/charts/BandDistributio
 import HandsetPerformanceChart from '@/components/dashboard/charts/HandsetPerformanceChart';
 import CoverageRankingChart from '@/components/dashboard/charts/CoverageRankingChart';
 import QualityRankingChart from '@/components/dashboard/charts/QualityRankingChart';
-import StatCardSkeleton from '@/components/dashboard/skeletons/StatCardSkeleton';
+import StatCardSkeleton from '@/components/dashboard/skeletons/statCardSkeleton';
 import { 
   useTotals, 
   useOperatorsAndNetworks, 
