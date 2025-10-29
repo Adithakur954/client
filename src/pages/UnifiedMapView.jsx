@@ -13,6 +13,7 @@ import UnifiedMapSidebar from "@/components/UnifiedMapSideBar.jsx";
 import SiteMarkers from "@/components/SiteMarkers";
 import NetworkSectors from "@/components/NetworkSectors";
 import { useSiteData } from "@/hooks/useSiteData";
+import UnifiedHeader from "@/components/unifiedMap/unifiedMapHeader";
 
 const defaultThresholds = {
   rsrp: [],
@@ -697,31 +698,13 @@ const UnifiedMapView = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 h-screen flex flex-col bg-gray-50 dark:bg-gray-800">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-        <h1 className="text-xl md:text-2xl font-semibold dark:text-white">
-          Unified Map View
-          <span className="text-base font-normal text-gray-600 dark:text-gray-400 block sm:inline sm:ml-2">
-            {projectId && `(Project: ${projectId})`}
-            {sessionIds.length > 0 && ` • Sessions: ${sessionIds.join(", ")}`}
-          </span>
-        </h1>
-        <div className="flex gap-3 items-center">
-          <button
-            onClick={() => setIsSideOpen(!isSideOpen)}
-            className="flex gap-1 items-center bg-blue-600 hover:bg-blue-500 text-white text-sm sm:text-base rounded-md px-3 py-1"
-          >
-            <Filter className="h-4" />
-            {isSideOpen ? "Close" : "Open"} Controls
-          </button>
-          <Link
-            to="/create-project"
-            className="text-blue-600 dark:text-blue-400 hover:underline text-sm sm:text-base"
-          >
-            ← Back to Projects
-          </Link>
-        </div>
-      </div>
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-800">
+      <UnifiedHeader 
+        onToggleControls={() => setIsSideOpen(!isSideOpen)}
+        isControlsOpen={isSideOpen}
+        projectId={projectId}
+        sessionIds={sessionIds}
+      />
 
       <UnifiedMapSidebar
         open={isSideOpen}

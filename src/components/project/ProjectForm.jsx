@@ -106,14 +106,12 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
       <Card>
         <CardHeader>
           <CardTitle>Create New Project</CardTitle>
-          <CardDescription>
-            Select polygon and generate building data from OpenStreetMap
-          </CardDescription>
+          
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <Label>Project Name</Label>
+              <Label className="pb-1">Project Name</Label>
               <Input
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
@@ -157,9 +155,7 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Site
               </Button>
-              <Button type="button" variant="outline">
-                Predict Sample
-              </Button>
+              
               <Button type="submit" disabled={loading || !canSubmit}>
                 {loading ? <Spinner /> : "Create Project"}
               </Button>

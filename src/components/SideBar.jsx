@@ -1,62 +1,155 @@
 // src/components/SideBar.jsx
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Upload, History, Map, Settings, FolderPlus, Users, ReceiptPoundSterling, BarChartHorizontal } from 'lucide-react'; // Added BarChartHorizontal for Prediction
-import VinfocomLogo from '../assets/vinfocom_logo.png'; // Assuming logo path is correct
+import React, { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { 
+    LayoutDashboard, 
+    Upload, 
+    History, 
+    Map, 
+    Settings, 
+    FolderPlus, 
+    Plus, 
+    Users, 
+    ReceiptPoundSterling, 
+    BarChartHorizontal,
+    ChevronDown,
+    ChevronRight,
+    FileText
+} from 'lucide-react';
+import VinfocomLogo from '../assets/vinfocom_logo.png';
 
-const SideBar = ({ collapsed }) => { // Removed isMapview prop, layout handles header visibility
+const SideBar = ({ collapsed }) => {
+    const location = useLocation();
+    const [openDropdowns, setOpenDropdowns] = useState({});
+
     const navLinks = [
         { icon: LayoutDashboard, text: 'Dashboard', path: '/dashboard' },
         { icon: Upload, text: 'Upload Data', path: '/upload-data' },
         { icon: History, text: 'Manage Drive Sessions', path: '/drive-test-sessions' },
-        // Main Map View (Logs, Filters, Drawing)
         { icon: Map, text: 'Map View', path: '/mapview' },
-        // Prediction Map View
-        // { icon: BarChartHorizontal, text: 'Prediction Viewer', path: '/prediction-map'}, // Added Prediction Link
-        { icon: FolderPlus, text: 'Projects', path: '/create-project' },
+        {
+            icon: FolderPlus,
+            text: 'Projects',
+            hasDropdown: true, // Add this flag to identify dropdown items
+            children: [
+                { icon: Plus, text: 'Create Project', path: '/create-project' },
+                { icon: FileText, text: 'View Projects', path: '/viewProject' },
+            ]
+        },
         { icon: Users, text: 'Manage User', path: '/manage-users' },
-        { icon: ReceiptPoundSterling, text: 'Get Report', path: '/getreport' }, // Corrected case
-        { icon: Settings, text: 'Setting', path: '/settings' }, // Corrected case
-        // Example link for specific session map (usually navigated to, not direct link)
-        // { icon: MapPin, text: 'Specific Session Map', path: '/map?session=123' },
+        { icon: ReceiptPoundSterling, text: 'Get Report', path: '/getreport' },
+        { icon: Settings, text: 'Setting', path: '/settings' },
     ];
+
+    const toggleDropdown = (text) => {
+        setOpenDropdowns(prev => ({
+            ...prev,
+            [text]: !prev[text]
+        }));
+    };
+
+    const isChildActive = (children) => {
+        return children.some(child => location.pathname === child.path);
+    };
+
+    const renderNavItem = (link, index) => {
+        const isOpen = openDropdowns[link.text];
+        const hasChildren = link.hasDropdown && link.children;
+        const isActive = link.path ? location.pathname === link.path : false;
+        const isParentActive = hasChildren && isChildActive(link.children);
+
+        return (
+            <li key={index} className="mb-1 sm:mb-2">
+                {hasChildren ? (
+                    <>
+                        {/* Parent item with dropdown */}
+                        <button
+                            onClick={() => !collapsed && toggleDropdown(link.text)}
+                            className={`w-full flex items-center p-2 sm:p-3 rounded-lg transition-colors duration-200 
+                                ${isParentActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}
+                                ${collapsed ? 'justify-center' : 'justify-between'}`}
+                            title={collapsed ? link.text : undefined}
+                        >
+                            <div className="flex items-center">
+                                <link.icon className={`h-5 w-5 flex-shrink-0 ${!collapsed ? 'mr-3' : ''}`} />
+                                {!collapsed && <span className="font-medium whitespace-nowrap">{link.text}</span>}
+                            </div>
+                            {!collapsed && (
+                                <div className="transition-transform duration-200">
+                                    {isOpen ? (
+                                        <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                        <ChevronRight className="h-4 w-4" />
+                                    )}
+                                </div>
+                            )}
+                        </button>
+
+                        {/* Dropdown items */}
+                        {!collapsed && (
+                            <ul 
+                                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                                    isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                                }`}
+                            >
+                                {link.children.map((child, childIndex) => (
+                                    <li key={childIndex}>
+                                        <NavLink
+                                            to={child.path}
+                                            className={({ isActive }) =>
+                                                `flex items-center p-2 pl-11 rounded-lg transition-colors duration-200 ${
+                                                    isActive
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+                                                }`
+                                            }
+                                        >
+                                            <child.icon className="h-4 w-4 mr-3" />
+                                            <span className="text-sm whitespace-nowrap">{child.text}</span>
+                                        </NavLink>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </>
+                ) : (
+                    // Regular nav item without dropdown
+                    <NavLink
+                        to={link.path}
+                        className={({ isActive }) =>
+                            `flex items-center p-2 sm:p-3 rounded-lg transition-colors duration-200 ${
+                                isActive
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                            } ${collapsed ? 'justify-center' : ''}`
+                        }
+                        title={collapsed ? link.text : undefined}
+                    >
+                        <link.icon className={`h-5 w-5 flex-shrink-0 ${!collapsed ? 'mr-3' : ''}`} />
+                        {!collapsed && <span className="font-medium whitespace-nowrap">{link.text}</span>}
+                    </NavLink>
+                )}
+            </li>
+        );
+    };
 
     return (
         <div
             className={`h-screen bg-gray-800 text-white flex flex-col shadow-lg transition-width duration-300 ease-in-out
-                ${collapsed ? 'w-16' : 'w-60'}`} // Use transition-width
+                ${collapsed ? 'w-16' : 'w-60'}`}
         >
             {/* Logo */}
-            <div className="p-4 flex items-center justify-center border-b border-gray-700 h-16 flex-shrink-0"> {/* Ensure consistent height */}
-                <img src={VinfocomLogo} alt="Logo" className="h-8 sm:h-10 object-contain" /> {/* Adjusted size */}
-                {!collapsed && <span className="ml-2 font-bold text-lg whitespace-nowrap">NetPulse</span>} {/* Added text size and nowrap */}
+            <div className="p-4 flex items-center justify-center border-b border-gray-700 h-16 flex-shrink-0">
+                <img src={VinfocomLogo} alt="Logo" className="h-8 sm:h-10 object-contain" />
+                {!collapsed && <span className="ml-2 font-bold text-lg whitespace-nowrap">NetPulse</span>}
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto p-2"> {/* Added overflow-y-auto */}
+            <nav className="flex-1 overflow-y-auto p-2">
                 <ul>
-                    {navLinks.map((link, index) => (
-                        <li key={index} className="mb-1 sm:mb-2"> {/* Adjusted margin */}
-                            <NavLink
-                                to={link.path}
-                                className={({ isActive }) =>
-                                    `flex items-center p-2 sm:p-3 rounded-lg transition-colors duration-200 ${
-                                        isActive
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                                    } ${collapsed ? 'justify-center' : ''}` // Center icon when collapsed
-                                }
-                                title={collapsed ? link.text : undefined} // Tooltip when collapsed
-                            >
-                                <link.icon className={`h-5 w-5 flex-shrink-0 ${!collapsed ? 'mr-3' : ''}`} /> {/* Ensure icon shrinks */}
-                                {!collapsed && <span className="font-medium whitespace-nowrap">{link.text}</span>} {/* Added nowrap */}
-                            </NavLink>
-                        </li>
-                    ))}
+                    {navLinks.map(renderNavItem)}
                 </ul>
             </nav>
-            {/* Optional: Footer or user section */}
-            {/* <div className="p-2 border-t border-gray-700"> ... </div> */}
         </div>
     );
 };

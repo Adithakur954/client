@@ -303,20 +303,18 @@ const UnifiedMapSidebar = ({
           {shouldShowMetricSelector && (
             <PanelSection title="Coverage Hole Filter" icon={AlertTriangle}>
               <div className="space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer p-3 rounded bg-amber-900/20 border border-amber-700 hover:bg-amber-900/30 transition-colors">
+                <label className="flex items-center gap-2 cursor-pointer p-3 rounded  transition-colors">
                   <input
                     type="checkbox"
                     checked={showCoverageHoleOnly}
                     onChange={(e) => setShowCoverageHoleOnly?.(e.target.checked)}
-                    className="w-4 h-4 rounded border-amber-600 text-amber-600 focus:ring-amber-500"
+                    className="w-4 h-4 rounded"
                   />
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-amber-100">
-                      Show Coverage Holes Only
+                    <div className="text-sm font-medium ">
+                      Coverage Holes
                     </div>
-                    <div className="text-xs text-amber-300">
-                      Display logs with RSRP below threshold
-                    </div>
+                   
                   </div>
                 </label>
 
@@ -337,34 +335,10 @@ const UnifiedMapSidebar = ({
                     />
                     <span className="text-xs text-slate-400 whitespace-nowrap">dBm</span>
                   </div>
-                  <div className="text-xs text-slate-400">
-                    Default: -110 dBm • Typical range: -140 to -80 dBm
-                  </div>
+                  
                 </div>
 
-                <div className={`p-3 rounded border text-sm ${
-                  showCoverageHoleOnly
-                    ? 'bg-amber-900/20 border-amber-700'
-                    : 'bg-slate-800 border-slate-700'
-                }`}>
-                  {showCoverageHoleOnly ? (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-amber-400" />
-                        <span className="font-medium text-amber-100">
-                          Coverage Hole Filter Active
-                        </span>
-                      </div>
-                      <div className="text-xs text-amber-300 ml-6">
-                        Showing only: RSRP &lt; {coverageHoleThreshold || -110} dBm
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-slate-400">
-                      Coverage hole filter disabled
-                    </div>
-                  )}
-                </div>
+                
               </div>
             </PanelSection>
           )}
@@ -427,25 +401,7 @@ const UnifiedMapSidebar = ({
             </PanelSection>
           )}
 
-          <PanelSection title="Map Settings">
-            <div>
-              <Label className="text-xs text-slate-300 mb-2 block">Basemap Style</Label>
-              <Select
-                value={ui?.basemapStyle || "roadmap"}
-                onValueChange={handleBasemapChange}
-              >
-                <SelectTrigger className="bg-slate-800 border-slate-700 text-white h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="roadmap">Roadmap</SelectItem>
-                  <SelectItem value="satellite">Satellite</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                  <SelectItem value="terrain">Terrain</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </PanelSection>
+          
 
         </div>
 

@@ -1,21 +1,33 @@
+// src/components/layout/AppLayout.jsx
 import React, { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import SideBar from "../SideBar";
-import Header from "../Header"; // Import the standard header
+import Header from "../Header";
 
 const AppLayout = ({ children }) => {
   const [visible, setVisible] = useState(true);
-  const location = useLocation(); // Get the current location object
+  const location = useLocation();
 
   const changeValue = () => {
     setVisible(!visible);
   };
 
   // List of paths where the standard header should be hidden
-  const pathsWithoutHeader = ["/mapview", "/prediction-map", "/map"];
+  const pathsWithoutHeader = [
+    "/mapview", 
+    "/prediction-map", 
+    "/map",
+    "/unified-map"
+  ];
 
   // Check if the current path starts with any of the paths in the list
-  const shouldShowHeader = !pathsWithoutHeader.some(path => location.pathname.startsWith(path));
+  const shouldShowHeader = !pathsWithoutHeader.some((path) =>
+    location.pathname.startsWith(path)
+  );
+
+  // Debug logging
+  console.log("Current pathname:", location.pathname);
+  console.log("Should show header:", shouldShowHeader);
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
@@ -28,7 +40,7 @@ const AppLayout = ({ children }) => {
       >
         {/* Sidebar content */}
         <div className="flex-1">
-          <SideBar />
+          <SideBar collapsed={!visible} />
         </div>
 
         {/* Accent edge + button */}
@@ -52,7 +64,7 @@ const AppLayout = ({ children }) => {
         {shouldShowHeader && <Header />}
 
         {/* The main content for the page */}
-        <main className="flex-1 overflow-y-auto">
+        <main className={`flex-1 overflow-y-auto ${!shouldShowHeader ? 'h-full' : ''}`}>
           {children || <Outlet />}
         </main>
       </div>
@@ -61,5 +73,3 @@ const AppLayout = ({ children }) => {
 };
 
 export default AppLayout;
-
-

@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { mapViewApi } from "@/api/apiEndpoints";
 
-
 const getYesterday = () => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
@@ -36,19 +35,32 @@ const normalizeProviderName = (raw) => {
   if (/^\/+$/.test(s)) return "Unknown"; // ////// etc.
   if (s.replace(/\s+/g, "") === "404011") return "Unknown";
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
-  if (cleaned.includes("JIO") || /^(IND)?JIO(4G|5G|TRUE5G)?$/.test(cleaned)) return "JIO";
-  if (cleaned.includes("AIRTEL") || /^INDAIRTEL$/.test(cleaned)) return "Airtel";
-  if (cleaned === "VI" || cleaned.includes("VIINDIA") || cleaned.includes("VODAFONE") || cleaned.includes("IDEA")) return "VI India";
+  if (cleaned.includes("JIO") || /^(IND)?JIO(4G|5G|TRUE5G)?$/.test(cleaned))
+    return "JIO";
+  if (cleaned.includes("AIRTEL") || /^INDAIRTEL$/.test(cleaned))
+    return "Airtel";
+  if (
+    cleaned === "VI" ||
+    cleaned.includes("VIINDIA") ||
+    cleaned.includes("VODAFONE") ||
+    cleaned.includes("IDEA")
+  )
+    return "VI India";
   return s;
 };
 
-const isObjectNonEmpty = (obj) => obj && typeof obj === "object" && Object.keys(obj).length > 0;
+const isObjectNonEmpty = (obj) =>
+  obj && typeof obj === "object" && Object.keys(obj).length > 0;
 
 // Small wrapper to keep sections consistent
 const PanelSection = ({ title, children }) => (
   <div className="space-y-2">
-    <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{title}</div>
-    <div className="rounded-lg border p-3 bg-white dark:bg-slate-900">{children}</div>
+    <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+      {title}
+    </div>
+    <div className="rounded-lg border p-3 bg-white dark:bg-slate-900">
+      {children}
+    </div>
   </div>
 );
 
@@ -100,16 +112,28 @@ export default function MapSidebarFloating({
 
         // Providers with normalization
         const provList = Array.isArray(provRes) ? provRes : [];
-        const normalizedSet = new Set(provList.map((p) => normalizeProviderName(p.name)));
-        const normalizedProviders = Array.from(normalizedSet).map((name) => ({ id: name, name }));
+        const normalizedSet = new Set(
+          provList.map((p) => normalizeProviderName(p.name))
+        );
+        const normalizedProviders = Array.from(normalizedSet).map((name) => ({
+          id: name,
+          name,
+        }));
 
         setProviders(normalizedProviders);
         setTechnologies(Array.isArray(techRes) ? techRes : []);
         setBands(Array.isArray(bandsRes) ? bandsRes : []);
 
         // Optional projects
-        const projData = Array.isArray(projRes?.Data) ? projRes.Data : (Array.isArray(projRes) ? projRes : []);
-        const projList = projData.map((p) => ({ id: p.id, name: p.project_name }));
+        const projData = Array.isArray(projRes?.Data)
+          ? projRes.Data
+          : Array.isArray(projRes)
+          ? projRes
+          : [];
+        const projList = projData.map((p) => ({
+          id: p.id,
+          name: p.project_name,
+        }));
         setProjects(projList);
       } catch (error) {
         console.error("Failed to fetch filter options", error);
@@ -118,21 +142,29 @@ export default function MapSidebarFloating({
     fetchFilterOptions();
   }, []);
 
-  const handleFilterChange = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const handleFilterChange = (key, value) =>
+    setFilters((prev) => ({ ...prev, [key]: value }));
 
   // Drawer position classes
   const sideClasses = useMemo(() => {
-    const base = "fixed top-0 h-full z-50 w-[90vw] sm:w-[360px] bg-white dark:bg-slate-950 dark:text-white shadow-2xl transition-transform duration-200 ease-out";
+    const base =
+      "fixed top-0 h-full z-50 w-[90vw] sm:w-[360px] bg-white dark:bg-slate-950 dark:text-white shadow-2xl transition-transform duration-200 ease-out";
     if (position === "right") {
-      return isOpen ? `${base} right-0 translate-x-0` : `${base} right-0 translate-x-full`;
+      return isOpen
+        ? `${base} right-0 translate-x-0`
+        : `${base} right-0 translate-x-full`;
     }
-    return isOpen ? `${base} left-0 translate-x-0` : `${base} left-0 -translate-x-full`;
+    return isOpen
+      ? `${base} left-0 translate-x-0`
+      : `${base} left-0 -translate-x-full`;
   }, [isOpen, position]);
 
   // Floating Action Button position (used only if hideTrigger = false)
   const fabPosition = useMemo(() => {
     const base = "fixed z-40";
-    return position === "right" ? `${base} top-4 right-4` : `${base} top-4 left-4`;
+    return position === "right"
+      ? `${base} top-4 right-4`
+      : `${base} top-4 left-4`;
   }, [position]);
 
   // Apply & Close
@@ -161,7 +193,10 @@ export default function MapSidebarFloating({
           <Filter size={16} />
           Filters
           {hasActiveFilters && (
-            <span className="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-400" title="Filters active" />
+            <span
+              className="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-400"
+              title="Filters active"
+            />
           )}
         </button>
       )}
@@ -182,7 +217,10 @@ export default function MapSidebarFloating({
             <SlidersHorizontal className="h-4 w-4" />
             <h3 className="text-base font-semibold">Map Filters</h3>
           </div>
-          <button className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setOpen(false)}>
+          <button
+            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={() => setOpen(false)}
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -217,12 +255,19 @@ export default function MapSidebarFloating({
             <div className="grid grid-cols-1 gap-3">
               <div>
                 <Label className="pb-2">Provider</Label>
-                <Select value={filters.provider} onValueChange={(v) => handleFilterChange("provider", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select Provider..." /></SelectTrigger>
+                <Select
+                  value={filters.provider}
+                  onValueChange={(v) => handleFilterChange("provider", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Provider..." />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">ALL Providers</SelectItem>
                     {providers.map((p) => (
-                      <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                      <SelectItem key={p.id} value={p.name}>
+                        {p.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -230,12 +275,19 @@ export default function MapSidebarFloating({
 
               <div>
                 <Label className="pb-2">Technology</Label>
-                <Select value={filters.technology} onValueChange={(v) => handleFilterChange("technology", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select Technology..." /></SelectTrigger>
+                <Select
+                  value={filters.technology}
+                  onValueChange={(v) => handleFilterChange("technology", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Technology..." />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">ALL Technologies</SelectItem>
                     {technologies.map((t) => (
-                      <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                      <SelectItem key={t.id} value={t.name}>
+                        {t.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -243,12 +295,19 @@ export default function MapSidebarFloating({
 
               <div>
                 <Label className="pb-2">Band / Frequency</Label>
-                <Select value={filters.band} onValueChange={(v) => handleFilterChange("band", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select Band..." /></SelectTrigger>
+                <Select
+                  value={filters.band}
+                  onValueChange={(v) => handleFilterChange("band", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Band..." />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">ALL Bands</SelectItem>
                     {bands.map((b) => (
-                      <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>
+                      <SelectItem key={b.id} value={b.name}>
+                        {b.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -256,8 +315,13 @@ export default function MapSidebarFloating({
 
               <div>
                 <Label className="pb-2">Visualize Metric</Label>
-                <Select value={filters.measureIn} onValueChange={(v) => handleFilterChange("measureIn", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select metric..." /></SelectTrigger>
+                <Select
+                  value={filters.measureIn}
+                  onValueChange={(v) => handleFilterChange("measureIn", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select metric..." />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="rsrp">RSRP</SelectItem>
                     <SelectItem value="rsrq">RSRQ</SelectItem>
@@ -271,24 +335,6 @@ export default function MapSidebarFloating({
               </div>
 
               {/* ✅ Coverage Hole Filter Checkbox */}
-              <div className="pt-2">
-                <label className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={filters.coverageHoleOnly || false}
-                    onChange={(e) => handleFilterChange("coverageHoleOnly", e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                  />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                      Show Coverage Holes Only
-                    </div>
-                    <div className="text-xs text-amber-700 dark:text-amber-300">
-                      Display only logs with RSRP &lt; {thresholds.coveragehole || -110} dBm
-                    </div>
-                  </div>
-                </label>
-              </div>
             </div>
           </PanelSection>
 
@@ -299,17 +345,36 @@ export default function MapSidebarFloating({
                 <input
                   type="checkbox"
                   checked={ui?.showSessions}
-                  onChange={(e) => onUIChange?.({ showSessions: e.target.checked })}
+                  onChange={(e) =>
+                    onUIChange?.({ showSessions: e.target.checked })
+                  }
                   disabled={hasActiveFilters}
                 />
                 Session Markers (when no filters)
+              </label>
+              <label className="flex items-center gap-2 ">
+                <input
+                  type="checkbox"
+                  checked={filters.coverageHoleOnly || false}
+                  onChange={(e) =>
+                    handleFilterChange("coverageHoleOnly", e.target.checked)
+                  }
+                  className="w-4 h-4 rounded border-gray-300 "
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium ">
+                    Coverage Hole
+                  </div>
+                </div>
               </label>
 
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={ui?.clusterSessions}
-                  onChange={(e) => onUIChange?.({ clusterSessions: e.target.checked })}
+                  onChange={(e) =>
+                    onUIChange?.({ clusterSessions: e.target.checked })
+                  }
                   disabled={!ui?.showSessions || hasActiveFilters}
                 />
                 Cluster Sessions
@@ -319,7 +384,9 @@ export default function MapSidebarFloating({
                 <input
                   type="checkbox"
                   checked={ui?.showLogsCircles}
-                  onChange={(e) => onUIChange?.({ showLogsCircles: e.target.checked })}
+                  onChange={(e) =>
+                    onUIChange?.({ showLogsCircles: e.target.checked })
+                  }
                   disabled={!hasActiveFilters}
                 />
                 Logs as Circles
@@ -329,7 +396,9 @@ export default function MapSidebarFloating({
                 <input
                   type="checkbox"
                   checked={ui?.showHeatmap}
-                  onChange={(e) => onUIChange?.({ showHeatmap: e.target.checked })}
+                  onChange={(e) =>
+                    onUIChange?.({ showHeatmap: e.target.checked })
+                  }
                   disabled={!hasActiveFilters}
                 />
                 Heatmap
@@ -339,7 +408,9 @@ export default function MapSidebarFloating({
                 <input
                   type="checkbox"
                   checked={ui?.renderVisibleLogsOnly}
-                  onChange={(e) => onUIChange?.({ renderVisibleLogsOnly: e.target.checked })}
+                  onChange={(e) =>
+                    onUIChange?.({ renderVisibleLogsOnly: e.target.checked })
+                  }
                   disabled={!hasActiveFilters}
                 />
                 Render Visible Logs Only
@@ -349,8 +420,13 @@ export default function MapSidebarFloating({
 
           {/* Basemap Style */}
           <PanelSection title="Basemap Style">
-            <Select value={ui?.basemapStyle} onValueChange={(v) => onUIChange?.({ basemapStyle: v })}>
-              <SelectTrigger><SelectValue placeholder="Select style..." /></SelectTrigger>
+            <Select
+              value={ui?.basemapStyle}
+              onValueChange={(v) => onUIChange?.({ basemapStyle: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select style..." />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="roadmap">Default (Roadmap)</SelectItem>
                 <SelectItem value="satellite">Satellite</SelectItem>
@@ -362,9 +438,16 @@ export default function MapSidebarFloating({
 
         {/* Footer with Clear/Apply */}
         <div className="p-3 border-t flex gap-2">
-          <Button variant="secondary" className="flex-1" onClick={clearAndClose}>Clear</Button>
+          <Button
+            variant="secondary"
+            className="flex-1"
+            onClick={clearAndClose}
+          >
+            Clear
+          </Button>
           <Button className="flex-1" onClick={applyAndClose}>
-            <Filter title="Apply & Fetch Logs" className="h-4 w-4 mr-2" /> Apply & Fetch Logs
+            <Filter title="Apply & Fetch Logs" className="h-4 w-4 mr-2" /> Apply
+            & Fetch Logs
           </Button>
         </div>
       </div>

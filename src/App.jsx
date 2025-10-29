@@ -26,6 +26,7 @@ import LogsCirclesPage from "@/pages/LogsCirclesPage"; // Separate example page
 import ProjectsPage from './pages/Projects'; // Renamed import
 import PredictionMapPage from './pages/PredictionMap';
 import GetReportPage from './pages/GetReport'; // Renamed import
+import ViewProjectsPage from './pages/ViewProjects';
 
 // --- Route Components ---
 const PrivateRoute = ({ children }) => {
@@ -75,6 +76,7 @@ function App() {
                     <Route path="/prediction-map" element={<PrivateRoute><PredictionMapPage /></PrivateRoute>} />
                     <Route path="/getreport" element={<PrivateRoute><GetReportPage /></PrivateRoute>} />
                     <Route path="/unified-map" element={<PrivateRoute><UnifiedMapView /></PrivateRoute>} />
+                    <Route path="/viewProject" element={<PrivateRoute><ViewProjectsPage/></PrivateRoute>} />
                     
 
                     {/* Catch-all for Not Found */}

@@ -147,6 +147,57 @@ export const adminApi = {
     formData.append("token", "");
     return api.post("/Admin/GetUser", formData);
   },
+    getTotalsV2: () => api.get("/Admin/TotalsV2"),
+  
+  getMonthlySamplesV2: (params) => 
+    api.get("/Admin/MonthlySamplesV2", { params }),
+  
+  getOperatorSamplesV2: (params) => 
+    api.get("/Admin/OperatorSamplesV2", { params }),
+  
+  getNetworkTypeDistributionV2: (params) => 
+    api.get("/Admin/NetworkTypeDistributionV2", { params }),
+  
+  getAvgRsrpV2: (params) => 
+    api.get("/Admin/AvgRsrpV2", { params }),
+  
+  getAvgRsrqV2: (params) => 
+    api.get("/Admin/AvgRsrqV2", { params }),
+  
+  getAvgSinrV2: (params) => 
+    api.get("/Admin/AvgSinrV2", { params }),
+  
+  getAvgMosV2: (params) => 
+    api.get("/Admin/AvgMosV2", { params }),
+  
+  getAvgJitterV2: (params) => 
+    api.get("/Admin/AvgJitterV2", { params }),
+  
+  getAvgLatencyV2: (params) => 
+    api.get("/Admin/AvgLatencyV2", { params }),
+  
+  getAvgPacketLossV2: (params) => 
+    api.get("/Admin/AvgPacketLossV2", { params }),
+  
+  getAvgDlTptV2: (params) => 
+    api.get("/Admin/AvgDlTptV2", { params }),
+  
+  getAvgUlTptV2: (params) => 
+    api.get("/Admin/AvgUlTptV2", { params }),
+  
+  getBandDistributionV2: (params) => 
+    api.get("/Admin/BandDistributionV2", { params }),
+  
+  getHandsetDistributionV2: (params) => 
+    api.get("/Admin/HandsetDistributionV2", { params }),
+  
+  // Discovery endpoints
+  getOperatorsV2: () => 
+    api.get("/Admin/OperatorsV2"),
+  
+  getNetworksV2: () => 
+    api.get("/Admin/NetworksV2"),
+  
   saveUserDetails: (data) => api.post("/Admin/SaveUserDetails", data),
   deleteUser: (id) => api.post(`/Admin/DeleteUser?id=${id}`),
   userResetPassword: (data) => api.post("/Admin/UserResetPassword", data),
