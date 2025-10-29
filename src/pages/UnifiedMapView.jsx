@@ -9,7 +9,7 @@ import { mapViewApi, settingApi } from "../api/apiEndpoints";
 import Spinner from "../components/common/Spinner";
 import MapWithMultipleCircles from "../components/MapwithMultipleCircle";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
-import UnifiedMapSidebar from "@/components/UnifiedMapSidebar";
+import UnifiedMapSidebar from "@/components/UnifiedMapSideBar.jsx";
 import SiteMarkers from "@/components/SiteMarkers";
 import NetworkSectors from "@/components/NetworkSectors";
 import { useSiteData } from "@/hooks/useSiteData";
