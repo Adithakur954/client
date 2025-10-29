@@ -13,6 +13,7 @@ import { useMemo } from 'react';
 export const useTotals = () => {
   return useSWR('totals', async () => {
     const resp = await adminApi.getTotalsV2?.() || {};
+    console.log(resp);
     return resp?.Data || resp || {};
   });
 };
@@ -23,6 +24,7 @@ export const useMonthlySamples = (filters) => {
     async () => {
       const queryString = buildQueryString(filters);
       const resp = await adminApi.getMonthlySamplesV2?.(queryString) || { Data: [] };
+      console.log(resp);
       return resp?.Data || resp || [];
     }
   );
@@ -34,6 +36,7 @@ export const useOperatorSamples = (filters) => {
     async () => {
       const queryString = buildQueryString(filters);
       const resp = await adminApi.getOperatorSamplesV2?.(queryString) || { Data: [] };
+      console.log(resp);
       const rawData = resp?.Data || resp || [];
       return groupOperatorSamplesByNetwork(rawData);
     }
@@ -46,6 +49,7 @@ export const useNetworkDistribution = (filters) => {
     async () => {
       const queryString = buildQueryString(filters);
       const resp = await adminApi.getNetworkTypeDistributionV2?.(queryString) || { Data: [] };
+      console.log(resp);
       return resp?.Data || resp || [];
     }
   );
@@ -94,6 +98,101 @@ export const useMetricData = (metric, filters) => {
           value: ['rsrp', 'rsrq'].includes(metric) ? ensureNegative(item.value) : item.value
         }))
         .sort((a, b) => b.value - a.value);
+    }
+  );
+};
+
+// Add this to your useDashboardData.js
+
+export const useOperatorMetrics = (metric, filters) => {
+  return useSWR(
+    ['operatorMetrics', metric, JSON.stringify(filters)],
+    async () => {
+      const queryString = buildQueryString(filters);
+      const endpointMap = {
+        samples: 'getOperatorSamplesV2',
+        rsrp: 'getAvgRsrpV2',
+        rsrq: 'getAvgRsrqV2',
+        sinr: 'getAvgSinrV2',
+        mos: 'getAvgMosV2',
+        jitter: 'getAvgJitterV2',
+        latency: 'getAvgLatencyV2',
+        packetLoss: 'getAvgPacketLossV2',
+        dlTpt: 'getAvgDlTptV2',
+        ulTpt: 'getAvgUlTptV2',
+      };
+      
+      const endpoint = endpointMap[metric];
+      if (!endpoint || !adminApi[endpoint]) return [];
+      
+      const resp = await adminApi[endpoint](queryString) || { Data: [] };
+      const rawData = resp?.Data || resp || [];
+      
+      console.log(`📦 Raw ${metric} data:`, rawData);
+      
+      // For samples, it's already grouped by network
+      if (metric === 'samples') {
+        return groupOperatorSamplesByNetwork(rawData);
+      }
+      
+      // For metrics, group by BOTH operator AND network (DON'T MERGE)
+      const grouped = {};
+      
+      rawData.forEach(item => {
+        const operatorName = canonicalOperatorName(item?.operatorName || item?.name);
+        const network = item?.network;
+        const value = toNumber(item?.value);
+        
+        if (!operatorName || !network) {
+          console.warn('Skipping item - missing operator or network:', item);
+          return;
+        }
+        
+        // Create unique key: operator + network
+        if (!grouped[operatorName]) {
+          grouped[operatorName] = { name: operatorName };
+        }
+        
+        // Store value for this network
+        grouped[operatorName][network] = ['rsrp', 'rsrq'].includes(metric) 
+          ? ensureNegative(value) 
+          : value;
+      });
+      
+      // Calculate totals for sorting
+      const result = Object.values(grouped).map(item => {
+        const networks = Object.keys(item).filter(k => k !== 'name');
+        const total = networks.length > 0 
+          ? networks.reduce((sum, net) => sum + (item[net] || 0), 0) / networks.length
+          : 0;
+        return { ...item, total };
+      });
+      
+      // Sort by total
+      const isNegativeMetric = ['rsrp', 'rsrq'].includes(metric);
+      const sorted = result.sort((a, b) => 
+        isNegativeMetric ? a.total - b.total : b.total - a.total
+      );
+      
+      console.log(`✅ Processed ${metric} data:`, sorted);
+      return sorted;
+    }
+  );
+};
+
+// Add this new hook to your useDashboardData.js
+export const useBandDistributionRaw = (filters) => {
+  return useSWR(
+    ['bandDistRaw', JSON.stringify(filters)],
+    async () => {
+      const queryString = buildQueryString(filters);
+      const resp = await adminApi.getBandDistributionV2?.(queryString) || { Data: [] };
+      const rawData = resp?.Data || resp || [];
+      
+      console.log('📦 Raw band distribution from API:', rawData);
+      
+      // Return raw data WITHOUT aggregation to preserve network info
+      return rawData;
     }
   );
 };

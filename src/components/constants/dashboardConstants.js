@@ -1,24 +1,31 @@
 export const CHART_COLORS = [
-  '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', 
-  '#EC4899', '#F97316', '#06B6D4', '#EF4444', 
-  '#84CC16', '#6366F1'
+  '#E6194B', // vivid red
+  '#3CB44B', // green
+  '#0082C8', // strong blue
+  '#F58231', // orange
+  '#911EB4', // purple
+  '#46F0F0', // cyan
+  '#F032E6', // magenta
+  '#D2F53C', // lime
+  '#FABEBE', // light pink
+  '#008080', // teal
 ];
 
 export const NETWORK_COLORS = {
-  '5G': '#8B5CF6',
-  '4G': '#3B82F6',
-  '3G': '#10B981',
-  '2G': '#F59E0B',
+  '5G': '#6F00FF',   // bright violet
+  '4G': '#0074D9',   // bold blue
+  '3G': '#2ECC40',   // green
+  '2G': '#FFDC00',   // yellow
 };
 
 export const RSRP_COLORS = {
-  EXCELLENT: '#10B981',
-  GOOD: '#86EFAC',
-  FAIR: '#60A5FA',
-  POOR: '#3B82F6',
-  VERY_POOR: '#FDE047',
-  BAD: '#F59E0B',
-  VERY_BAD: '#EF4444',
+  EXCELLENT: '#00C851',   // bright green
+  GOOD: '#B8E986',        // soft green
+  FAIR: '#33B5E5',        // sky blue
+  POOR: '#FFBB33',        // amber
+  VERY_POOR: '#FF4444',   // strong red
+  BAD: '#CC0000',         // deep red
+  VERY_BAD: '#800000',    // dark maroon
 };
 
 export const METRICS = [
