@@ -95,7 +95,7 @@ const ChartFilterSettings = ({
         </div>
       )}
 
-      {showDateRange && (
+      {/* {showDateRange && (
         <div className="space-y-3">
           <label className="font-semibold text-gray-800 flex items-center gap-2">
             <Calendar className="h-4 w-4" />
@@ -122,9 +122,9 @@ const ChartFilterSettings = ({
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
-      {showTopN && (
+      {/* {showTopN && (
         <div className="space-y-3">
           <label className="font-semibold text-gray-800">Show Top</label>
           <select
@@ -139,7 +139,7 @@ const ChartFilterSettings = ({
             <option value={-1}>All</option>
           </select>
         </div>
-      )}
+      )} */}
 
       <div className="flex gap-2 pt-4 border-t">
         <button
