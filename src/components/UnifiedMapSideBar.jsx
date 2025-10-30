@@ -301,7 +301,7 @@ const UnifiedMapSidebar = ({
           )}
 
           {shouldShowMetricSelector && (
-            <PanelSection title="Coverage Hole Filter" icon={AlertTriangle}>
+            <PanelSection title="Coverage Holes" icon={AlertTriangle}>
               <div className="space-y-3">
                 <label className="flex items-center gap-2 cursor-pointer p-3 rounded  transition-colors">
                   <input
