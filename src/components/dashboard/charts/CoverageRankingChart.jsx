@@ -8,19 +8,31 @@ import { formatNumber } from '@/utils/chartUtils';
 
 const CoverageRankingChart = () => {
   const [settings, setSettings] = useState({ rsrpMin: -95, rsrpMax: 0 });
-  const [draft, setDraft] = useState(settings);
+  const [draft, setDraft] = useState({ rsrpMin: '-95', rsrpMax: '0' }); // Store as strings
 
   const { data, isLoading } = useCoverageRanking(settings.rsrpMin, settings.rsrpMax);
 
   useEffect(() => {
-    setDraft(settings);
+    setDraft({ 
+      rsrpMin: String(settings.rsrpMin), 
+      rsrpMax: String(settings.rsrpMax) 
+    });
   }, [settings]);
 
   const applySettings = () => {
-    if (draft.rsrpMin > draft.rsrpMax) {
+    const rsrpMin = Number(draft.rsrpMin);
+    const rsrpMax = Number(draft.rsrpMax);
+
+    // Validation
+    if (isNaN(rsrpMin) || isNaN(rsrpMax)) {
+      return toast.warn("Please enter valid numbers for RSRP range");
+    }
+
+    if (rsrpMin > rsrpMax) {
       return toast.warn("RSRP: Min cannot be greater than Max");
     }
-    setSettings(draft);
+
+    setSettings({ rsrpMin, rsrpMax });
   };
 
   return (
@@ -37,25 +49,30 @@ const CoverageRankingChart = () => {
             <div className="font-semibold text-gray-800 text-base">RSRP Coverage Range (dBm)</div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Min</label>
+                <label className="text-sm font-medium text-gray-700">Min (dBm)</label>
                 <input
                   type="number"
                   step="1"
+                  placeholder="-95"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={draft.rsrpMin}
-                  onChange={(e) => setDraft(s => ({ ...s, rsrpMin: Number(e.target.value) }))}
+                  onChange={(e) => setDraft(s => ({ ...s, rsrpMin: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Max</label>
+                <label className="text-sm font-medium text-gray-700">Max (dBm)</label>
                 <input
                   type="number"
                   step="1"
+                  placeholder="0"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={draft.rsrpMax}
-                  onChange={(e) => setDraft(s => ({ ...s, rsrpMax: Number(e.target.value) }))}
+                  onChange={(e) => setDraft(s => ({ ...s, rsrpMax: e.target.value }))}
                 />
               </div>
+            </div>
+            <div className="text-xs text-gray-500 italic">
+              Typical RSRP range: -140 to -44 dBm
             </div>
           </div>
         ),

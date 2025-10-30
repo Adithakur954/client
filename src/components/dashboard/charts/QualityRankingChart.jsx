@@ -8,19 +8,31 @@ import { formatNumber } from '@/utils/chartUtils';
 
 const QualityRankingChart = () => {
   const [settings, setSettings] = useState({ rsrqMin: -10, rsrqMax: 0 });
-  const [draft, setDraft] = useState(settings);
+  const [draft, setDraft] = useState({ rsrqMin: '-10', rsrqMax: '0' }); // Store as strings
 
   const { data, isLoading } = useQualityRanking(settings.rsrqMin, settings.rsrqMax);
 
   useEffect(() => {
-    setDraft(settings);
+    setDraft({ 
+      rsrqMin: String(settings.rsrqMin), 
+      rsrqMax: String(settings.rsrqMax) 
+    });
   }, [settings]);
 
   const applySettings = () => {
-    if (draft.rsrqMin > draft.rsrqMax) {
+    const rsrqMin = Number(draft.rsrqMin);
+    const rsrqMax = Number(draft.rsrqMax);
+
+    // Validation
+    if (isNaN(rsrqMin) || isNaN(rsrqMax)) {
+      return toast.warn("Please enter valid numbers for RSRQ range");
+    }
+
+    if (rsrqMin > rsrqMax) {
       return toast.warn("RSRQ: Min cannot be greater than Max");
     }
-    setSettings(draft);
+
+    setSettings({ rsrqMin, rsrqMax });
   };
 
   return (
@@ -37,25 +49,30 @@ const QualityRankingChart = () => {
             <div className="font-semibold text-gray-800 text-base">RSRQ Quality Range (dB)</div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Min</label>
+                <label className="text-sm font-medium text-gray-700">Min (dB)</label>
                 <input
                   type="number"
                   step="0.5"
+                  placeholder="-10"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={draft.rsrqMin}
-                  onChange={(e) => setDraft(s => ({ ...s, rsrqMin: Number(e.target.value) }))}
+                  onChange={(e) => setDraft(s => ({ ...s, rsrqMin: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Max</label>
+                <label className="text-sm font-medium text-gray-700">Max (dB)</label>
                 <input
                   type="number"
                   step="0.5"
+                  placeholder="0"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={draft.rsrqMax}
-                  onChange={(e) => setDraft(s => ({ ...s, rsrqMax: Number(e.target.value) }))}
+                  onChange={(e) => setDraft(s => ({ ...s, rsrqMax: e.target.value }))}
                 />
               </div>
+            </div>
+            <div className="text-xs text-gray-500 italic">
+              Typical RSRQ range: -20 to -3 dB
             </div>
           </div>
         ),
