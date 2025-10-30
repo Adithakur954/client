@@ -55,10 +55,10 @@ const isObjectNonEmpty = (obj) =>
 // Small wrapper to keep sections consistent
 const PanelSection = ({ title, children }) => (
   <div className="space-y-2">
-    <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+    <div className="text-sm font-medium text-slate-100">
       {title}
     </div>
-    <div className="rounded-lg border p-3 bg-white dark:bg-slate-900">
+    <div className="rounded-lg border p-3 bg-slate-900">
       {children}
     </div>
   </div>
@@ -148,7 +148,7 @@ export default function MapSidebarFloating({
   // Drawer position classes
   const sideClasses = useMemo(() => {
     const base =
-      "fixed top-0 h-full z-50 w-[90vw] sm:w-[360px] bg-white dark:bg-slate-950 dark:text-white shadow-2xl transition-transform duration-200 ease-out";
+      "fixed top-0 h-full z-50 w-[90vw] sm:w-[360px] bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out";
     if (position === "right") {
       return isOpen
         ? `${base} right-0 translate-x-0`
@@ -218,7 +218,7 @@ export default function MapSidebarFloating({
             <h3 className="text-base font-semibold">Map Filters</h3>
           </div>
           <button
-            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="p-1 rounded hover:bg-slate-800"
             onClick={() => setOpen(false)}
           >
             <X className="h-5 w-5" />
