@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, ChevronDown, ChevronUp, PenTool, XCircle, Download, SlidersHorizontal, Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import img from "../../../assets/vinfocom_logo.png";
+import img from "../../../assets/vinfocom.png";
 import MapSidebarFloating from "./MapSidebarFloating";
 
 export default function MapHeader({
