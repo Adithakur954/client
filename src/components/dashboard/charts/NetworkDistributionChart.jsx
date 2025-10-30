@@ -6,17 +6,76 @@ import { useNetworkDistribution } from '@/hooks/useDashboardData';
 import { applyTopN } from '@/utils/dashboardUtils';
 import { formatNumber } from '@/utils/chartUtils';
 
+// Network normalization mapping
+const NETWORK_NORMALIZATION_MAP = {
+  '5G': '5G',
+  'NSA': '5G',
+  'SA': '5G',
+  'NR': '5G',
+  '5G NSA': '5G',
+  '5G SA': '5G',
+  '5G NR': '5G',
+  'LTE': 'LTE/4G',
+  '4G': 'LTE/4G',
+  'LTE/4G': 'LTE/4G',
+  '3G': '3G',
+  '2G': '2G',
+  'UNKNOWN': 'Unknown',
+  'Unknown': 'Unknown',
+  'unknown': 'Unknown',
+  'N/A': 'Unknown',
+  'NA': 'Unknown'
+};
+
+// Function to normalize network data
+const normalizeNetworkData = (data) => {
+  if (!data || !Array.isArray(data)) return [];
+  
+  // Create a map to aggregate normalized values
+  const normalizedMap = new Map();
+  
+  data.forEach(item => {
+    // Get the normalized network name
+    const originalNetwork = item.network?.trim() || 'Unknown';
+    const normalizedNetwork = NETWORK_NORMALIZATION_MAP[originalNetwork] || originalNetwork;
+    
+    // Aggregate values for the same normalized network
+    if (normalizedMap.has(normalizedNetwork)) {
+      const existing = normalizedMap.get(normalizedNetwork);
+      normalizedMap.set(normalizedNetwork, {
+        ...existing,
+        value: existing.value + (item.value || 0)
+      });
+    } else {
+      normalizedMap.set(normalizedNetwork, {
+        network: normalizedNetwork,
+        value: item.value || 0
+      });
+    }
+  });
+  
+  // Convert map back to array and sort by value
+  return Array.from(normalizedMap.values()).sort((a, b) => b.value - a.value);
+};
+
 const NetworkDistributionChart = ({ chartFilters, onChartFiltersChange, operators, networks }) => {
   const { data, isLoading } = useNetworkDistribution(chartFilters);
 
+  // First normalize the data, then apply topN filter
   const filteredData = useMemo(() => {
-    return applyTopN(data, chartFilters?.topN);
+    const normalizedData = normalizeNetworkData(data);
+    return applyTopN(normalizedData, chartFilters?.topN);
   }, [data, chartFilters?.topN]);
+
+  // Use normalized data for export as well
+  const exportData = useMemo(() => {
+    return normalizeNetworkData(data);
+  }, [data]);
 
   return (
     <ChartCard
       title="Network Technology Distribution"
-      dataset={data}
+      dataset={exportData}
       exportFileName="network_type_distribution"
       isLoading={isLoading}
       chartFilters={chartFilters}
@@ -51,7 +110,7 @@ const NetworkDistributionChart = ({ chartFilters, onChartFiltersChange, operator
               style={{ fill: '#111827', fontSize: '12px', fontWeight: 700 }}
               formatter={formatNumber}
             />
-            {data?.map((entry, index) => (
+            {filteredData?.map((entry, index) => (
               <Cell
                 key={`cell-net-${index}`}
                 fill={NETWORK_COLORS[entry.network] || CHART_COLORS[index % CHART_COLORS.length]}
