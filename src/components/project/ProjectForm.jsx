@@ -161,15 +161,7 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
               </Button>
             </div>
 
-            {/* Warning when Python backend is offline */}
-            {/* {!backendHealthy?.python && (
-              <Alert className="border-yellow-500 bg-yellow-50">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <AlertDescription className="text-yellow-800">
-                  Python backend is offline. Building extraction and cell site processing are disabled.
-                </AlertDescription>
-              </Alert>
-            )} */}
+           
           </form>
         </CardContent>
       </Card>

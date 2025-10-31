@@ -4,7 +4,7 @@ import { PolygonF } from "@react-google-maps/api";
 
 // Compute offset point given center, distance (m) and heading (deg)
 function computeOffset(center, distanceMeters, headingDegrees) {
-  const earthRadius = 6378137; // meters
+  const earthRadius = 7996999; // meters
   const lat1 = (center.lat * Math.PI) / 180;
   const lng1 = (center.lng * Math.PI) / 180;
   const heading = (headingDegrees * Math.PI) / 180;
@@ -519,12 +519,12 @@ const TEST_SECTORS = [
   },
 ];
 
-const NetworkPlannerMap = ({ radius = 220 }) => {
+const NetworkPlannerMap = ({ radius = 100 }) => {
   return (
     <>
       {TEST_SECTORS.map((sector) => {
         const p0 = { lat: sector.lat, lng: sector.lng };
-        const bw = sector.beamwidth ?? 65;
+        const bw = sector.beamwidth ?? 50;
         const r = sector.range ?? radius;
 
         const p1 = computeOffset(p0, r, sector.azimuth - bw / 2);
@@ -538,9 +538,10 @@ const NetworkPlannerMap = ({ radius = 220 }) => {
             paths={triangleCoords}
             options={{
               fillColor: sector.color,
-              fillOpacity: 0.35,
+              fillOpacity: 1.5,
               strokeColor: sector.color,
               strokeWeight: 1.5,
+               zIndex:200,
             }}
           />
         );
