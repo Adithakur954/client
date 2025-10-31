@@ -267,7 +267,11 @@ export const mapViewApi = {
     const sid = extractId(sessionLike);
     return api.get("/api/MapView/GetNetworkLog", { params: { session_id: sid } });
   },
+
   
+  // getNetworkLog: (sessionLike) =>api.get("/api/MapView/GetNetworkLog", { params: { session_id: sessionLike } }),
+
+
   getLogsByDateRange: (filters) =>
     api.get("/api/MapView/GetLogsByDateRange", { params: filters }),
   

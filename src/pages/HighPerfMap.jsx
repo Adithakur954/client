@@ -106,6 +106,7 @@ export default function HighPerfMap() {
 
   const [selectedSessionData, setSelectedSessionData] = useState(null);
   const [drawnLogs, setDrawnLogs] = useState([]);
+   const [colorBy, setColorBy] = useState(null);
 
   const [ui, setUi] = useState({
     showSessions: true,
@@ -247,6 +248,7 @@ export default function HighPerfMap() {
     setAnalysis(null);
     setUi((u) => ({ ...u, showLogsCircles: true }));
     setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
+     setColorBy(filters.colorBy || null);
 };
 
   const handleClearFilters = useCallback(() => {
@@ -254,6 +256,7 @@ export default function HighPerfMap() {
     setSelectedSessionData(null);
     setDrawnLogs([]);
     setAnalysis(null);
+    setColorBy(null);
     setUi((u) => ({ ...u, showHeatmap: false, drawEnabled: false }));
     fetchAllSessions();
   }, [fetchAllSessions]);
@@ -264,6 +267,7 @@ export default function HighPerfMap() {
     setIsLoading(true);
     try {
       const logs = await mapViewApi.getNetworkLog(session.id);
+      console.log("Is session reciving",session.id)
       console.log("hello check here",logs)
       setSelectedSessionData({ session, logs: logs || [] });
     } catch (e) {
@@ -529,6 +533,7 @@ export default function HighPerfMap() {
               canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
               maxDraw={80000}
                coverageHoleOnly={showCoverageHoleOnly}
+               colorBy={colorBy}
               />
           )}
 
@@ -555,8 +560,12 @@ export default function HighPerfMap() {
           )}
         </GoogleMap>
 
-        {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
-          <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} />
+       {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
+          <MapLegend 
+            thresholds={thresholds} 
+            selectedMetric={selectedMetric}
+            colorBy={colorBy} 
+          />
         )}
 
         {analysis && (

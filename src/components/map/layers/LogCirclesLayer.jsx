@@ -1,10 +1,11 @@
 // src/components/map/layers/LogCirclesLayer.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toast } from "react-toastify";
 import { mapViewApi } from "@/api/apiEndpoints";
 import CanvasPointsOverlay from "@/components/map/overlays/CanvasPointsOverlay";
 import { resolveMetricConfig, getColorForMetric } from "@/utils/metrics";
 import { toYmdLocal, fitMapToMostlyLogs } from "@/utils/maps";
+import { getLogColor } from "@/components/map/layout/MapSidebarFloating";
 
 export default function LogCirclesLayer({
   map,
@@ -19,7 +20,8 @@ export default function LogCirclesLayer({
   renderVisibleOnly = true,
   canvasRadiusPx = (zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2))),
   maxDraw = 60000,
-  coverageHoleOnly = false, // ✅ Filter to show only coverage holes
+  coverageHoleOnly = false,
+  colorBy = null,
 }) {
   const [logs, setLogs] = useState([]);
   const heatmapRef = useRef(null);
@@ -101,7 +103,7 @@ export default function LogCirclesLayer({
     };
   }, [map, filterSignature, setIsLoading]);
 
-  // ✅ Filter logs for coverage holes if checkbox is enabled
+  // Filter logs for coverage holes if checkbox is enabled
   const filteredLogs = useMemo(() => {
     if (!coverageHoleOnly) {
       return logs;
@@ -116,7 +118,7 @@ export default function LogCirclesLayer({
     return filtered;
   }, [logs, coverageHoleOnly, thresholds]);
 
-  // ✅ Show info toast when coverage hole filter is active
+  // Show info toast when coverage hole filter is active
   useEffect(() => {
     if (coverageHoleOnly && filteredLogs.length > 0 && logs.length > 0) {
       const threshold = thresholds.coveragehole || -110;
@@ -126,6 +128,34 @@ export default function LogCirclesLayer({
       );
     }
   }, [coverageHoleOnly, filteredLogs.length, logs.length, thresholds.coveragehole]);
+
+  // Helper function to determine color for a log
+  const getColorForLog = useCallback(
+    (log, metricValue) => {
+      // If colorBy mode is active, use category colors
+      if (colorBy === "provider") {
+        // Use the provider field for provider coloring
+        const providerValue = log.provider || log.Provider;
+        return getLogColor("provider", providerValue);
+      }
+      
+      if (colorBy === "technology") {
+        // Use 'network' field for technology (based on your data structure)
+        const techValue = log.network || log.Network;
+        return getLogColor("technology", techValue);
+      }
+      
+      if (colorBy === "band") {
+        // Use 'band' field
+        const bandValue = log.band || log.Band;
+        return getLogColor("band", bandValue);
+      }
+
+      // Otherwise, use metric-based colors (default behavior)
+      return getColorForMetric(selectedMetric, metricValue, thresholds);
+    },
+    [colorBy, selectedMetric, thresholds]
+  );
 
   // Parse & prep (use filteredLogs)
   const processed = useMemo(() => {
@@ -139,6 +169,7 @@ export default function LogCirclesLayer({
           lat: Number.isFinite(lat) ? lat : null,
           lng: Number.isFinite(lng) ? lng : null,
           value: Number.isFinite(val) ? val : undefined,
+          raw: l,
         };
       })
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
@@ -158,14 +189,14 @@ export default function LogCirclesLayer({
     });
   }, [processed, renderVisibleOnly, visibleBounds]);
 
-  // Color points based on selected metric (not coverage hole)
+  // Color points based on colorBy mode or selected metric
   const pointsForCanvas = useMemo(() => {
     return visibleProcessed.map((p) => ({
       lat: p.lat,
       lng: p.lng,
-      color: getColorForMetric(selectedMetric, p.value, thresholds),
+      color: getColorForLog(p.raw, p.value),
     }));
-  }, [visibleProcessed, selectedMetric, thresholds]);
+  }, [visibleProcessed, getColorForLog]);
 
   // Heatmap layer
   useEffect(() => {

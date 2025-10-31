@@ -16,7 +16,8 @@ export default function LogsCirclesPage() {
   const [map, setMap] = useState(null);
   const [thresholds, setThresholds] = useState({});
   const [selectedMetric, setSelectedMetric] = useState("rsrp");
-  const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false); // ✅ Coverage hole filter
+  const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false); 
+   const [colorBy, setColorBy] = useState(null);
   
   const [filters, setFilters] = useState({
     startDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
@@ -197,6 +198,51 @@ export default function LogsCirclesPage() {
             />
           </label>
         </div>
+         <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e5e7eb" }}>
+          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
+            Color Logs By:
+          </div>
+          
+          <label style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="colorBy"
+              checked={colorBy === null}
+              onChange={() => setColorBy(null)}
+            />
+            <span style={{ fontSize: 13 }}>Metric Value (Default)</span>
+          </label>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="colorBy"
+              checked={colorBy === "provider"}
+              onChange={() => setColorBy("provider")}
+            />
+            <span style={{ fontSize: 13 }}>Provider/Carrier</span>
+          </label>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="colorBy"
+              checked={colorBy === "technology"}
+              onChange={() => setColorBy("technology")}
+            />
+            <span style={{ fontSize: 13 }}>Technology</span>
+          </label>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="colorBy"
+              checked={colorBy === "band"}
+              onChange={() => setColorBy("band")}
+            />
+            <span style={{ fontSize: 13 }}>Band/Frequency</span>
+          </label>
+        </div>
       </div>
 
       <GoogleMap
@@ -223,7 +269,8 @@ export default function LogsCirclesPage() {
           canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
           maxDraw={70000}
           onLogsLoaded={(list) => setDrawnLogs(Array.isArray(list) ? list : [])}
-          coverageHoleOnly={showCoverageHoleOnly} // ✅ Pass filter to layer
+          coverageHoleOnly={showCoverageHoleOnly} 
+          colorBy={colorBy}
         />
 
         {drawUi.enabled && (
@@ -242,7 +289,7 @@ export default function LogsCirclesPage() {
         )}
       </GoogleMap>
 
-      <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} />
+      <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} colorBy={colorBy} />
 
       {analysis && (
         <div

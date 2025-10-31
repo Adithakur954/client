@@ -31,7 +31,7 @@ export default function AllLogsPanelToggle({
           thresholds={thresholds}
           selectedMetric={selectedMetric}
           isLoading={isLoading}
-          onClose={() => setOpen(false)} // acts as "minimize"
+          onClose={() => setOpen(false)}
         />
       )}
 

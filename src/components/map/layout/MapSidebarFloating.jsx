@@ -18,6 +18,45 @@ const getYesterday = () => {
   return d;
 };
 
+// Normalize technology names
+const normalizeTechName = (tech) => {
+  if (!tech) return "Unknown";
+  const t = String(tech).trim().toUpperCase();
+  
+  if (t.includes("5G") || t.includes("NR")) return "5G";
+  if (t.includes("LTE") || t.includes("4G")) return "4G";
+  if (t.includes("3G")) return "3G";
+  if (t.includes("2G") || t.includes("EDGE")) return "2G";
+  return "Unknown";
+}
+
+// Normalize provider names
+const normalizeProviderName = (raw) => {
+  if (!raw) return "Unknown";
+  const s = String(raw).trim();
+  if (/^\/+$/.test(s)) return "Unknown";
+  if (s.replace(/\s+/g, "") === "404011") return "Unknown";
+  
+  const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
+  
+  // Handle Jio variations (including "Jio True5G")
+  if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) {
+    return "JIO";
+  }
+  if (cleaned.includes("AIRTEL")) {
+    return "Airtel";
+  }
+  if (cleaned === "VI" || cleaned.includes("VIINDIA") || 
+      cleaned.includes("VODAFONE") || cleaned.includes("IDEA")) {
+    return "VI India";
+  }
+  if (cleaned.includes("BSNL")) {
+    return "BSNL";
+  }
+  
+  return "Unknown";
+};
+
 const defaultFilters = {
   startDate: getYesterday(),
   endDate: new Date(),
@@ -25,34 +64,84 @@ const defaultFilters = {
   technology: "ALL",
   band: "ALL",
   measureIn: "rsrp",
-  coverageHoleOnly: false, // ✅ Added default value
+  coverageHoleOnly: false,
+  colorBy: null
 };
 
-// Normalize carrier/provider names from API
-const normalizeProviderName = (raw) => {
-  if (!raw) return "Unknown";
-  const s = String(raw).trim();
-  if (/^\/+$/.test(s)) return "Unknown"; // ////// etc.
-  if (s.replace(/\s+/g, "") === "404011") return "Unknown";
-  const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
-  if (cleaned.includes("JIO") || /^(IND)?JIO(4G|5G|TRUE5G)?$/.test(cleaned))
-    return "JIO";
-  if (cleaned.includes("AIRTEL") || /^INDAIRTEL$/.test(cleaned))
-    return "Airtel";
-  if (
-    cleaned === "VI" ||
-    cleaned.includes("VIINDIA") ||
-    cleaned.includes("VODAFONE") ||
-    cleaned.includes("IDEA")
-  )
-    return "VI India";
-  return s;
+const COLOR_SCHEMES = {
+  provider: {
+    JIO: "#3B82F6",
+    Airtel: "#EF4444",
+    "VI India": "#22C55E",
+    BSNL: "#F59E0B",
+    Unknown: "#6B7280",
+  },
+  technology: {
+    "5G": "#EC4899",
+    "4G": "#8B5CF6",
+    "3G": "#10B981",
+    "2G": "#6B7280",
+    "Unknown": "#F59E0B",
+  },
+  band: {
+    "3": "#EF4444",
+    "5": "#F59E0B",
+    "8": "#10B981",
+    "40": "#3B82F6",
+    "41": "#8B5CF6",
+    "n28": "#EC4899",
+    "n78": "#F472B6",
+    "1": "#EF4444",
+    "2": "#F59E0B",
+    "7": "#10B781",
+    "Unknown": "#6B7280",
+  },
+};
+
+export const getLogColor = (colorBy, value, defaultColor = "#6B7280") => {
+  if (!colorBy || !value) {
+    return defaultColor;
+  }
+
+  const scheme = COLOR_SCHEMES[colorBy];
+  if (!scheme) {
+    return defaultColor;
+  }
+
+  let normalizedValue = String(value).trim();
+  
+  // Apply normalization based on colorBy type
+  if (colorBy === 'provider') {
+    normalizedValue = normalizeProviderName(value);
+  } else if (colorBy === 'technology') {
+    normalizedValue = normalizeTechName(value);
+  } else if (colorBy === 'band') {
+    // Bands might be negative (-1), handle special cases
+    if (normalizedValue === "-1" || normalizedValue === "") {
+      normalizedValue = "Unknown";
+    }
+  }
+  
+  // Try exact match first
+  if (scheme[normalizedValue]) {
+    return scheme[normalizedValue];
+  }
+  
+  // Try case-insensitive match (fallback)
+  const matchKey = Object.keys(scheme).find(
+    key => key.toLowerCase() === normalizedValue.toLowerCase()
+  );
+  
+  if (matchKey) {
+    return scheme[matchKey];
+  }
+  
+  return defaultColor;
 };
 
 const isObjectNonEmpty = (obj) =>
   obj && typeof obj === "object" && Object.keys(obj).length > 0;
 
-// Small wrapper to keep sections consistent
 const PanelSection = ({ title, children }) => (
   <div className="space-y-2">
     <div className="text-sm font-medium text-slate-100">
@@ -63,6 +152,32 @@ const PanelSection = ({ title, children }) => (
     </div>
   </div>
 );
+
+const ColorLegend = ({ colorBy }) => {
+  if (!colorBy) return null;
+
+  const scheme = COLOR_SCHEMES[colorBy];
+  if (!scheme) return null;
+
+  return (
+    <div className="mt-2 p-2 bg-slate-800 rounded-md">
+      <div className="text-xs font-medium mb-2 text-slate-300">
+        Color Legend ({colorBy})
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {Object.entries(scheme).map(([key, color]) => (
+          <div key={key} className="flex items-center gap-2">
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+            <span className="text-xs text-slate-300">{key}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function MapSidebarFloating({
   onApplyFilters,
@@ -75,9 +190,8 @@ export default function MapSidebarFloating({
   open: controlledOpen,
   onOpenChange,
   hideTrigger = false,
-  thresholds = {}, // ✅ Added to get coverage hole threshold
+  thresholds = {},
 }) {
-  // Controlled/uncontrolled open handling
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = typeof controlledOpen === "boolean";
   const isOpen = isControlled ? controlledOpen : internalOpen;
@@ -92,14 +206,13 @@ export default function MapSidebarFloating({
   const [bands, setBands] = useState([]);
   const [projects, setProjects] = useState([]);
 
-  // If parent provides initialFilters, merge them once on mount/changes
   const hasActiveFilters = isObjectNonEmpty(initialFilters);
+  
   useEffect(() => {
     if (!initialFilters) return;
     setFilters((prev) => ({ ...prev, ...initialFilters }));
   }, [initialFilters]);
 
-  // Fetch filter options on mount
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
@@ -110,7 +223,6 @@ export default function MapSidebarFloating({
           mapViewApi.getProjects?.(),
         ]);
 
-        // Providers with normalization
         const provList = Array.isArray(provRes) ? provRes : [];
         const normalizedSet = new Set(
           provList.map((p) => normalizeProviderName(p.name))
@@ -124,7 +236,6 @@ export default function MapSidebarFloating({
         setTechnologies(Array.isArray(techRes) ? techRes : []);
         setBands(Array.isArray(bandsRes) ? bandsRes : []);
 
-        // Optional projects
         const projData = Array.isArray(projRes?.Data)
           ? projRes.Data
           : Array.isArray(projRes)
@@ -145,7 +256,13 @@ export default function MapSidebarFloating({
   const handleFilterChange = (key, value) =>
     setFilters((prev) => ({ ...prev, [key]: value }));
 
-  // Drawer position classes
+  const handleColorByChange = (type) => {
+    setFilters((prev) => ({
+      ...prev,
+      colorBy: prev.colorBy === type ? null : type,
+    }));
+  };
+
   const sideClasses = useMemo(() => {
     const base =
       "fixed top-0 h-full z-50 w-[90vw] sm:w-[360px] bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out";
@@ -159,7 +276,6 @@ export default function MapSidebarFloating({
       : `${base} left-0 -translate-x-full`;
   }, [isOpen, position]);
 
-  // Floating Action Button position (used only if hideTrigger = false)
   const fabPosition = useMemo(() => {
     const base = "fixed z-40";
     return position === "right"
@@ -167,22 +283,19 @@ export default function MapSidebarFloating({
       : `${base} top-4 left-4`;
   }, [position]);
 
-  // Apply & Close
   const applyAndClose = () => {
     onApplyFilters?.(filters, "logs");
     if (autoCloseOnApply) setOpen(false);
   };
 
-  // Clear & Close
   const clearAndClose = () => {
-    setFilters(defaultFilters); // ✅ Reset to default filters
+    setFilters(defaultFilters);
     onClearFilters?.();
     setOpen(false);
   };
 
   return (
     <>
-      {/* Floating Filter Button (hidden when hideTrigger = true) */}
       {!hideTrigger && (
         <button
           type="button"
@@ -201,7 +314,6 @@ export default function MapSidebarFloating({
         </button>
       )}
 
-      {/* Backdrop (click to close) */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
@@ -209,9 +321,7 @@ export default function MapSidebarFloating({
         />
       )}
 
-      {/* Drawer Panel */}
       <div className={sideClasses}>
-        {/* Header */}
         <div className="flex items-center justify-between p-3 border-b">
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4" />
@@ -225,9 +335,7 @@ export default function MapSidebarFloating({
           </button>
         </div>
 
-        {/* Content */}
         <div className="h-[calc(100%-112px)] overflow-y-auto p-3 space-y-4">
-          {/* Date Range */}
           <PanelSection title="Date Range">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -250,7 +358,6 @@ export default function MapSidebarFloating({
             </div>
           </PanelSection>
 
-          {/* Filter by Provider/Technology/Band/Metric */}
           <PanelSection title="Filter by">
             <div className="grid grid-cols-1 gap-3">
               <div>
@@ -333,40 +440,62 @@ export default function MapSidebarFloating({
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* ✅ Coverage Hole Filter Checkbox */}
             </div>
           </PanelSection>
 
-          {/* Layers (still controlled via `ui` and `onUIChange`) */}
           <PanelSection title="Layers">
             <div className="space-y-2 text-sm">
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={ui?.showSessions}
-                  onChange={(e) =>
-                    onUIChange?.({ showSessions: e.target.checked })
-                  }
-                  disabled={hasActiveFilters}
-                />
-                Session Markers (when no filters)
-              </label>
-              <label className="flex items-center gap-2 ">
                 <input
                   type="checkbox"
                   checked={filters.coverageHoleOnly || false}
                   onChange={(e) =>
                     handleFilterChange("coverageHoleOnly", e.target.checked)
                   }
-                  className="w-4 h-4 rounded border-gray-300 "
+                  className="w-4 h-4 rounded border-gray-300"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-medium ">
-                    Coverage Hole
-                  </div>
+                  <div className="text-sm font-medium">Coverage Holes</div>
                 </div>
               </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={filters.colorBy === "provider"}
+                  onChange={() => handleColorByChange("provider")}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium">Provider</div>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={filters.colorBy === "technology"}
+                  onChange={() => handleColorByChange("technology")}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium">Technology</div>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={filters.colorBy === "band"}
+                  onChange={() => handleColorByChange("band")}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium">Band</div>
+                </div>
+              </label>
+
+              
 
               <label className="flex items-center gap-2">
                 <input
@@ -383,18 +512,6 @@ export default function MapSidebarFloating({
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={ui?.showLogsCircles}
-                  onChange={(e) =>
-                    onUIChange?.({ showLogsCircles: e.target.checked })
-                  }
-                  disabled={!hasActiveFilters}
-                />
-                Logs as Circles
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
                   checked={ui?.showHeatmap}
                   onChange={(e) =>
                     onUIChange?.({ showHeatmap: e.target.checked })
@@ -403,22 +520,9 @@ export default function MapSidebarFloating({
                 />
                 Heatmap
               </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={ui?.renderVisibleLogsOnly}
-                  onChange={(e) =>
-                    onUIChange?.({ renderVisibleLogsOnly: e.target.checked })
-                  }
-                  disabled={!hasActiveFilters}
-                />
-                Render Visible Logs Only
-              </label>
             </div>
           </PanelSection>
 
-          {/* Basemap Style */}
           <PanelSection title="Basemap Style">
             <Select
               value={ui?.basemapStyle}
@@ -436,7 +540,6 @@ export default function MapSidebarFloating({
           </PanelSection>
         </div>
 
-        {/* Footer with Clear/Apply */}
         <div className="p-3 border-t flex gap-2">
           <Button
             variant="secondary"
@@ -446,8 +549,8 @@ export default function MapSidebarFloating({
             Clear
           </Button>
           <Button className="flex-1" onClick={applyAndClose}>
-            <Filter title="Apply & Fetch Logs" className="h-4 w-4 mr-2" /> Apply
-            & Fetch Logs
+            <Filter title="Apply & Fetch Logs" className="h-4 w-4 mr-2" /> 
+            Apply & Fetch Logs
           </Button>
         </div>
       </div>
