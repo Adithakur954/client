@@ -37,7 +37,7 @@ export default function AllLogsPanelToggle({
 
       {showFab && (
         <button
-          className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-indigo-600 text-white px-4 py-2 shadow-lg hover:bg-indigo-700"
+          className="fixed top-20 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-indigo-600 text-white px-4 py-2 shadow-lg hover:bg-indigo-700"
           onClick={() => setOpen(true)}
           title="Show logs summary"
         >

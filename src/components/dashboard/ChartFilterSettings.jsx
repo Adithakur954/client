@@ -9,8 +9,7 @@ const ChartFilterSettings = ({
   onChange,
   showOperators = true,
   showNetworks = true,
-  showDateRange = true,
-  showTopN = false
+  
 }) => {
   const [localFilters, setLocalFilters] = useState(value);
 
@@ -95,51 +94,7 @@ const ChartFilterSettings = ({
         </div>
       )}
 
-      {/* {showDateRange && (
-        <div className="space-y-3">
-          <label className="font-semibold text-gray-800 flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Date Range
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-gray-600">From</label>
-              <input
-                type="date"
-                value={localFilters.dateFrom || ''}
-                onChange={(e) => setLocalFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-gray-600">To</label>
-              <input
-                type="date"
-                value={localFilters.dateTo || ''}
-                onChange={(e) => setLocalFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              />
-            </div>
-          </div>
-        </div>
-      )} */}
-
-      {/* {showTopN && (
-        <div className="space-y-3">
-          <label className="font-semibold text-gray-800">Show Top</label>
-          <select
-            value={localFilters.topN || 10}
-            onChange={(e) => setLocalFilters(prev => ({ ...prev, topN: Number(e.target.value) }))}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value={5}>Top 5</option>
-            <option value={10}>Top 10</option>
-            <option value={15}>Top 15</option>
-            <option value={20}>Top 20</option>
-            <option value={-1}>All</option>
-          </select>
-        </div>
-      )} */}
+      
 
       <div className="flex gap-2 pt-4 border-t">
         <button

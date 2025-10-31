@@ -1,16 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
+import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
+import { PieChart } from '@mui/x-charts/PieChart';
+import { Box, TextField, Typography, Grid } from '@mui/material';
 import ChartCard from '../ChartCard';
-import { TOOLTIP_STYLE, CHART_COLORS } from '@/components/constants/dashboardConstants';
 import { useCoverageRanking } from '@/hooks/useDashboardData';
 import { formatNumber } from '@/utils/chartUtils';
 
+const CHART_COLORS = [
+  '#1976d2', // Blue
+  '#d32f2f', // Red
+  '#388e3c', // Green
+  '#f57c00', // Orange
+  '#7b1fa2', // Purple
+  '#0097a7', // Cyan
+  '#c2185b', // Pink
+  '#5d4037', // Brown
+];
+
 const CoverageRankingChart = () => {
   const [settings, setSettings] = useState({ rsrpMin: -95, rsrpMax: 0 });
-  const [draft, setDraft] = useState({ rsrpMin: '-95', rsrpMax: '0' }); // Store as strings
+  const [draft, setDraft] = useState({ rsrpMin: '-95', rsrpMax: '0' });
 
   const { data, isLoading } = useCoverageRanking(settings.rsrpMin, settings.rsrpMax);
+
+  // Transform data for MUI X Charts
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    
+    const total = data.reduce((sum, item) => sum + (item.value || 0), 0);
+    
+    return data.map((item, index) => ({
+      id: index,
+      value: item.value,
+      label: item.label,
+      percentage: total > 0 ? parseFloat(((item.value / total) * 100).toFixed(2)) : 0,
+      color: CHART_COLORS[index % CHART_COLORS.length]
+    }));
+  }, [data]);
 
   useEffect(() => {
     setDraft({ 
@@ -23,7 +49,6 @@ const CoverageRankingChart = () => {
     const rsrpMin = Number(draft.rsrpMin);
     const rsrpMax = Number(draft.rsrpMax);
 
-    // Validation
     if (isNaN(rsrpMin) || isNaN(rsrpMax)) {
       return toast.warn("Please enter valid numbers for RSRP range");
     }
@@ -38,83 +63,101 @@ const CoverageRankingChart = () => {
   return (
     <ChartCard
       title={`Operator Coverage Ranking (RSRP ${settings.rsrpMin} to ${settings.rsrpMax} dBm)`}
-      dataset={data}
+      dataset={chartData}
       exportFileName="coverage_rank"
       isLoading={isLoading}
       showChartFilters={false}
       settings={{
         title: 'Coverage Rank Settings',
         render: () => (
-          <div className="space-y-4">
-            <div className="font-semibold text-gray-800 text-base">RSRP Coverage Range (dBm)</div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Min (dBm)</label>
-                <input
+          <Box sx={{ p: 2 }}>
+            <Typography variant="subtitle1" fontWeight="600" gutterBottom>
+              RSRP Coverage Range (dBm)
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
                   type="number"
-                  step="1"
-                  placeholder="-95"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  label="Min (dBm)"
                   value={draft.rsrpMin}
                   onChange={(e) => setDraft(s => ({ ...s, rsrpMin: e.target.value }))}
+                  size="small"
+                  inputProps={{ step: 1 }}
                 />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Max (dBm)</label>
-                <input
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
                   type="number"
-                  step="1"
-                  placeholder="0"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  label="Max (dBm)"
                   value={draft.rsrpMax}
                   onChange={(e) => setDraft(s => ({ ...s, rsrpMax: e.target.value }))}
+                  size="small"
+                  inputProps={{ step: 1 }}
                 />
-              </div>
-            </div>
-            <div className="text-xs text-gray-500 italic">
+              </Grid>
+            </Grid>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', fontStyle: 'italic' }}>
               Typical RSRP range: -140 to -44 dBm
-            </div>
-          </div>
+            </Typography>
+          </Box>
         ),
         onApply: applySettings
       }}
     >
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          margin={{ top: 12, right: 40, left: 10, bottom: 45 }}
-          barSize={28}
-        >
-          <CartesianGrid strokeDasharray="3 3" horizontal stroke="rgba(0,0,0,0.08)" vertical={false} />
-          <XAxis
-            dataKey="label"
-            tickLine={false}
-            axisLine={false}
-            interval={0}
-            angle={-25}
-            textAnchor="end"
-            height={55}
-            tick={{ fill: '#111827', fontSize: 12, fontWeight: 600 }}
-          />
-          <YAxis
-            type="number"
-            tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 500 }}
-            tickFormatter={formatNumber}
-          />
-          <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [v.toLocaleString(), 'Samples in range']} />
-          <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-            <LabelList
-              dataKey="value"
-              position="top"
-              style={{ fill: '#111827', fontSize: '12px', fontWeight: 700 }}
-              formatter={formatNumber}
-            />
-            {data?.map((entry, index) => (
-              <Cell key={`cell-cov-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <PieChart
+          series={[
+            {
+              data: chartData,
+              highlightScope: { faded: 'global', highlighted: 'item' },
+              faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
+              innerRadius: 60,
+              outerRadius: 130,
+              paddingAngle: 2,
+              cornerRadius: 5,
+              // Arc labels (percentage on slices)
+              arcLabel: (item) => `${item.percentage}%`,
+              arcLabelMinAngle: 35,
+              arcLabelRadius: '60%',
+              // Tooltip/value formatter
+              valueFormatter: (item) => {
+                return `${formatNumber(item.value)} (${item.percentage}%)`;
+              },
+            },
+          ]}
+          colors={CHART_COLORS}
+          width={500}
+          height={400}
+          slotProps={{
+            legend: {
+              direction: 'row',
+              position: { vertical: 'bottom', horizontal: 'middle' },
+              padding: 0,
+              itemMarkWidth: 14,
+              itemMarkHeight: 14,
+              markGap: 6,
+              itemGap: 12,
+              labelStyle: {
+                fontSize: 13,
+                fontWeight: 500,
+              },
+            },
+          }}
+          sx={{
+            '& .MuiPieArc-root': {
+              stroke: '#fff',
+              strokeWidth: 2,
+            },
+            '& .MuiChartsLegend-label': {
+              fontSize: '13px !important',
+              fontWeight: '500 !important',
+            },
+          }}
+          margin={{ top: 20, bottom: 80, left: 20, right: 20 }}
+        />
+      </Box>
     </ChartCard>
   );
 };

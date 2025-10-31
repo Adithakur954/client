@@ -47,7 +47,7 @@ const MapLegend = ({ thresholds, selectedMetric, coverageHoleOnly = false }) => 
   if (!list.length) return null;
 
   return (
-    <div className="absolute bottom-4 right-4 z-10 rounded-lg border bg-white dark:bg-slate-950 dark:text-white p-3 shadow">
+    <div className="absolute top-21  right-4 z-10 rounded-lg border bg-white dark:bg-slate-950 dark:text-white p-3 shadow">
       <div className="text-sm font-semibold mb-2">
         {label} {unit ? `(${unit})` : ""}
       </div>
