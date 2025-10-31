@@ -310,11 +310,7 @@ const OperatorNetworkChart = () => {
             </h3>
             <p className="text-sm text-gray-500">
               {currentMetric.label}
-              {isReversedAxis && (
-                <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">
-                  ↑ Better values at top
-                </span>
-              )}
+              
             </p>
           </div>
           {hasActiveFilters && (
@@ -381,7 +377,7 @@ const OperatorNetworkChart = () => {
             >
               {Object.entries(METRICS).map(([key, config]) => (
                 <option key={key} value={key}>
-                  {config.label} {config.reversed ? '(↑ Reversed)' : ''}
+                  {config.label}
                 </option>
               ))}
             </select>
@@ -568,7 +564,7 @@ const OperatorNetworkChart = () => {
                   dataKey={tech}
                   name={tech}
                   fill={NETWORK_COLORS[tech] || CHART_COLORS[idx % CHART_COLORS.length]}
-                  radius={isReversedAxis ? [0, 0, 6, 6] : [6, 6, 0, 0]}
+                 
                   barSize={26}
                 />
               ))}
