@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, AlertCircle, FileText, X } from "lucide-react";
+import { Upload, AlertCircle, FileText, X, CheckSquare, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
@@ -16,24 +16,125 @@ import {
 import { mapViewApi, buildingApi, cellSiteApi } from "../../api/apiEndpoints";
 import Spinner from "../common/Spinner";
 import { BuildingGenerator, generateBuildingsForPolygon } from "./BuildingGenerator";
-import { SessionSelector } from "./SessionSelector";
 
-const PolygonDropdown = ({ polygons, selectedPolygon, setSelectedPolygon }) => (
-  <select
-    className="w-full border rounded px-3 py-2 bg-white text-black"
-    value={selectedPolygon || ""}
-    onChange={(e) => setSelectedPolygon(e.target.value ? Number(e.target.value) : null)}
-  >
-    <option value="">Select polygon...</option>
-    {polygons.map((p) => (
-      <option key={p.value} value={p.value}>
-        {p.label}
-      </option>
-    ))}
-  </select>
-);
+const PolygonDropdown = ({ polygons, selectedPolygon, setSelectedPolygon }) => {
+  const safePolygons = Array.isArray(polygons) ? polygons : [];
+  
+  return (
+    <div>
+      <select
+        className="w-full border rounded px-3 py-2 bg-white text-black"
+        value={selectedPolygon || ""}
+        onChange={(e) => setSelectedPolygon(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">
+          {safePolygons.length === 0 
+            ? "No polygons available" 
+            : "Select polygon..."}
+        </option>
+        {safePolygons.map((p) => (
+          <option key={p.value} value={p.value}>
+            {p.label} {p.sessionIds?.length > 0 ? `(${p.sessionIds.length} sessions)` : ''}
+          </option>
+        ))}
+      </select>
+      
+      <div className="text-xs text-gray-500 mt-1">
+        {safePolygons.length === 0 ? (
+          <span className="text-orange-600"> No polygons loaded yet</span>
+        ) : (
+          <span className="text-green-600">{safePolygons.length} polygon(s) available</span>
+        )}
+      </div>
+    </div>
+  );
+};
 
-export const ProjectForm = ({ polygons, onProjectCreated }) => {
+
+const PolygonSessionSelector = ({ sessions, selectedSessions, setSelectedSessions }) => {
+  const allSelected = sessions.length > 0 && selectedSessions.length === sessions.length;
+  const someSelected = selectedSessions.length > 0 && selectedSessions.length < sessions.length;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedSessions([]);
+    } else {
+      setSelectedSessions([...sessions]);
+    }
+  };
+
+  const toggleSession = (sessionId) => {
+    if (selectedSessions.includes(sessionId)) {
+      setSelectedSessions(selectedSessions.filter(id => id !== sessionId));
+    } else {
+      setSelectedSessions([...selectedSessions, sessionId]);
+    }
+  };
+
+  if (!sessions || sessions.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium text-blue-900">
+          Available Sessions ({sessions.length})
+        </Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={toggleAll}
+          className="h-7 text-xs"
+        >
+          {allSelected ? (
+            <>
+              <CheckSquare className="h-3 w-3 mr-1" />
+              Deselect All
+            </>
+          ) : (
+            <>
+              <Square className="h-3 w-3 mr-1" />
+              Select All
+            </>
+          )}
+        </Button>
+      </div>
+
+      <div className="space-y-1 max-h-48 overflow-y-auto">
+        {sessions.map((sessionId) => (
+          <label
+            key={sessionId}
+            className="flex items-center gap-2 p-2 hover:bg-blue-100 rounded cursor-pointer transition-colors"
+          >
+            <input
+              type="checkbox"
+              checked={selectedSessions.includes(sessionId)}
+              onChange={() => toggleSession(sessionId)}
+              className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">
+              Session ID: {sessionId}
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div className="text-xs text-blue-600 mt-2">
+        {selectedSessions.length === 0 ? (
+          " No sessions selected"
+        ) : selectedSessions.length === sessions.length ? (
+          ` All ${sessions.length} sessions selected`
+        ) : (
+          ` ${selectedSessions.length} of ${sessions.length} sessions selected`
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const ProjectForm = ({ polygons, loading: parentLoading, onProjectCreated }) => {
   const [projectName, setProjectName] = useState("");
   const [selectedPolygon, setSelectedPolygon] = useState(null);
   const [selectedPolygonData, setSelectedPolygonData] = useState(null);
@@ -58,15 +159,26 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
   
   const fileInputRef = useRef(null);
 
+  
   useEffect(() => {
     if (selectedPolygon) {
       const polygon = polygons.find(p => p.value === selectedPolygon);
+    
+      
       setSelectedPolygonData(polygon);
       setGeneratedBuildings(null);
-      console.log("📍 Selected Polygon:", polygon);
+      
+      
+      if (polygon?.sessionIds && polygon.sessionIds.length > 0) {
+        setSelectedSessions(polygon.sessionIds);
+       
+      } else {
+        setSelectedSessions([]);
+      }
     } else {
       setSelectedPolygonData(null);
       setGeneratedBuildings(null);
+      setSelectedSessions([]);
     }
   }, [selectedPolygon, polygons]);
 
@@ -91,7 +203,6 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
     }
   };
 
-  // ✅ ADD: Validation function
   const validateForm = () => {
     const errors = [];
     
@@ -103,8 +214,8 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
       errors.push("Project name is too long (max 255 characters)");
     }
     
-    if (!selectedPolygon && (!selectedSessions || selectedSessions.length === 0)) {
-      errors.push("Please select at least one polygon or session");
+    if (!selectedPolygon) {
+      errors.push("Please select a polygon");
     }
     
     return errors;
@@ -113,7 +224,6 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ✅ IMPROVED: Validation
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
       const errorMsg = validationErrors.join(", ");
@@ -128,12 +238,10 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
     let buildingsToSave = generatedBuildings;
     
     try {
-      // ============================================
       // STEP 0: AUTO-GENERATE BUILDINGS IF POLYGON SELECTED
-      // ============================================
       if (selectedPolygonData && !generatedBuildings) {
         setCurrentStep("Generating buildings from OpenStreetMap...");
-        console.log("🏗️ Step 0: Auto-generating buildings...");
+       
         setBuildingLoading(true);
         
         try {
@@ -142,50 +250,46 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
           if (buildingResult.success && buildingResult.data) {
             setGeneratedBuildings(buildingResult.data);
             buildingsToSave = buildingResult.data;
-            toast.success(`✅ Generated ${buildingResult.count} buildings`);
-            console.log(`✅ Generated ${buildingResult.count} buildings`);
+            toast.success(`Generated ${buildingResult.count} buildings`);
+           
           } else {
-            console.warn("⚠️ No buildings generated:", buildingResult.message);
+            console.warn(" No buildings generated:", buildingResult.message);
             toast.info(buildingResult.message);
             buildingsToSave = null;
           }
         } catch (buildingError) {
-          console.error("❌ Building generation error:", buildingError);
+          console.error(" Building generation error:", buildingError);
           toast.warn(`Could not generate buildings: ${buildingError.message}`);
           buildingsToSave = null;
         } finally {
           setBuildingLoading(false);
         }
       } else if (generatedBuildings) {
-        console.log("ℹ️ Using previously generated buildings");
+       
         buildingsToSave = generatedBuildings;
       }
 
-      // ============================================
-      // STEP 1: CREATE PROJECT AND GET PROJECT ID
-      // ============================================
+      // STEP 1: CREATE PROJECT
       setCurrentStep("Creating project...");
-      console.log("📝 Step 1: Creating project...");
+     
       
-      // ✅ FIXED: Ensure proper payload structure
+     
       const projectPayload = {
         ProjectName: projectName.trim(),
         PolygonIds: selectedPolygon ? [selectedPolygon] : [],
-        SessionIds: Array.isArray(selectedSessions) ? selectedSessions : [], 
+        SessionIds: selectedSessions.length > 0 ? selectedSessions : [], 
       };
 
-      console.log("📤 Project payload:", projectPayload);
+     
 
       const projectRes = await mapViewApi.createProjectWithPolygons(projectPayload);
-      console.log("📥 Project response:", projectRes);
+     
       
-      // ✅ IMPROVED: Better response handling
       if (!projectRes || projectRes.Status !== 1) {
         const errorMsg = projectRes?.Message || projectRes?.message || "Unknown error creating project";
         throw new Error(errorMsg);
       }
 
-      // ✅ IMPROVED: Multiple ways to extract project ID
       projectId = projectRes.Data?.projectId || 
                   projectRes.Data?.project_id ||
                   projectRes.Data?.ProjectId ||
@@ -196,16 +300,9 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
       
       projectData = projectRes.Data?.project || projectRes.Data || projectRes;
       
-      console.log("🔍 Extracted data:", {
-        projectId,
-        projectData,
-        fullResponse: projectRes
-      });
-      
       if (!projectId) {
         console.error("❌ Failed to extract project ID from response:", projectRes);
-        console.error("   Available keys in Data:", Object.keys(projectRes.Data || {}));
-        throw new Error("No project ID received from server. Check server response structure.");
+        throw new Error("No project ID received from server.");
       }
 
       const projectNameDisplay = projectData?.project_name || 
@@ -213,19 +310,13 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
                                  projectData?.name || 
                                  projectName;
 
-      toast.success(`✅ Project "${projectNameDisplay}" created! ID: ${projectId}`);
-      console.log("✅ Project created successfully:");
-      console.log("   - Project ID:", projectId);
-      console.log("   - Project Name:", projectNameDisplay);
-      console.log("   - Sessions:", projectData?.ref_session_id || selectedSessions);
-      console.log("   - Created:", projectData?.created_on || new Date().toISOString());
+      toast.success(` Project "${projectNameDisplay}" created! ID: ${projectId}`);
+     
 
-      // ============================================
-      // STEP 2: SEND BUILDING DATA WITH PROJECT ID
-      // ============================================
+      // STEP 2: SAVE BUILDINGS
       if (buildingsToSave && selectedPolygonData) {
         setCurrentStep("Saving buildings to project...");
-        console.log("🏢 Step 2: Sending building data for project ID:", projectId);
+       
         
         try {
           const buildingPayload = {
@@ -235,39 +326,24 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
             buildings_geojson: buildingsToSave,
           };
 
-          console.log("📤 Building payload:", {
-            project_id: buildingPayload.project_id,
-            polygon_label: buildingPayload.polygon_label,
-            total_buildings: buildingsToSave.features?.length || 0
-          });
-          
           const buildingRes = await buildingApi.saveBuildingsWithProject(buildingPayload);
-          console.log("📥 Building response:", buildingRes);
           
           if (buildingRes.Status === 1 || buildingRes.success) {
             const count = buildingsToSave.features?.length || 0;
-            toast.success(`✅ ${count} buildings saved to project!`);
-            console.log("✅ Buildings saved successfully");
+            toast.success(` ${count} buildings saved to project!`);
           } else {
-            console.warn("⚠️ Buildings could not be saved:", buildingRes.Message || buildingRes.error);
             toast.warn("Buildings could not be saved, but project was created");
           }
         } catch (buildingError) {
           console.error("❌ Building save error:", buildingError);
           toast.warn(`Building save failed: ${buildingError.message}`);
         }
-      } else if (selectedPolygonData && !buildingsToSave) {
-        console.log("ℹ️ No buildings to save (generation may have failed or returned 0 results)");
-      } else {
-        console.log("ℹ️ Skipping building save - no polygon selected");
       }
 
-      // ============================================
-      // STEP 3: UPLOAD SITE FILE WITH PROJECT ID
-      // ============================================
+      // STEP 3: UPLOAD SITE FILE
       if (siteFile) {
         setCurrentStep("Processing site file...");
-        console.log("📡 Step 3: Uploading site file for project ID:", projectId);
+       
         
         try {
           const formData = new FormData();
@@ -287,42 +363,26 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
             if (uploadParams.trainPath) formData.append('train_path', uploadParams.trainPath);
           }
 
-          console.log("📤 Sending site upload request...");
           const uploadRes = await cellSiteApi.uploadSite(formData);
-          console.log("📥 Site upload response:", uploadRes);
           
           if (uploadRes.success || uploadRes.Status === 1) {
             const message = uploadRes.message || uploadRes.Message || "Site file processed successfully!";
-            toast.success(`✅ ${message}`);
-            console.log("✅ Site file processed successfully");
-            
-            if (uploadRes.results) {
-              console.log("📥 Available downloads:", uploadRes.results);
-              if (uploadRes.output_dir) {
-                console.log("📁 Output directory:", uploadRes.output_dir);
-              }
-            }
+            toast.success(` ${message}`);
           } else {
             const errorMsg = uploadRes.error || uploadRes.Message || "Site file processing failed";
-            console.warn("⚠️ Site file processing failed:", errorMsg);
             toast.warn(`Site processing issue: ${errorMsg}`);
           }
         } catch (uploadError) {
           console.error("❌ Site upload error:", uploadError);
           toast.error(`Site upload failed: ${uploadError.message}`);
         }
-      } else {
-        console.log("ℹ️ No site file to upload");
       }
 
-      // ============================================
-      // STEP 4: SUCCESS - CLEANUP AND RESET
-      // ============================================
+      // STEP 4: SUCCESS - CLEANUP
       setCurrentStep("Finalizing...");
       
       const finalMessage = `Project "${projectNameDisplay}" (ID: ${projectId}) created successfully!`;
       toast.success(`🎉 ${finalMessage}`);
-      console.log("✅ All operations completed successfully!");
       
       // Reset form
       setProjectName("");
@@ -352,21 +412,13 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
       }
 
     } catch (err) {
-      console.error("❌ PROJECT CREATION ERROR:");
-      console.error("   Message:", err.message);
-      console.error("   Stack:", err.stack);
+      console.error("❌ PROJECT CREATION ERROR:", err);
       
-      // ✅ IMPROVED: Extract detailed error information
       let errorMessage = "Failed to create project";
       
-      if (err.response) {
-        console.error("   Response Status:", err.response.status);
-        console.error("   Response Data:", err.response.data);
-        console.error("   Response Headers:", err.response.headers);
-        
+      if (err.response?.data) {
         const data = err.response.data;
         
-        // Extract error message from various possible locations
         if (data?.InnerException) {
           errorMessage = `Database Error: ${data.InnerException}`;
         } else if (data?.Message) {
@@ -374,7 +426,6 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
         } else if (data?.message) {
           errorMessage = data.message;
         } else if (data?.errors) {
-          // ASP.NET validation errors
           const validationErrors = Object.entries(data.errors)
             .map(([field, messages]) => {
               const msgArray = Array.isArray(messages) ? messages : [messages];
@@ -386,7 +437,6 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
           errorMessage = data;
         }
       } else if (err.request) {
-        console.error("   No response received");
         errorMessage = "No response from server. Please check your connection.";
       } else {
         errorMessage = err.message || "Unknown error occurred";
@@ -395,9 +445,7 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
       toast.error(errorMessage);
       
       if (projectId) {
-        toast.info(`Note: Project ID ${projectId} was created but some operations failed.`, {
-          autoClose: 5000
-        });
+        toast.info(`Note: Project ID ${projectId} was created but some operations failed.`);
       }
     } finally {
       setLoading(false);
@@ -406,14 +454,15 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
     }
   };
 
-  const canSubmit = projectName.trim() && (selectedPolygon || selectedSessions.length > 0);
+  const canSubmit = projectName.trim() && selectedPolygon;
+  const isLoadingPolygons = parentLoading && (!polygons || polygons.length === 0);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Create New Project</CardTitle>
         <CardDescription>
-          Create a project with polygon, buildings, and site data
+          Create a project with polygon, sessions, buildings, and site data
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -438,16 +487,26 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
 
           {/* Polygon Selection */}
           <div className="space-y-2">
-            <Label>Select Polygon</Label>
-            <PolygonDropdown
-              polygons={polygons}
-              selectedPolygon={selectedPolygon}
-              setSelectedPolygon={setSelectedPolygon}
-            />
+            <Label>
+              Select Polygon <span className="text-red-500">*</span>
+            </Label>
+            
+            {isLoadingPolygons ? (
+              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded border">
+                <Spinner className="h-4 w-4" />
+                <span className="text-sm text-gray-600">Loading polygons...</span>
+              </div>
+            ) : (
+              <PolygonDropdown
+                polygons={polygons || []}
+                selectedPolygon={selectedPolygon}
+                setSelectedPolygon={setSelectedPolygon}
+              />
+            )}
             
             {selectedPolygonData && !generatedBuildings && (
               <div className="text-sm text-blue-600 mt-1">
-                ℹ️ Buildings will be generated automatically from OpenStreetMap when you create the project
+                Buildings will be generated automatically 
               </div>
             )}
             
@@ -460,11 +519,14 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
             />
           </div>
 
-          {/* Session Selection */}
-          <SessionSelector
-            selectedSessions={selectedSessions}
-            setSelectedSessions={setSelectedSessions}
-          />
+  
+          {selectedPolygonData?.sessionIds && selectedPolygonData.sessionIds.length > 0 && (
+            <PolygonSessionSelector
+              sessions={selectedPolygonData.sessionIds}
+              selectedSessions={selectedSessions}
+              setSelectedSessions={setSelectedSessions}
+            />
+          )}
 
           {/* Site File Upload Section */}
           <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
@@ -509,7 +571,7 @@ export const ProjectForm = ({ polygons, onProjectCreated }) => {
 
           {/* Submit Button */}
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="submit" disabled={loading || !canSubmit}>
+            <Button type="submit" disabled={loading || !canSubmit || isLoadingPolygons}>
               {loading ? (
                 <>
                   <Spinner className="mr-2" />
