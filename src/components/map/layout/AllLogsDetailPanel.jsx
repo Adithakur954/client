@@ -1,6 +1,18 @@
-import React, { useMemo } from "react";
-import { X, Download } from "lucide-react";
+import React, { useEffect, useState, useMemo } from "react";
+import { X, Download, Clock } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+
 import Spinner from "@/components/common/Spinner";
+import { adminApi, mapViewApi } from "@/api/apiEndpoints";
 
 // Metric config with units and proper threshold mapping
 const resolveMetricConfig = (selectedMetric) => {
@@ -21,13 +33,13 @@ const resolveMetricConfig = (selectedMetric) => {
       label: "UL Throughput",
       unit: "Mbps",
     },
-    dl_tpt: {
+    "dl-tpt": {
       field: "dl_tpt",
       thresholdKey: "dl_thpt",
       label: "DL Throughput",
       unit: "Mbps",
     },
-    ul_tpt: {
+    "ul-tpt": {
       field: "ul_tpt",
       thresholdKey: "ul_thpt",
       label: "UL Throughput",
@@ -52,6 +64,7 @@ const resolveMetricConfig = (selectedMetric) => {
 
 const toFixedSmart = (v, digits = 2) =>
   Number.isFinite(v) ? v.toFixed(digits) : "N/A";
+
 const quantile = (sorted, q) => {
   if (!sorted.length) return NaN;
   const pos = (sorted.length - 1) * q;
@@ -63,24 +76,123 @@ const quantile = (sorted, q) => {
   return sorted[base];
 };
 
+// Format duration from hours to readable format
+const formatDuration = (hours) => {
+  if (!hours || hours < 0.001) return "0s";
+
+  const totalSeconds = hours * 3600;
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0 && h === 0) parts.push(`${s}s`); // Only show seconds if less than an hour
+
+  return parts.join(" ") || "0s";
+};
+
+// Update the normalizeOperator function to handle more edge cases
 const normalizeOperator = (raw) => {
-  if (!raw) return "Unknown";
+  if (!raw || raw === null || raw === undefined) return "Unknown";
+
   const s = String(raw).trim();
+
+  // Handle empty, null, or special characters
+  if (s === "" || s === "null" || s === "undefined") return "Unknown";
   if (/^\/+$/.test(s)) return "Unknown";
-  if (s.replace(/\s+/g, "") === "404011") return "Unknown";
+  if (s === "404011") return "Unknown";
+
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
-  if (cleaned.includes("JIO") || /^(IND)?JIO(4G|5G|TRUE5G)?$/.test(cleaned))
+
+  // JIO variations
+  if (
+    cleaned.includes("JIO") ||
+    cleaned.includes("JIOTRUE") ||
+    cleaned === "INDJIO" ||
+    cleaned === "JIO4G" ||
+    cleaned === "JIO5G"
+  ) {
     return "JIO";
-  if (cleaned.includes("AIRTEL") || /^INDAIRTEL$/.test(cleaned))
+  }
+
+  // Airtel variations
+  if (
+    cleaned.includes("AIRTEL") ||
+    cleaned === "INDAIRTEL" ||
+    cleaned === "AIRTEL5G"
+  ) {
     return "Airtel";
+  }
+
+  // VI/Vodafone/Idea variations
   if (
     cleaned === "VI" ||
     cleaned.includes("VIINDIA") ||
     cleaned.includes("VODAFONE") ||
     cleaned.includes("IDEA")
-  )
+  ) {
     return "VI India";
-  return s;
+  }
+
+  // BSNL
+  if (cleaned.includes("BSNL")) {
+    return "BSNL";
+  }
+
+  return "Unknown";
+};
+
+const normalizeNetwork = (network) => {
+  if (!network || network === null || network === undefined) return "Unknown";
+
+  const n = String(network).trim().toUpperCase();
+
+  if (n === "" || n === "NULL" || n === "UNDEFINED") return "Unknown";
+
+  // 5G variations
+  if (n.includes("5G") || n.includes("NR")) {
+    if (n.includes("SA")) return "5G SA";
+    if (n.includes("NSA")) return "5G NSA";
+    return "5G";
+  }
+
+  // 4G variations
+  if (n.includes("4G") || n.includes("LTE")) return "4G";
+
+  // 3G variations
+  if (n.includes("3G") || n.includes("WCDMA") || n.includes("UMTS"))
+    return "3G";
+
+  // 2G variations
+  if (
+    n.includes("2G") ||
+    n.includes("EDGE") ||
+    n.includes("GPRS") ||
+    n.includes("GSM")
+  )
+    return "2G";
+
+  // Unknown
+  if (n === "UNKNOWN") return "Unknown";
+
+  return "Unknown";
+};
+
+// Network type color mapping
+const getNetworkColor = (network) => {
+  const colors = {
+    "5G SA": "#ec4899",
+    "5G NSA": "#db2777",
+    "5G": "#ec4899",
+    "4G": "#8b5cf6",
+    "3G": "#10b981",
+    "2G": "#6b7280",
+    Unknown: "#f59e0b",
+  };
+
+  return colors[network] || "#f59e0b";
 };
 
 const FALLBACK_BUCKET_COLORS = [
@@ -145,7 +257,6 @@ const buildDistribution = (values, thresholds) => {
   return bins;
 };
 
-// FIX: percentage now uses counted total (not logs.length)
 const buildTopCounts = (logs, getter, topN = 6) => {
   const map = new Map();
   for (const l of logs) {
@@ -189,7 +300,6 @@ const buildOperatorNetworkCombo = (logs, topN = 10) => {
   });
 };
 
-// FIX: align with backend (session_id, provider, network)
 const exportCsv = ({ logs, field, filename = "logs_metric.csv" }) => {
   if (!Array.isArray(logs) || !logs.length) return;
   const header = [
@@ -234,25 +344,85 @@ const AllLogsDetailPanel = ({
   thresholds = {},
   selectedMetric = "rsrp",
   isLoading,
+  startDate,
+  endDate,
   onClose,
 }) => {
+  const [networkDurations, setNetworkDurations] = useState([]);
+  const [isDurationsLoading, setIsDurationsLoading] = useState(false);
+  const [durationsError, setDurationsError] = useState(null);
+
+  // Ensure logs is always an array
+  const safeLogsList = Array.isArray(logs) ? logs : [];
+
   const cfg = resolveMetricConfig(selectedMetric);
   const unit = cfg.unit ? ` ${cfg.unit}` : "";
   const ranges = thresholds?.[cfg.thresholdKey] || [];
 
   const numericValues = useMemo(() => {
-    if (!Array.isArray(logs) || !logs.length) return [];
     const vals = [];
-    for (const l of logs) {
+    for (const l of safeLogsList) {
       const v = parseFloat(l?.[cfg.field]);
       if (Number.isFinite(v)) vals.push(v);
     }
     return vals;
-  }, [logs, cfg.field]);
+  }, [safeLogsList, cfg.field]);
+
+  const formatDateRange = () => {
+    if (!startDate || !endDate) return null;
+
+    const formatDate = (date) => {
+      if (!date) return "";
+      return new Date(date).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    };
+
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  };
+
+  // Fetch and process network durations data - Keeping this for future use but not displaying
+  useEffect(() => {
+    if (!startDate || !endDate) return;
+
+    const fetchNetworkDurations = async () => {
+      setIsDurationsLoading(true);
+      setDurationsError(null);
+      try {
+        const res = await adminApi.getNetworkDurations({
+          startDate,
+          endDate,
+        });
+
+        console.log("Network durations API response:", res);
+
+        // Handle the response format
+        let rawData = [];
+        if (res?.Data && Array.isArray(res.Data)) {
+          rawData = res.Data;
+        } else if (Array.isArray(res)) {
+          rawData = res;
+        }
+
+        // We're not displaying this data, but we can keep the fetch for future use
+        setNetworkDurations([]);
+      } catch (error) {
+        console.error("Failed to fetch network durations:", error);
+        setDurationsError(error.message || "Failed to load network durations");
+        setNetworkDurations([]);
+      } finally {
+        setIsDurationsLoading(false);
+      }
+    };
+
+    fetchNetworkDurations();
+  }, [startDate, endDate]);
 
   const providerNetworkTop = useMemo(
-    () => buildOperatorNetworkCombo(logs),
-    [logs]
+    () => buildOperatorNetworkCombo(safeLogsList),
+    [safeLogsList]
   );
 
   const stats = useMemo(() => {
@@ -296,27 +466,37 @@ const AllLogsDetailPanel = ({
     [numericValues, ranges]
   );
 
-  // FIX: use provider and network per backend shape
   const providerTop = useMemo(
     () =>
-      buildTopCounts(logs, (l) =>
+      buildTopCounts(safeLogsList, (l) =>
         normalizeOperator(l.provider ?? l.m_alpha_long ?? "Unknown")
       ),
-    [logs]
+    [safeLogsList]
   );
+
   const networkTop = useMemo(
     () =>
       buildTopCounts(
-        logs,
+        safeLogsList,
         (l) =>
           l.network ?? l.technology ?? l.tech ?? l.network_type ?? "Unknown"
       ),
-    [logs]
+    [safeLogsList]
   );
+
   const bandTop = useMemo(
-    () => buildTopCounts(logs, (l) => l.band ?? "Unknown"),
-    [logs]
+    () => buildTopCounts(safeLogsList, (l) => l.band ?? "Unknown"),
+    [safeLogsList]
   );
+
+  // Safe array checks
+  const safeBuckets = Array.isArray(buckets) ? buckets : [];
+  const safeProviderTop = Array.isArray(providerTop) ? providerTop : [];
+  const safeNetworkTop = Array.isArray(networkTop) ? networkTop : [];
+  const safeBandTop = Array.isArray(bandTop) ? bandTop : [];
+  const safeProviderNetworkTop = Array.isArray(providerNetworkTop)
+    ? providerNetworkTop
+    : [];
 
   return (
     <div className="fixed top-0 right-0 h-screen w-[26rem] max-w-[100vw] text-white bg-slate-900 shadow-2xl z-50">
@@ -329,12 +509,18 @@ const AllLogsDetailPanel = ({
               Metric: {cfg.label}
               {unit}
             </div>
+            {formatDateRange() && (
+              <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                <span>📅</span>
+                {formatDateRange()}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() =>
                 exportCsv({
-                  logs,
+                  logs: safeLogsList,
                   field: cfg.field,
                   filename: `logs_${cfg.field}.csv`,
                 })
@@ -411,12 +597,12 @@ const AllLogsDetailPanel = ({
               <div>
                 <h4 className="font-semibold mb-2">Distribution</h4>
                 <div className="space-y-2">
-                  {buckets.length === 0 && (
+                  {safeBuckets.length === 0 && (
                     <div className="text-sm text-slate-400">
                       No data available.
                     </div>
                   )}
-                  {buckets.map((b, idx) => {
+                  {safeBuckets.map((b, idx) => {
                     const pct = stats.total
                       ? Math.round((b.count / stats.total) * 100)
                       : 0;
@@ -453,95 +639,122 @@ const AllLogsDetailPanel = ({
 
               {/* Breakdowns */}
               <div className="grid grid-cols-1 gap-3">
+                {/* Providers */}
                 <div className="bg-slate-800/60 rounded-lg p-3">
                   <div className="font-semibold mb-2">Providers</div>
                   <div className="space-y-2">
-                    {providerTop.map((o) => (
-                      <div key={o.name} className="text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-200">{o.name}</span>
-                          <span className="text-slate-300">
-                            {o.count} ({o.percent}%)
-                          </span>
-                        </div>
-                        <div className="h-1.5 bg-slate-700 rounded mt-1">
-                          <div
-                            className="h-1.5 rounded bg-blue-500"
-                            style={{ width: `${o.percent}%` }}
-                          />
-                        </div>
+                    {safeProviderTop.length === 0 ? (
+                      <div className="text-xs text-slate-400">
+                        No provider data
                       </div>
-                    ))}
+                    ) : (
+                      safeProviderTop.map((o) => (
+                        <div key={o.name} className="text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200">{o.name}</span>
+                            <span className="text-slate-300">
+                              {o.count} ({o.percent}%)
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-slate-700 rounded mt-1">
+                            <div
+                              className="h-1.5 rounded bg-blue-500"
+                              style={{ width: `${o.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
+                {/* Network */}
                 <div className="bg-slate-800/60 rounded-lg p-3">
                   <div className="font-semibold mb-2">Network</div>
                   <div className="space-y-2">
-                    {networkTop.map((t) => (
-                      <div key={t.name} className="text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-200">{t.name}</span>
-                          <span className="text-slate-300">
-                            {t.count} ({t.percent}%)
-                          </span>
-                        </div>
-                        <div className="h-1.5 bg-slate-700 rounded mt-1">
-                          <div
-                            className="h-1.5 rounded bg-emerald-500"
-                            style={{ width: `${t.percent}%` }}
-                          />
-                        </div>
+                    {safeNetworkTop.length === 0 ? (
+                      <div className="text-xs text-slate-400">
+                        No network data
                       </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-slate-800/60 rounded-lg p-3">
-                  <div className="font-semibold mb-2">Operator vs Network</div>
-                  <div className="space-y-2">
-                    {providerNetworkTop.map((item) => (
-                      <div
-                        key={`${item.provider}-${item.network}`}
-                        className="text-sm"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-200">
-                            {item.provider} / {item.network}
-                          </span>
-                          <span className="text-slate-300">
-                            {item.count} ({item.percent}%)
-                          </span>
+                    ) : (
+                      safeNetworkTop.map((t) => (
+                        <div key={t.name} className="text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200">{t.name}</span>
+                            <span className="text-slate-300">
+                              {t.count} ({t.percent}%)
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-slate-700 rounded mt-1">
+                            <div
+                              className="h-1.5 rounded bg-emerald-500"
+                              style={{ width: `${t.percent}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1.5 bg-slate-700 rounded mt-1">
-                          <div
-                            className="h-1.5 rounded bg-purple-500"
-                            style={{ width: `${item.percent}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
 
+                {/* Operator vs Network */}
+                <div className="bg-slate-800/60 rounded-lg p-3">
+                  <div className="font-semibold mb-2">Operator vs Network</div>
+                  <div className="space-y-2">
+                    {safeProviderNetworkTop.length === 0 ? (
+                      <div className="text-xs text-slate-400">
+                        No operator/network data
+                      </div>
+                    ) : (
+                      safeProviderNetworkTop.map((item) => (
+                        <div
+                          key={`${item.provider}-${item.network}`}
+                          className="text-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200">
+                              {item.provider} / {item.network}
+                            </span>
+                            <span className="text-slate-300">
+                              {item.count} ({item.percent}%)
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-slate-700 rounded mt-1">
+                            <div
+                              className="h-1.5 rounded bg-purple-500"
+                              style={{ width: `${item.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Bands */}
                 <div className="bg-slate-800/60 rounded-lg p-3">
                   <div className="font-semibold mb-2">Bands</div>
                   <div className="space-y-2">
-                    {bandTop.map((b) => (
-                      <div key={b.name} className="text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-200">{b.name}</span>
-                          <span className="text-slate-300">
-                            {b.count} ({b.percent}%)
-                          </span>
+                    {safeBandTop.length === 0 ? (
+                      <div className="text-xs text-slate-400">No band data</div>
+                    ) : (
+                      safeBandTop.map((b) => (
+                        <div key={b.name} className="text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200">{b.name}</span>
+                            <span className="text-slate-300">
+                              {b.count} ({b.percent}%)
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-slate-700 rounded mt-1">
+                            <div
+                              className="h-1.5 rounded bg-amber-500"
+                              style={{ width: `${b.percent}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1.5 bg-slate-700 rounded mt-1">
-                          <div
-                            className="h-1.5 rounded bg-amber-500"
-                            style={{ width: `${b.percent}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               </div>

@@ -8,6 +8,8 @@ export default function AllLogsPanelToggle({
   thresholds = {},
   selectedMetric = "rsrp",
   isLoading = false,
+  startDate,  
+  endDate,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -32,6 +34,8 @@ export default function AllLogsPanelToggle({
           selectedMetric={selectedMetric}
           isLoading={isLoading}
           onClose={() => setOpen(false)}
+          startDate={startDate}    
+          endDate={endDate} 
         />
       )}
 

@@ -1,12 +1,7 @@
 // src/pages/page.jsx
 import React from 'react';
 
-// This page component is deprecated and its functionality has been split into:
-// - src/pages/HighPerfMap.jsx (for filtered logs and drawing)
-// - src/pages/PredictionMap.jsx (for prediction data display)
-// - src/pages/MapView.jsx (for viewing specific session logs via URL)
-//
-// You can safely remove this file and update the corresponding route in src/App.jsx.
+
 
 export default function DeprecatedMapView() {
   return (

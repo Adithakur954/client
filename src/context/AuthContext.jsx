@@ -18,7 +18,7 @@ const AuthProvider = ({ children }) => {
   
   const navigate = useNavigate();
 
-  // ✅ Listen for storage changes (logout in other tabs)
+  
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'user' && !e.newValue) {
@@ -53,7 +53,7 @@ const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout API failed:', error);
     } finally {
-      // ✅ Always clear session, even if API fails
+      
       setUser(null);
       sessionStorage.removeItem('user');
       navigate('/login', { replace: true });
@@ -62,7 +62,7 @@ const AuthProvider = ({ children }) => {
 
   const isAuthenticated = () => !!user;
 
-  // ✅ Add method to clear session (called from apiService on 401)
+  
   const clearSession = () => {
     setUser(null);
     sessionStorage.removeItem('user');

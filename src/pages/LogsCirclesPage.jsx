@@ -87,7 +87,7 @@ export default function LogsCirclesPage() {
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100vh" }}>
-      {/* Metric + Drawing Controls */}
+      
       <div
         style={{
           position: "absolute",
@@ -119,7 +119,7 @@ export default function LogsCirclesPage() {
           </select>
         </label>
 
-        {/* ✅ Coverage Hole Filter Checkbox */}
+        
         <label 
           style={{ 
             display: "flex", 

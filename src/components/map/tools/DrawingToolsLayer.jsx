@@ -366,6 +366,17 @@ export default function DrawingToolsLayer({
 
       const geometry = serializeOverlay(type, overlay);
       const { inside, stats } = analyzeInside(type, overlay, logs || [], selectedMetric);
+      const uniqueSessionsMap = new Map();
+inside.forEach((log) => {
+  const sessionKey = log.session_id
+  if (sessionKey && !uniqueSessionsMap.has(sessionKey)) {
+    uniqueSessionsMap.set(sessionKey, log.session_id);
+  }
+});
+const uniqueSessions = Array.from(uniqueSessionsMap.values());
+const uniqueSessionCount = uniqueSessions.length;
+
+      console.log("Points inside the polygon",inside, uniqueSessionCount, uniqueSessions)
       
       let areaInMeters = 0;
       const spherical = gm.geometry?.spherical;
@@ -395,6 +406,7 @@ export default function DrawingToolsLayer({
         selectedMetric,
         stats,
         count: inside.length,
+        session:uniqueSessions,
         logs: inside,
         grid: gridInfo,
         createdAt: new Date().toISOString(),

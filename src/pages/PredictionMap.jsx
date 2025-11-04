@@ -152,7 +152,7 @@ const isPointInPolygon = (point, polygon) => {
 
 // ================== OPTIMIZED LAYERS ==================
 const CirclesLayer = memo(({ points, getColor, radius }) => {
-  console.log(`🎨 Rendering ${points.length} circles with ${radius}m radius`);
+ 
   
   return (
     <>
@@ -177,7 +177,7 @@ const CirclesLayer = memo(({ points, getColor, radius }) => {
 CirclesLayer.displayName = 'CirclesLayer';
 
 const PolygonsLayer = memo(({ polygons }) => {
-  console.log(`🔷 Rendering ${polygons.length} polygons`);
+ 
   
   return (
     <>
@@ -225,14 +225,13 @@ export default function PredictionMapPage() {
 
   const sessionParam = useMemo(() => {
   const sessionId = searchParams.get("sessionId") ?? searchParams.get("session") ?? "";
-  console.log("🔗 Session from URL:", sessionId);
-  console.log("🔗 Full URL params:", Object.fromEntries(searchParams.entries()));
+ 
   return sessionId;
 }, [searchParams]);
 
 const projectParam = useMemo(()=>{
   const project = searchParams.get("project_id");
-  console.log(project);
+ 
   setProjectId(project);
   return project;
 }, [searchParams])
@@ -267,7 +266,7 @@ const projectParam = useMemo(()=>{
 
   const circleRadius = useMemo(() => {
     const radius = calculateRadius(zoom);
-    console.log(`🔍 Zoom: ${zoom} → Radius: ${radius}m`);
+   
     return radius;
   }, [zoom]);
 
@@ -417,7 +416,7 @@ const projectParam = useMemo(()=>{
   // Enhanced visible points calculation with detailed debugging
   const visiblePoints = useMemo(() => {
     if (!viewport || !dataList.length) {
-      console.log("⚠️ No viewport or no data");
+    
       return [];
     }
     
@@ -431,13 +430,11 @@ const projectParam = useMemo(()=>{
       }
     }
     
-    console.log(`📍 Step 1 - Points in viewport: ${points.length}`);
+    
     
     // Step 2: Filter by polygon if needed
     if (onlyInside && showPolys && polygons.length > 0) {
-      console.log(`🔍 FILTERING MODE ACTIVE`);
-      console.log(`   - Total polygons: ${polygons.length}`);
-      console.log(`   - Points to check: ${points.length}`);
+   
       
       const filtered = [];
       let debugCount = 0;
@@ -456,30 +453,18 @@ const projectParam = useMemo(()=>{
         }
         
         // Debug first few points
-        if (i < 3) {
-          console.log(`   Point ${i}: (${point.lat}, ${point.lon}) - Inside: ${foundInside}`);
-        }
+       
       }
       
-      console.log(`✅ Filtering complete:`);
-      console.log(`   - Points before filter: ${points.length}`);
-      console.log(`   - Points after filter: ${filtered.length}`);
-      console.log(`   - Points removed: ${points.length - filtered.length}`);
+    
       
       points = filtered;
-    } else {
-      console.log(`📊 Showing ALL points (no filter)`);
-      console.log(`   - onlyInside: ${onlyInside}`);
-      console.log(`   - showPolys: ${showPolys}`);
-      console.log(`   - polygons.length: ${polygons.length}`);
     }
     
     const result = points.slice(0, MAX_RENDER_POINTS);
     
     const endTime = performance.now();
-    console.log(`⚡ Point filtering took ${(endTime - startTime).toFixed(2)}ms`);
-    console.log(`🎯 Final points to render: ${result.length}`);
-    
+   
     return result;
   }, [viewport, dataList, onlyInside, showPolys, polygons]);
 

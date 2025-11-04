@@ -26,7 +26,7 @@ const DriveTestSessionsPage = () => {
         try {
             setLoading(true);
             const data = await adminApi.getSessions();
-            console.log('Fetched sessions:', data);
+           
             setSessions(Array.isArray(data) ? data : []);
         } catch (error) {
             toast.error(`Failed to fetch sessions: ${error.message}`);
@@ -52,7 +52,7 @@ const DriveTestSessionsPage = () => {
     };
 
     const handleViewOnMap = (sessionId) => {
-        console.log('Navigating to map view for session:', sessionId);
+       
         navigate(`/map?session=${encodeURIComponent(String(sessionId))}`);
     };
 

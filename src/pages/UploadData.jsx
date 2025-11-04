@@ -185,16 +185,16 @@ const UploadDataPage = () => {
       end.setHours(23, 59, 59, 999);
       try {
         const response = await excelApi.getSessions(start, end);
-        console.log("get session ka response dekhne ke liye ",response); // yaha bhi console hai
+        // yaha bhi console hai
         const fetched = response.Data || [];
-        console.log("fethced data of response ",fetched)
+       
         setSessionsInRange(
           fetched.map((s) => ({
             value: s.id,
             label: s.label || `Session ${s.id}`,
           }))
         );
-        console.log("session ki structure ",sessionsInRange)
+       
         if (fetched.length === 0) toast.info("No sessions found.");
       } catch {
         toast.error("Failed to fetch sessions.");

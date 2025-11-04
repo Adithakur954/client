@@ -10,7 +10,7 @@ import Spinner from "../components/common/Spinner";
 import MapWithMultipleCircles from "../components/MapwithMultipleCircle";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 import MapViewSide from "@/components/MapView/MapViewSide";
-import NetworkPlannerMap from "@/components/NetworkPlannerMap";
+import NetworkPlannerMap from "@/components/unifiedMap/NetworkPlannerMap";
 
 const defaultThresholds = {
   rsrp: [],
@@ -35,7 +35,7 @@ const canonicalOperatorName = (raw) => {
   return s;
 };
 
-const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 }; // fallback when no points
+const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 }; 
 
 const SimpleMapView = () => {
   const [rawLocations, setRawLocations] = useState([]);

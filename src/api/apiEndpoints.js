@@ -41,6 +41,28 @@ export const buildingApi = {
     }
   },
 
+  // NEW: Save buildings with project association
+  saveBuildingsWithProject: async (data) => {
+    try {
+      const response = await pythonApi.post('/api/buildings/save', data);
+      return response;
+    } catch (error) {
+      console.error('Save buildings error:', error);
+      throw error;
+    }
+  },
+
+  // NEW: Get buildings for a project
+  getProjectBuildings: async (projectId) => {
+    try {
+      const response = await pythonApi.get(`/api/buildings/project/${projectId}`);
+      return response;
+    } catch (error) {
+      console.error('Get project buildings error:', error);
+      throw error;
+    }
+  },
+
   healthCheck: async () => {
     try {
       const response = await pythonApi.get('/api/buildings/health');
@@ -56,7 +78,6 @@ export const cellSiteApi = {
   uploadSite: async (formData) => {
     try {
       const response = await pythonApi.post('/api/cell-site/upload', formData, {
-        // Add timeout for large files
         signal: AbortSignal.timeout(300000), // 5 minutes
       });
       return response;
@@ -66,15 +87,39 @@ export const cellSiteApi = {
     }
   },
 
+  // NEW: Process with project association
+  uploadSiteWithProject: async (formData) => {
+    try {
+      const response = await pythonApi.post('/api/cell-site/process', formData, {
+        signal: AbortSignal.timeout(300000), // 5 minutes
+      });
+      return response;
+    } catch (error) {
+      console.error('Cell Site process error:', error);
+      throw error;
+    }
+  },
+
+  // NEW: Get cell sites for a project
+  getProjectCellSites: async (projectId) => {
+    try {
+      const response = await pythonApi.get(`/api/cell-site/project/${projectId}`);
+      return response;
+    } catch (error) {
+      console.error('Get project cell sites error:', error);
+      throw error;
+    }
+  },
+
   downloadFile: (outputDir, filename) => {
-    const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:5000";
+    const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:8080";
     const url = `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`;
     window.open(url, '_blank');
   },
 
   downloadFileBlob: async (outputDir, filename) => {
     try {
-      const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:5000";
+      const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:8080";
       const response = await fetch(
         `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`
       );
@@ -99,6 +144,33 @@ export const cellSiteApi = {
       throw error;
     }
   },
+siteNoml: async(projectId, signal = null) => {
+  try {
+    console.log(`Calling siteNoml for projectId: ${projectId}`);
+    
+    const config = {
+      timeout: 30000, // 30 seconds
+    };
+    
+    if (signal) {
+      config.signal = signal;
+    }
+    
+    const response = await pythonApi.get(
+      `/api/cell-site/site-noml/${projectId}`,
+      config
+    );
+    
+    console.log('siteNoml response:', response);
+    return response;
+  } catch (error) {
+    console.error('siteNoml error:', error);
+    throw error;
+  }
+},
+
+
+
 
   listOutputs: async (outputDir) => {
     try {
@@ -121,6 +193,97 @@ export const cellSiteApi = {
   },
 };
 
+// export const buildingApi = {
+//   generateBuildings: async (polygonData) => {
+//     try {
+//       const response = await pythonApi.post('/api/buildings/generate', polygonData);
+//       return response;
+//     } catch (error) {
+//       console.error('Building API Error:', error);
+//       throw error;
+//     }
+//   },
+
+//   healthCheck: async () => {
+//     try {
+//       const response = await pythonApi.get('/api/buildings/health');
+//       return response;
+//     } catch (error) {
+//       console.error('Building service health check failed:', error);
+//       throw error;
+//     }
+//   },
+// };
+
+// export const cellSiteApi = {
+//   uploadSite: async (formData) => {
+//     try {
+//       const response = await pythonApi.post('/api/cell-site/upload', formData, {
+//         // Add timeout for large files
+//         signal: AbortSignal.timeout(300000), // 5 minutes
+//       });
+//       return response;
+//     } catch (error) {
+//       console.error('Cell Site upload error:', error);
+//       throw error;
+//     }
+//   },
+
+//   downloadFile: (outputDir, filename) => {
+//     const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:5000";
+//     const url = `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`;
+//     window.open(url, '_blank');
+//   },
+
+//   downloadFileBlob: async (outputDir, filename) => {
+//     try {
+//       const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:5000";
+//       const response = await fetch(
+//         `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`
+//       );
+
+//       if (!response.ok) {
+//         throw new Error('Download failed');
+//       }
+
+//       const blob = await response.blob();
+//       const url = window.URL.createObjectURL(blob);
+//       const link = document.createElement('a');
+//       link.href = url;
+//       link.setAttribute('download', filename);
+//       document.body.appendChild(link);
+//       link.click();
+//       link.remove();
+//       window.URL.revokeObjectURL(url);
+
+//       return blob;
+//     } catch (error) {
+//       console.error('Download error:', error);
+//       throw error;
+//     }
+//   },
+
+//   listOutputs: async (outputDir) => {
+//     try {
+//       const response = await pythonApi.get(`/api/cell-site/outputs/${outputDir}`);
+//       return response;
+//     } catch (error) {
+//       console.error('List outputs error:', error);
+//       throw error;
+//     }
+//   },
+
+//   healthCheck: async () => {
+//     try {
+//       const response = await pythonApi.get('/api/cell-site/health');
+//       return response;
+//     } catch (error) {
+//       console.error('Cell Site health check failed:', error);
+//       throw error;
+//     }
+//   },
+// };
+
 /**
  * ============================================
  * C# BACKEND APIs (Port 5224)
@@ -135,6 +298,7 @@ export const adminApi = {
   getReactDashboardData: () => api.get("/Admin/GetReactDashboardData"),
   getDashboardGraphData: () => api.get("/Admin/GetDashboardGraphData"),
   getAllUsers: (filters) => api.post("/Admin/GetAllUsers", filters),
+  getNetworkDurations:(params) => api.get("/Admin/GetNetworkDurations", {params}),
   getUsers: (params) => api.get("/Admin/GetUsers", { params }),
   getOnlineUsers: () => api.get("/Admin/GetOnlineUsers"),
   getOperatorCoverageRanking: ({ min, max }) =>
@@ -219,6 +383,12 @@ export const mapViewApi = {
   // ==================== Polygon Management ====================
   getProjectPolygons: (projectId) =>
     api.get(`/api/MapView/GetProjectPolygons?projectId=${projectId}`),
+  
+  
+  getProjectPolygonsV2: (projectId, source = 'map') =>
+    api.get("/api/MapView/GetProjectPolygonsV2", { 
+      params: { projectId, source } 
+    }),
   
   savePolygon: (payload) => api.post("/api/MapView/SavePolygon", payload),
   

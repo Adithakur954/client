@@ -56,7 +56,7 @@ export default function UnifiedHeader({ onToggleControls, isControlsOpen, projec
               className="flex gap-1 items-center bg-blue-600 hover:bg-blue-500 text-white"
             >
               <Filter className="h-4 w-4" />
-              {isControlsOpen ? "Close" : "Open"} Controls
+              {isControlsOpen ? "Close" : "Open"} Filter
             </Button>
             
            

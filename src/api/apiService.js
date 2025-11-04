@@ -1,12 +1,20 @@
 // src/api/apiService.js
 
 // Use environment variable or fallback to localhost
-// const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL || "http://localhost:5224";
-const API_BASE_URL =  "https://signaltrackers-1.onrender.com";
+const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL || "http://localhost:5224";
+// const API_BASE_URL =  "https://signaltrackers-1.onrender.com";
 
 const apiService = async (endpoint, { body, params, ...customOptions } = {}) => {
   const isFormData = body instanceof FormData;
-  const headers = isFormData ? {} : { "Content-Type": "application/json" };
+  const headers = {
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+
+    "Cache-Control":"no-store",
+    Pragma: "no-cache",
+    ...customOptions.headers,
+  };
+
+  
 
   const config = {
     method: customOptions.method || "GET",
@@ -15,7 +23,7 @@ const apiService = async (endpoint, { body, params, ...customOptions } = {}) => 
       ...headers,
       ...customOptions.headers,
     },
-    credentials: "include", // Send cookies with request
+    credentials: "include", 
   };
 
   if (body) config.body = isFormData ? body : JSON.stringify(body);
@@ -27,7 +35,7 @@ const apiService = async (endpoint, { body, params, ...customOptions } = {}) => 
     const response = await fetch(url.toString(), config);
 
     // ✅ HANDLE 401 - Session Expired
-    if (response.status === 401) {
+    if (response.status === 401 || response.status == 403) {
       console.error("Unauthorized request. Session may have expired.");
       
       // Clear session storage

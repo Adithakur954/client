@@ -25,7 +25,7 @@ const ManageSessionsPage = () => {
         try {
             setLoading(true);
             const data = await adminApi.getSessions();
-            console.log("Fetched sessions:", data);
+           
             setSessions(Array.isArray(data) ? data : []);
         } catch (error) {
             toast.error(`Failed to fetch sessions: ${error.message}`);

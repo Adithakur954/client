@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { toast } from "react-toastify";
 import MapSearchBox from "@/components/map/MapSearchBox";
@@ -31,10 +37,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
-
 // Utils
 import { loadSavedViewport, saveViewport } from "@/utils/viewport";
-import {  parseWKTToCoordinates } from "@/utils/wkt";
+import { parseWKTToCoordinates } from "@/utils/wkt";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
@@ -45,7 +50,7 @@ const coordinatesToWktPolygon = (coords) => {
     return null; // Need at least 3 points for a polygon
   }
   // Format each point as "lng lat" and join with commas
-  const pointsString = coords.map(p => `${p.lng} ${p.lat}`).join(', ');
+  const pointsString = coords.map((p) => `${p.lng} ${p.lat}`).join(", ");
   // Ensure the polygon is closed by repeating the first point at the end
   const firstPointString = `${coords[0].lng} ${coords[0].lat}`;
   // WKT format requires longitude first, then latitude
@@ -57,7 +62,11 @@ const MAP_STYLES = {
   clean: [
     { featureType: "poi", stylers: [{ visibility: "off" }] },
     { featureType: "transit", stylers: [{ visibility: "off" }] },
-    { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+    {
+      featureType: "road",
+      elementType: "labels.icon",
+      stylers: [{ visibility: "off" }],
+    },
     { elementType: "labels.text.stroke", stylers: [{ visibility: "off" }] },
     { elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
   ],
@@ -65,21 +74,81 @@ const MAP_STYLES = {
     { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
     { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
     { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-    { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-    { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
-    { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
-    { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
-    { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
-    { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-    { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-    { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
+    {
+      featureType: "administrative.locality",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#d59563" }],
+    },
+    {
+      featureType: "poi",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#d59563" }],
+    },
+    {
+      featureType: "poi.park",
+      elementType: "geometry",
+      stylers: [{ color: "#263c3f" }],
+    },
+    {
+      featureType: "poi.park",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#6b9a76" }],
+    },
+    {
+      featureType: "road",
+      elementType: "geometry",
+      stylers: [{ color: "#38414e" }],
+    },
+    {
+      featureType: "road",
+      elementType: "geometry.stroke",
+      stylers: [{ color: "#212a37" }],
+    },
+    {
+      featureType: "road",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#9ca5b3" }],
+    },
+    {
+      featureType: "road.highway",
+      elementType: "geometry",
+      stylers: [{ color: "#746855" }],
+    },
+    {
+      featureType: "road.highway",
+      elementType: "geometry.stroke",
+      stylers: [{ color: "#1f2835" }],
+    },
+    {
+      featureType: "road.highway",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#f3d19c" }],
+    },
+    {
+      featureType: "transit",
+      elementType: "geometry",
+      stylers: [{ color: "#2f3948" }],
+    },
+    {
+      featureType: "transit.station",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#d59563" }],
+    },
+    {
+      featureType: "water",
+      elementType: "geometry",
+      stylers: [{ color: "#17263c" }],
+    },
+    {
+      featureType: "water",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#515c6d" }],
+    },
+    {
+      featureType: "water",
+      elementType: "labels.text.stroke",
+      stylers: [{ color: "#17263c" }],
+    },
   ],
 };
 const formatArea = (areaInMeters) => {
@@ -106,7 +175,7 @@ export default function HighPerfMap() {
 
   const [selectedSessionData, setSelectedSessionData] = useState(null);
   const [drawnLogs, setDrawnLogs] = useState([]);
-   const [colorBy, setColorBy] = useState(null);
+  const [colorBy, setColorBy] = useState(null);
 
   const [ui, setUi] = useState({
     showSessions: true,
@@ -133,13 +202,13 @@ export default function HighPerfMap() {
   const idleListenerRef = useRef(null);
   const idleTimerRef = useRef(null);
 
-  const [isSearchOpen, setIsSearchOpen]= useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     const fetchThresholds = async () => {
       try {
         const res = await settingApi.getThresholdSettings();
-        console.log(res);
+       
         if (res?.Data) {
           const d = res.Data;
           setThresholds({
@@ -150,7 +219,7 @@ export default function HighPerfMap() {
             ul_thpt: JSON.parse(d.ul_thpt_json || "[]"),
             mos: JSON.parse(d.mos_json || "[]"),
             lte_bler: JSON.parse(d.lte_bler_json || "[]"),
-            coveragehole: parseFloat(d.coveragehole_json) || -110, 
+            coveragehole: parseFloat(d.coveragehole_json) || -110,
           });
         }
       } catch {
@@ -165,7 +234,9 @@ export default function HighPerfMap() {
     try {
       const data = await adminApi.getSessions();
       const valid = (data || []).filter(
-        (s) => Number.isFinite(parseFloat(s.start_lat)) && Number.isFinite(parseFloat(s.start_lon))
+        (s) =>
+          Number.isFinite(parseFloat(s.start_lat)) &&
+          Number.isFinite(parseFloat(s.start_lon))
       );
       setAllSessions(valid);
     } catch (e) {
@@ -187,11 +258,13 @@ export default function HighPerfMap() {
       }
       setIsLoading(true);
       try {
-        const rows = await mapViewApi.getProjectPolygons({ projectId: ui.selectedProjectId });
+        const rows = await mapViewApi.getProjectPolygons({
+          projectId: ui.selectedProjectId,
+        });
         const parsed = (rows || []).map((r) => ({
           id: r.id,
           name: r.name,
-          rings:  parseWKTToCoordinates(r.wkt),
+          rings: parseWKTToCoordinates(r.wkt),
         }));
         setProjectPolygons(parsed);
       } catch (err) {
@@ -244,12 +317,12 @@ export default function HighPerfMap() {
     setActiveFilters(filters);
     setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
     setSelectedSessionData(null);
-    setDrawnLogs([]); 
+    setDrawnLogs([]);
     setAnalysis(null);
     setUi((u) => ({ ...u, showLogsCircles: true }));
     setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
-     setColorBy(filters.colorBy || null);
-};
+    setColorBy(filters.colorBy || null);
+  };
 
   const handleClearFilters = useCallback(() => {
     setActiveFilters(null);
@@ -261,24 +334,27 @@ export default function HighPerfMap() {
     fetchAllSessions();
   }, [fetchAllSessions]);
 
-  const handleUIChange = (partial) => setUi((prev) => ({ ...prev, ...partial }));
+  const handleUIChange = (partial) =>
+    setUi((prev) => ({ ...prev, ...partial }));
 
   const handleSessionMarkerClick = async (session) => {
     setIsLoading(true);
     try {
       const logs = await mapViewApi.getNetworkLog(session.id);
-      console.log("Is session reciving",session.id)
-      console.log("hello check here",logs)
+      
       setSelectedSessionData({ session, logs: logs || [] });
     } catch (e) {
-      toast.error(`Failed to fetch logs for session ${session.id}: ${e?.message || "Unknown error"}`);
+      toast.error(
+        `Failed to fetch logs for session ${session.id}: ${
+          e?.message || "Unknown error"
+        }`
+      );
     } finally {
       setIsLoading(false);
     }
-    
   };
 
- const handleSavePolygon = async () => {
+  const handleSavePolygon = async () => {
     if (!analysis || !analysis.geometry) {
       toast.warn("No analysis data or geometry found to save.");
       return;
@@ -292,9 +368,9 @@ export default function HighPerfMap() {
     const geometry = analysis.geometry;
 
     // Convert geometry coordinates to WKT based on type
-    if (geometry.type === 'polygon' && geometry.polygon) {
+    if (geometry.type === "polygon" && geometry.polygon) {
       wktString = coordinatesToWktPolygon(geometry.polygon);
-    } else if (geometry.type === 'rectangle' && geometry.rectangle) {
+    } else if (geometry.type === "rectangle" && geometry.rectangle) {
       // Convert rectangle bounds to a polygon coordinate array first
       const { ne, sw } = geometry.rectangle;
       const rectCoords = [
@@ -305,7 +381,7 @@ export default function HighPerfMap() {
         // Closing point is added by coordinatesToWktPolygon
       ];
       wktString = coordinatesToWktPolygon(rectCoords);
-    } else if (geometry.type === 'circle' && geometry.circle) {
+    } else if (geometry.type === "circle" && geometry.circle) {
       // Approximate circle as a polygon for WKT
       const { center, radius } = geometry.circle;
       const circleCoords = [];
@@ -313,12 +389,17 @@ export default function HighPerfMap() {
       for (let i = 0; i < numPoints; i++) {
         const angle = (i / numPoints) * 360;
         // Approximate degrees based on meters (latitude doesn't change much locally)
-        const latOffset = (radius / 111111) * Math.cos(angle * Math.PI / 180);
+        const latOffset = (radius / 111111) * Math.cos((angle * Math.PI) / 180);
         // Longitude offset depends on latitude
-        const lngOffset = (radius / (111111 * Math.cos(center.lat * Math.PI / 180))) * Math.sin(angle * Math.PI / 180);
-        circleCoords.push({ lat: center.lat + latOffset, lng: center.lng + lngOffset });
+        const lngOffset =
+          (radius / (111111 * Math.cos((center.lat * Math.PI) / 180))) *
+          Math.sin((angle * Math.PI) / 180);
+        circleCoords.push({
+          lat: center.lat + latOffset,
+          lng: center.lng + lngOffset,
+        });
       }
-       wktString = coordinatesToWktPolygon(circleCoords);
+      wktString = coordinatesToWktPolygon(circleCoords);
     }
 
     if (!wktString) {
@@ -329,33 +410,41 @@ export default function HighPerfMap() {
     // Prepare payload matching the C# controller
     const payload = {
       Name: polygonName,
-      WKT: wktString,
+      WKT: wktString, //try to send in array os session
+      SessionIds: Array.isArray(analysis.session) ? analysis.session : [], 
+      
     };
 
-    console.log("Sending payload to SavePolygon:", payload); // Log the payload
+  
+  
 
     setIsLoading(true); // Indicate loading state
     try {
       // Use the correct API endpoint function name
       const response = await mapViewApi.savePolygon(payload);
-      if (response && response.Status === 1) { // Check response structure
+      if (response && response.Status === 1) {
+        // Check response structure
         toast.success(`Polygon "${polygonName}" saved successfully!`);
         setIsSaveDialogOpen(false); // Close dialog on success
         setPolygonName(""); // Reset name field
         // Optionally: Trigger a refresh of polygons if needed
       } else {
         // Use message from response if available
-        toast.error(response?.Message || "Failed to save polygon. Check server logs.");
+        toast.error(
+          response?.Message || "Failed to save polygon. Check server logs."
+        );
         console.error("SavePolygon API Error:", response);
       }
     } catch (error) {
-      toast.error(`Error saving polygon: ${error.message || "An unknown error occurred."}`);
+      toast.error(
+        `Error saving polygon: ${error.message || "An unknown error occurred."}`
+      );
       console.error("SavePolygon Network/Catch Error:", error);
     } finally {
       setIsLoading(false); // End loading state
     }
   };
-  
+
   const handleDownloadStatsCsv = useCallback(() => {
     if (!analysis || !analysis.stats) {
       toast.error("No polygon stats available. Draw a shape first.");
@@ -385,7 +474,9 @@ export default function HighPerfMap() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `polygon_stats_${selectedMetric}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `polygon_stats_${selectedMetric}_${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
 
@@ -415,7 +506,7 @@ export default function HighPerfMap() {
       "technology",
     ];
 
-    console.log(headers)
+   
 
     const csvRows = [
       headers.join(","),
@@ -436,7 +527,9 @@ export default function HighPerfMap() {
               val = log.lng ?? log.lon ?? log.longitude ?? log.Longitude ?? "";
             }
 
-            return typeof val === "string" && val.includes(",") ? `"${val}"` : val;
+            return typeof val === "string" && val.includes(",")
+              ? `"${val}"`
+              : val;
           })
           .join(",");
       }),
@@ -447,11 +540,15 @@ export default function HighPerfMap() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `polygon_raw_logs_${selectedMetric}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `polygon_raw_logs_${selectedMetric}_${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
 
-    toast.success(`✅ Raw CSV downloaded (${logsInside.length} logs inside polygon)!`);
+    toast.success(
+      `✅ Raw CSV downloaded (${logsInside.length} logs inside polygon)!`
+    );
   }, [analysis, selectedMetric]);
 
   const mapOptions = useMemo(() => {
@@ -459,7 +556,7 @@ export default function HighPerfMap() {
     const styleKey = ui.basemapStyle || "roadmap";
 
     const options = {
-      disableDefaultUI: true,
+      disableDefaultUI: false,
       zoomControl: true,
       mapId: MAP_ID,
       gestureHandling: "greedy",
@@ -477,7 +574,7 @@ export default function HighPerfMap() {
     return options;
   }, [ui.basemapStyle]);
 
-  console.log("hello here to check data ",selectedSessionData)
+ 
 
   if (loadError) return <div>Error loading Google Maps.</div>;
   if (!isLoaded) return <div className="p-4">Loading map…</div>;
@@ -495,7 +592,7 @@ export default function HighPerfMap() {
         onClearFilters={handleClearFilters}
         initialFilters={activeFilters}
         isSearchOpen={isSearchOpen}
-        onSearchToggle={() => setIsSearchOpen(prev => !prev)}
+        onSearchToggle={() => setIsSearchOpen((prev) => !prev)}
         thresholds={thresholds}
       />
 
@@ -524,17 +621,23 @@ export default function HighPerfMap() {
               filters={activeFilters}
               selectedMetric={selectedMetric}
               thresholds={thresholds}
-              onLogsLoaded={(list) => setDrawnLogs(Array.isArray(list) ? list : [])}
+              onLogsLoaded={(list) =>
+                setDrawnLogs(Array.isArray(list) ? list : [])
+              }
               setIsLoading={setLogsLoading}
-              showCircles={ui.showLogsCircles && !(ui.drawPixelateRect && analysis)}
+              showCircles={
+                ui.showLogsCircles && !(ui.drawPixelateRect && analysis)
+              }
               showHeatmap={ui.showHeatmap}
               visibleBounds={ui.renderVisibleLogsOnly ? visibleBounds : null}
               renderVisibleOnly={ui.renderVisibleLogsOnly}
-              canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
+              canvasRadiusPx={(zoom) =>
+                Math.max(3, Math.min(7, Math.floor(zoom / 2)))
+              }
               maxDraw={80000}
-               coverageHoleOnly={showCoverageHoleOnly}
-               colorBy={colorBy}
-              />
+              coverageHoleOnly={showCoverageHoleOnly}
+              colorBy={colorBy}
+            />
           )}
 
           {ui.showPolygons && (
@@ -560,25 +663,29 @@ export default function HighPerfMap() {
           )}
         </GoogleMap>
 
-       {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
-          <MapLegend 
-            thresholds={thresholds} 
+        {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
+          <MapLegend
+            thresholds={thresholds}
             selectedMetric={selectedMetric}
-            colorBy={colorBy} 
+            colorBy={colorBy}
           />
         )}
 
         {analysis && (
           <div className="absolute bottom-4 left-4 z-30 bg-white/95 dark:bg-gray-900/95 rounded-lg shadow-xl p-4 min-w-[260px] border border-gray-200">
             <div className="font-semibold mb-2 text-gray-800 dark:text-white flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                    <span className="text-lg">📊</span>
-                    Selection Stats
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setIsSaveDialogOpen(true)}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📊</span>
+                Selection Stats
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSaveDialogOpen(true)}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
             </div>
             <div className="text-sm text-gray-700 dark:text-gray-200 space-y-1.5">
               <div className="flex justify-between border-b border-gray-100 pb-1">
@@ -594,46 +701,61 @@ export default function HighPerfMap() {
                 <span className="font-medium">{analysis.count}</span>
               </div>
               {analysis.grid && (
-                                <div className="mt-2 pt-2 border-t border-gray-200">
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>Cell Size:</span>
-                                        <span className="font-medium">{analysis.grid.cellSizeMeters}m</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>Active Grid Cells:</span>
-                                        <span className="font-medium">{analysis.grid.cellsWithLogs}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>Grid Area:</span>
-                                        <span className="font-medium">{formatArea(analysis.grid.totalGridArea)}</span>
-                                    </div>
-                                </div>
-                            )}
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Cell Size:</span>
+                    <span className="font-medium">
+                      {analysis.grid.cellSizeMeters}m
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Active Grid Cells:</span>
+                    <span className="font-medium">
+                      {analysis.grid.cellsWithLogs}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Grid Area:</span>
+                    <span className="font-medium">
+                      {formatArea(analysis.grid.totalGridArea)}
+                    </span>
+                  </div>
+                </div>
+              )}
               {analysis.stats?.count > 0 ? (
                 <>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Mean:</span>
-                    <span className="font-medium text-blue-600">{analysis.stats.mean?.toFixed(2)}</span>
+                    <span className="font-medium text-blue-600">
+                      {analysis.stats.mean?.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Median:</span>
-                    <span className="font-medium text-green-600">{analysis.stats.median?.toFixed(2)}</span>
+                    <span className="font-medium text-green-600">
+                      {analysis.stats.median?.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Range:</span>
                     <span className="font-medium text-orange-600">
-                      {analysis.stats.min?.toFixed(2)} → {analysis.stats.max?.toFixed(2)}
+                      {analysis.stats.min?.toFixed(2)} →{" "}
+                      {analysis.stats.max?.toFixed(2)}
                     </span>
                   </div>
                   {analysis.grid && (
                     <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
                       <div className="flex justify-between">
                         <span>Grid Cells:</span>
-                        <span className="font-medium">{analysis.grid.cells}</span>
+                        <span className="font-medium">
+                          {analysis.grid.cells}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Cell Size:</span>
-                        <span className="font-medium">{analysis.grid.cellSizeMeters}m</span>
+                        <span className="font-medium">
+                          {analysis.grid.cellSizeMeters}m
+                        </span>
                       </div>
                     </div>
                   )}
@@ -646,7 +768,7 @@ export default function HighPerfMap() {
             </div>
           </div>
         )}
-         
+
         <SessionDetailPanel
           sessionData={selectedSessionData}
           isLoading={isLoading}
@@ -660,43 +782,55 @@ export default function HighPerfMap() {
           thresholds={thresholds}
           selectedMetric={selectedMetric}
           isLoading={logsLoading}
+          startDate={activeFilters?.startDate} // ✅ Add this
+          endDate={activeFilters?.endDate}
         />
 
         {(isLoading || logsLoading) && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-black/70 backdrop-blur-sm">
             <div className="bg-white rounded-lg shadow-xl p-6 flex items-center gap-3">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="text-lg font-medium text-gray-700">Loading…</span>
+              <span className="text-lg font-medium text-gray-700">
+                Loading…
+              </span>
             </div>
           </div>
         )}
 
         <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                    <DialogTitle>Save Polygon Analysis</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">
-                            Name
-                        </Label>
-                        <Input
-                            id="name"
-                            value={polygonName}
-                            onChange={(e) => setPolygonName(e.target.value)}
-                            className="col-span-3"
-                            placeholder="e.g., Sector 15 Coverage Gap"
-                        />
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleSavePolygon} disabled={!polygonName.trim() || isLoading}>
-                        {isLoading ? "Saving..." : "Save Polygon"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Save Polygon Analysis</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  value={polygonName}
+                  onChange={(e) => setPolygonName(e.target.value)}
+                  className="col-span-3"
+                  placeholder="e.g., Sector 15 Coverage Gap"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsSaveDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSavePolygon}
+                disabled={!polygonName.trim() || isLoading}
+              >
+                {isLoading ? "Saving..." : "Save Polygon"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
         </Dialog>
       </div>
     </div>

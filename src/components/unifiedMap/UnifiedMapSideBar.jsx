@@ -1,6 +1,6 @@
 // src/components/UnifiedMapSidebar.jsx
 import React, { useMemo, useCallback, memo } from "react";
-import { X, RefreshCw, Eye, EyeOff, Filter as FilterIcon, Layers, AlertTriangle } from "lucide-react";
+import { X, RefreshCw, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -72,6 +72,8 @@ const UnifiedMapSidebar = ({
   onUIChange,
   showPolygons,
   setShowPolygons,
+  polygonSource,
+  setPolygonSource,
   onlyInsidePolygons,
   setOnlyInsidePolygons,
   polygonCount,
@@ -93,8 +95,8 @@ const UnifiedMapSidebar = ({
   }, [reloadData]);
 
   const shouldShowMetricSelector = useMemo(
-    () => enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction"),
-    [enableDataToggle, enableSiteToggle, siteToggle]
+    () => enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction") || showPolygons,
+    [enableDataToggle, enableSiteToggle, siteToggle, showPolygons]
   );
 
   const siteToggleOptions = useMemo(
@@ -114,6 +116,11 @@ const UnifiedMapSidebar = ({
     []
   );
 
+  const polygonToggleOptions = useMemo(() => [
+    { value: "map", label: "Map Regions" },
+    { value: "save", label: "Buildings" }
+  ], []);
+
   const handleDataToggleChange = useCallback(
     (value) => setDataToggle?.(value),
     [setDataToggle]
@@ -129,9 +136,12 @@ const UnifiedMapSidebar = ({
     [setMetric]
   );
 
-  const handleBasemapChange = useCallback(
-    (value) => onUIChange?.({ basemapStyle: value }),
-    [onUIChange]
+  const handlePolygonSourceChange = useCallback(
+    (value) => {
+      console.log(`🔄 Polygon source changed to: ${value}`);
+      setPolygonSource?.(value);
+    },
+    [setPolygonSource]
   );
 
   return (
@@ -178,7 +188,7 @@ const UnifiedMapSidebar = ({
             </div>
           </PanelSection>
 
-          <PanelSection title="Toggle 1: Data Layer">
+          <PanelSection title="Data Layer">
             <div className="space-y-3">
               <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
                 <input
@@ -201,22 +211,10 @@ const UnifiedMapSidebar = ({
                   options={dataToggleOptions}
                 />
               </div>
-
-              <div className="text-xs p-2 bg-slate-800 rounded">
-                {enableDataToggle ? (
-                  <span className="text-green-400">
-                    ✓ Showing {dataToggle} data
-                  </span>
-                ) : (
-                  <span className="text-slate-500">
-                    ✗ Data layer disabled
-                  </span>
-                )}
-              </div>
             </div>
           </PanelSection>
 
-          <PanelSection title="Toggle 2: Sites Layer">
+          <PanelSection title="Sites Layer">
             <div className="space-y-3">
               <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
                 <input
@@ -263,18 +261,112 @@ const UnifiedMapSidebar = ({
                   </label>
                 </div>
               )}
+            </div>
+          </PanelSection>
 
-              <div className="text-xs p-2 bg-slate-800 rounded">
-                {enableSiteToggle ? (
-                  <span className="text-purple-400">
-                    ✓ Showing {siteToggle} data
-                  </span>
-                ) : (
-                  <span className="text-slate-500">
-                    ✗ Sites layer disabled
-                  </span>
-                )}
+          {/* ✅ SINGLE POLYGON LAYER SECTION */}
+          <PanelSection title="Polygon Layer">
+            <div className="space-y-3">
+              {/* Enable/Disable Polygons */}
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
+                <input
+                  type="checkbox"
+                  checked={showPolygons}
+                  onChange={(e) => {
+                    const isEnabled = e.target.checked;
+                    console.log(`🔘 Polygon checkbox toggled: ${isEnabled}`);
+                    setShowPolygons?.(isEnabled);
+                  }}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">Show Polygons</span>
+              </label>
+
+              {/* Polygon Source Toggle */}
+              <div>
+                <Label className="text-xs text-slate-300 mb-2 block">
+                  Polygon Source
+                </Label>
+                <ToggleButton
+                  value={polygonSource}
+                  onChange={handlePolygonSourceChange}
+                  disabled={!showPolygons}
+                  options={polygonToggleOptions}
+                />
               </div>
+
+              {/* Show polygon count */}
+              {showPolygons && polygonCount > 0 && (
+                <div className="p-2 bg-slate-800 rounded text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Loaded:</span>
+                    <span className="font-semibold text-blue-400">
+                      {polygonCount} polygon(s)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-slate-400">Source:</span>
+                    <span className="font-semibold text-green-400">
+                      {polygonSource === 'map' ? 'Map Regions' : 'Buildings'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Filter Options */}
+              {/* {showPolygons && (
+                <div className="space-y-2 pt-2 border-t border-slate-700">
+                  <Label className="text-xs text-slate-300 block">
+                    Display Mode
+                  </Label>
+                  
+                  <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={onlyInsidePolygons}
+                      onChange={(e) => setOnlyInsidePolygons?.(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm">Polygon Heatmap</div>
+                      <div className="text-xs text-slate-400">
+                        Color polygons by average metric
+                      </div>
+                    </div>
+                  </label>
+
+                  {onlyInsidePolygons && (
+                    <div className="ml-6 text-xs text-yellow-400 bg-yellow-900/20 p-2 rounded">
+                      ⚠️ Individual points hidden
+                    </div>
+                  )}
+                </div>
+              )} */}
+
+              <Label className="text-xs text-slate-300 mb-2 block">
+                      Point Filtering
+                    </Label>
+                    
+                    <div className="mb-2 p-2 bg-slate-800 rounded text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Mode:</span>
+                        <span className={`font-semibold ${onlyInsidePolygons ? 'text-green-400' : 'text-blue-400'}`}>
+                          {onlyInsidePolygons ? 'Filtered' : 'All Points'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setOnlyInsidePolygons?.(!onlyInsidePolygons)}
+                      className={`w-full px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
+                        onlyInsidePolygons
+                          ? "bg-green-600 hover:bg-green-700 text-white"
+                          : "bg-slate-700 hover:bg-slate-600 text-slate-300"
+                      }`}
+                    >
+                      
+                      {onlyInsidePolygons ? "Show All Points" : "Filter Inside Only"}
+                    </button>
             </div>
           </PanelSection>
 
@@ -303,7 +395,7 @@ const UnifiedMapSidebar = ({
           {shouldShowMetricSelector && (
             <PanelSection title="Coverage Holes" icon={AlertTriangle}>
               <div className="space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer p-3 rounded  transition-colors">
+                <label className="flex items-center gap-2 cursor-pointer p-3 rounded transition-colors">
                   <input
                     type="checkbox"
                     checked={showCoverageHoleOnly}
@@ -311,10 +403,9 @@ const UnifiedMapSidebar = ({
                     className="w-4 h-4 rounded"
                   />
                   <div className="flex-1">
-                    <div className="text-sm font-medium ">
+                    <div className="text-sm font-medium">
                       Coverage Holes
                     </div>
-                   
                   </div>
                 </label>
 
@@ -335,74 +426,10 @@ const UnifiedMapSidebar = ({
                     />
                     <span className="text-xs text-slate-400 whitespace-nowrap">dBm</span>
                   </div>
-                  
                 </div>
-
-                
               </div>
             </PanelSection>
           )}
-
-          {projectId && (
-            <PanelSection title="Polygon Controls" icon={Layers}>
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-xs text-slate-300 mb-2 block">
-                    Project Polygons
-                  </Label>
-                  <button
-                    onClick={() => setShowPolygons?.(!showPolygons)}
-                    className={`w-full px-4 py-3 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                      showPolygons
-                        ? "bg-green-600 hover:bg-green-700 text-white"
-                        : "bg-slate-700 hover:bg-slate-600 text-slate-300"
-                    }`}
-                  >
-                    {showPolygons ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    {showPolygons ? "Polygons Visible" : "Polygons Hidden"}
-                  </button>
-                </div>
-
-                {showPolygons && (
-                  <div className="pt-2 border-t border-slate-700">
-                    <Label className="text-xs text-slate-300 mb-2 block">
-                      Point Filtering
-                    </Label>
-                    
-                    <div className="mb-2 p-2 bg-slate-800 rounded text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Mode:</span>
-                        <span className={`font-semibold ${onlyInsidePolygons ? 'text-green-400' : 'text-blue-400'}`}>
-                          {onlyInsidePolygons ? 'Filtered' : 'All Points'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setOnlyInsidePolygons?.(!onlyInsidePolygons)}
-                      className={`w-full px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                        onlyInsidePolygons
-                          ? "bg-green-600 hover:bg-green-700 text-white"
-                          : "bg-slate-700 hover:bg-slate-600 text-slate-300"
-                      }`}
-                    >
-                      <FilterIcon className="h-4 w-4" />
-                      {onlyInsidePolygons ? "Show All Points" : "Filter Inside Only"}
-                    </button>
-
-                    {polygonCount > 0 && (
-                      <div className="mt-2 text-xs text-slate-400">
-                        {polygonCount} polygon(s) loaded
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </PanelSection>
-          )}
-
-          
-
         </div>
 
         <div className="p-4 border-t border-slate-700 bg-slate-900">

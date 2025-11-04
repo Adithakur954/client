@@ -25,7 +25,7 @@ const CreateProjectPage = () => {
           geojson: null,
         }));
         setPolygons(mappedPolygons);
-        console.log(`✅ Loaded ${mappedPolygons.length} polygons`);
+       
       }
     } catch (error) {
       toast.error("Failed to load polygons.");

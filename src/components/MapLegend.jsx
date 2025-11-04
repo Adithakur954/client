@@ -23,18 +23,16 @@ const MapLegend = ({ showOperators = true, showSignalQuality = false }) => {
     <div className="absolute top-2 right-2 z-10 bg-white/95 dark:bg-gray-900/95 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 min-w-[220px] max-w-[280px]">
       <h3 className="text-xs font-bold text-gray-800 dark:text-gray-200 mb-2 pb-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
         <span>📡</span>
-        <span>Radio Planning Legend</span>
+        <span>Legends</span>
       </h3>
       
       {showOperators && (
         <div className="mb-3">
           <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-            <span>📐</span>
+            
             <span>Cell Sectors (Triangles)</span>
           </div>
-          <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-2 italic">
-            Each triangle shows coverage pattern with azimuth angle
-          </div>
+          
           <div className="space-y-1.5">
             {OPERATOR_LEGEND.map(({ operator, color, description, sectors }) => (
               <div key={operator} className="flex items-center gap-2">
@@ -48,25 +46,12 @@ const MapLegend = ({ showOperators = true, showSignalQuality = false }) => {
                   <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
                     {operator}
                   </div>
-                  <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                    {description} • {sectors} sectors
-                  </div>
+                 
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-[10px] text-gray-500 dark:text-gray-400">
-            <div className="flex items-start gap-1">
-              <span>📍</span>
-              <div>
-                <div className="font-medium">Triangle Elements:</div>
-                <div>• Point: Cell site location</div>
-                <div>• Direction: Azimuth angle</div>
-                <div>• Width: Beamwidth (65°)</div>
-                <div>• Length: Coverage range</div>
-              </div>
-            </div>
-          </div>
+          
         </div>
       )}
 

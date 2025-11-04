@@ -1,5 +1,5 @@
 import React from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import ChartCard from '../ChartCard';
 import { TOOLTIP_STYLE } from '@/components/constants/dashboardConstants';
 import { useMonthlySamples } from '@/hooks/useDashboardData';
@@ -50,7 +50,14 @@ const MonthlySamplesChart = ({ chartFilters, onChartFiltersChange, operators, ne
             fill="url(#gradBlue)"
             dot={{ r: 3, stroke: '#3B82F6', strokeWidth: 2, fill: '#fff' }}
             activeDot={{ r: 5, stroke: '#3B82F6', strokeWidth: 2, fill: '#fff' }}
-          />
+          >
+            <LabelList
+    dataKey="count"
+    position="top"
+    style={{ fill: '#374151', fontSize: 11, fontWeight: 600 }}
+    formatter={(value) => formatNumber(value)} // optional
+  />
+            </Area >
         </AreaChart>
       </ResponsiveContainer>
     </ChartCard>

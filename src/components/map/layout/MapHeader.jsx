@@ -182,7 +182,7 @@ export default function MapHeader({
         )}
       </div>
 
-      {/* Right: Header controls + User */}
+     
       <div className="flex items-center space-x-4">
         <Button 
           size="sm"
