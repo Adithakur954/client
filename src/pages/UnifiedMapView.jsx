@@ -1037,7 +1037,8 @@ const UnifiedMapView = () => {
               {enableSiteToggle && showSiteSectors && (
                 <NetworkPlannerMap
                   
-                  defaultRadius={220}
+                  defaultRadius={10}
+                  scale={0.2}
                   showSectors={showSiteSectors}
                   onSectorClick={handleSectorClick}
                   viewport={viewport}

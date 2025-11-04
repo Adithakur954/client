@@ -52,11 +52,11 @@ function generateSectorsFromSite(site) {
   const color = getColorForNetwork(site.network);
   
   // Default range based on network type
-  let range = 280; // default
+  let range = 120; // default
   if (site.network?.toLowerCase().includes("5g") || site.network?.toLowerCase().includes("jio")) {
-    range = 220;
+    range = 90;
   } else if (site.network?.toLowerCase().includes("vi") || site.network?.toLowerCase().includes("900")) {
-    range = 350;
+    range = 160;
   }
   
   // Generate sectors evenly spaced
@@ -93,7 +93,7 @@ function generateSectorsFromSite(site) {
 let instanceCounter = 0;
 
 const NetworkPlannerMap = ({ 
-  radius = 280, 
+  radius = 120, 
   projectId,
   sectors: externalSectors = null,
   onSectorClick = null,
@@ -312,7 +312,8 @@ const NetworkPlannerMap = ({
         try {
           const p0 = { lat: sector.lat, lng: sector.lng };
           const bw = sector.beamwidth ?? 65;
-          const r = sector.range ?? radius;
+          const r = (sector.range ?? radius) * (options.scale ?? 1);
+
 
           const p1 = computeOffset(p0, r, sector.azimuth - bw / 2);
           const p2 = computeOffset(p0, r, sector.azimuth + bw / 2);
