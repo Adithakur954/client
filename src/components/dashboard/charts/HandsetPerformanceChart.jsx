@@ -12,8 +12,8 @@ const HandsetPerformanceChart = () => {
   const renderLollipopStick = (props) => {
     const { x, y, width, height, payload } = props;
     const stickX = x + width / 2;
-    const stickY = y + height; // Bottom of the chart
-    const endY = y; // Top (where value is)
+    const stickY = y + height;
+    const endY = y; 
     
     return (
       <line

@@ -14,6 +14,7 @@ import CoverageRankingChart from '@/components/dashboard/charts/CoverageRankingC
 import QualityRankingChart from '@/components/dashboard/charts/QualityRankingChart';
 import StatCardSkeleton from '@/components/dashboard/skeletons/StatCardSkeleton';
 import { StatCard } from '@/components/dashboard';
+import AppChart from '@/components/dashboard/charts/AppChart';
 
 import { 
   useTotals, 
@@ -35,16 +36,7 @@ const DashboardPage = () => {
   const { data: bandDistData } = useBandDistribution({});
 
   // Calculate normalized counts for Technologies and Bands
-  const technologyCount = useMemo(() => {
-    if (!networkDistData || networkDistData.length === 0) return 0;
-    
-    // Get unique network types
-    const uniqueNetworks = new Set(
-      networkDistData.map(item => item.network).filter(Boolean)
-    );
-    
-    return uniqueNetworks.size;
-  }, [networkDistData]);
+  
 
   const bandCount = useMemo(() => {
     if (!bandDistData || bandDistData.length === 0) return 0;
@@ -93,13 +85,13 @@ const DashboardPage = () => {
         color: "bg-gradient-to-br from-sky-500 to-sky-600",
         description: "Unique network operators"
       },
-      {
-        title: "Technologies",
-        value: technologyCount,
-        icon: Radio,
-        color: "bg-gradient-to-br from-pink-500 to-pink-600",
-        description: "Network types (2G, 3G, 4G, 5G)"
-      },
+      // {
+      //   title: "Technologies",
+      //   value: technologyCount,
+      //   icon: Radio,
+      //   color: "bg-gradient-to-br from-pink-500 to-pink-600",
+      //   description: "Network types (2G, 3G, 4G, 5G)"
+      // },
       {
         title: "Bands",
         value: bandCount,
@@ -108,7 +100,17 @@ const DashboardPage = () => {
         description: "Frequency bands detected"
       },
     ];
-  }, [totalsData, operatorCount, technologyCount, bandCount]);
+  }, [totalsData, operatorCount,  bandCount]);
+  // const technologyCount = useMemo(() => {
+  //   if (!networkDistData || networkDistData.length === 0) return 0;
+    
+  //   // Get unique network types
+  //   const uniqueNetworks = new Set(
+  //     networkDistData.map(item => item.network).filter(Boolean)
+  //   );
+    
+  //   return uniqueNetworks.size;
+  // }, [networkDistData]);
 
   const handleChartFilterChange = (chartKey, newFilters) => {
     setChartFilters(prev => ({
@@ -180,12 +182,7 @@ const DashboardPage = () => {
           />
 
           {/* Network Type Distribution */}
-          <NetworkDistributionChart
-            chartFilters={chartFilters['networkDist']}
-            onChartFiltersChange={(f) => handleChartFilterChange('networkDist', f)}
-            operators={operators}
-            networks={networks}
-          />
+          <AppChart />
 
           {/* Dynamic Metric Chart */}
           <MetricChart

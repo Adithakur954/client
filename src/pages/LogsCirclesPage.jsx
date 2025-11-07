@@ -54,7 +54,7 @@ export default function LogsCirclesPage() {
             ul_thpt: JSON.parse(d.ul_thpt_json || "[]"),
             mos: JSON.parse(d.mos_json || "[]"),
             lte_bler: JSON.parse(d.lte_bler_json || "[]"),
-            coveragehole: parseFloat(d.coveragehole_json) || -110, // ✅ Coverage hole threshold
+            coveragehole: parseFloat(d.coveragehole_json) || -105, 
           });
         }
       } catch {}

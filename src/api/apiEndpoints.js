@@ -298,40 +298,34 @@ export const adminApi = {
   getReactDashboardData: () => api.get("/Admin/GetReactDashboardData"),
   getDashboardGraphData: () => api.get("/Admin/GetDashboardGraphData"),
   getAllUsers: (filters) => api.post("/Admin/GetAllUsers", filters),
+  getAppValue:(startDate,endDate)=> api.get(`/Admin/AppQualityFlatV2?from=${startDate}&to=${endDate}`),
 
 getNetworkDurations: async (startDate, endDate) => {
-  // ✅ Format date in LOCAL timezone (not UTC)
   const formatDateLocal = (d) => {
-    try {
-      if (!d) return null;
-      const dateObj = d instanceof Date ? d : new Date(d);
-      if (isNaN(dateObj.getTime())) return null;
-      
-      // ✅ Use local date components (not UTC)
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      
-      return `${year}-${month}-${day}`;
-    } catch (err) {
-      console.warn("Invalid date conversion:", d, err);
-      return null;
-    }
+    if (!d) return null;
+    const dateObj = new Date(d);
+    if (isNaN(dateObj)) return null;
+    return dateObj.toISOString().split("T")[0];
   };
 
   const from = formatDateLocal(startDate);
   const to = formatDateLocal(endDate);
 
-  if (!from || !to) {
-    console.warn("❌ Invalid date(s):", { startDate, endDate, from, to });
-    throw new Error("Invalid date range");
-  }
+  if (!from || !to) throw new Error("Invalid date range");
 
   const url = `/Admin/GetNetworkDurations?fromDate=${encodeURIComponent(from)}&toDate=${encodeURIComponent(to)}`;
-  console.log("✅ Final URL:", url);
 
-  return api.get(url);
+  try {
+    console.log("✅ Final URL:", url);
+    const response = await api.get(url); // ✅ await Axios
+    console.log("✅ API resolved:", response);
+    return response; // or `response.data` if you prefer
+  } catch (err) {
+    console.error("❌ API error:", err);
+    throw err;
+  }
 },
+
 
 
 
@@ -548,10 +542,15 @@ export const settingApi = {
 
 export const excelApi = {
   uploadFile: (formData) => api.post("/ExcelUpload/UploadExcelFile", formData),
-  downloadTemplate: (fileType) =>
-    api.get("/ExcelUpload/DownloadExcel", { params: { FileType: fileType } }),
+  
+  downloadTemplate: (fileType) => {
+    window.open(`https://signaltrackers-1.onrender.com/ExcelUpload/DownloadExcel?fileType=${fileType}`, '_blank');
+    return Promise.resolve({ success: true });
+  },
+  
   getUploadedFiles: (type) =>
     api.get(`/ExcelUpload/GetUploadedExcelFiles`, { params: { FileType: type } }),
+    
   getSessions: (fromDate, toDate) =>
     api.get("/ExcelUpload/GetSessions", {
       params: {
@@ -560,7 +559,6 @@ export const excelApi = {
       },
     }),
 };
-
 /**
  * ============================================
  * UTILITY FUNCTIONS

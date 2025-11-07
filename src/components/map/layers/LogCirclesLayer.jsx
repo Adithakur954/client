@@ -24,6 +24,7 @@ export default function LogCirclesLayer({
   colorBy = null,
 }) {
   const [logs, setLogs] = useState([]);
+  const [keys,setKeys] = useState([]);
   const heatmapRef = useRef(null);
   const { field } = resolveMetricConfig(selectedMetric);
 
@@ -63,6 +64,7 @@ export default function LogCirclesLayer({
         const apiParams = JSON.parse(filterSignature);
 
         const fetched = await mapViewApi.getLogsByDateRange(apiParams);
+
         if (cancelled) return;
 
         if (!Array.isArray(fetched) || fetched.length === 0) {
@@ -72,6 +74,8 @@ export default function LogCirclesLayer({
           if (heatmapRef.current) heatmapRef.current.setMap(null);
           return;
         }
+
+        setKeys(fetched.map((item)=>item.id))
 
         setLogs(fetched);
         onLogsLoadedRef.current?.(fetched);

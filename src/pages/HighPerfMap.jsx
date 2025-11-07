@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 import MapSearchBox from "@/components/map/MapSearchBox";
 import { Save } from "lucide-react";
 
-// APIs
+
 import { adminApi, mapViewApi, settingApi } from "@/api/apiEndpoints";
 
 // Layout components
@@ -201,6 +201,7 @@ export default function HighPerfMap() {
   const [visibleBounds, setVisibleBounds] = useState(null);
   const idleListenerRef = useRef(null);
   const idleTimerRef = useRef(null);
+  const [idCollect, setIdCollect] = useState([]);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -340,9 +341,17 @@ export default function HighPerfMap() {
   const handleSessionMarkerClick = async (session) => {
     setIsLoading(true);
     try {
+      console.log(session.id,"mayank bhaiya")
       const logs = await mapViewApi.getNetworkLog(session.id);
-      
+      console.log(logs)
       setSelectedSessionData({ session, logs: logs || [] });
+      console.log(selectedSessionData)
+
+    setIdCollect(logs.map((item)=>item.id))
+      
+
+    
+     
     } catch (e) {
       toast.error(
         `Failed to fetch logs for session ${session.id}: ${
@@ -353,6 +362,10 @@ export default function HighPerfMap() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+  console.log("🔥 idCollect state changed:", idCollect);
+}, [idCollect]);
 
   const handleSavePolygon = async () => {
     if (!analysis || !analysis.geometry) {

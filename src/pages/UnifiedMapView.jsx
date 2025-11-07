@@ -22,6 +22,7 @@ import UnifiedHeader from "@/components/unifiedMap/unifiedMapHeader";
 import MapLegend from "@/components/MapLegend";
 
 
+
 const defaultThresholds = {
   rsrp: [],
   rsrq: [],
@@ -466,6 +467,7 @@ const UnifiedMapView = () => {
         metric: String(selectedMetric).toUpperCase(),
       });
 
+      console.log(res)
       if (res?.Status === 1 && res?.Data) {
         const dataList = res.Data.dataList || [];
         const colorSettings = res.Data.colorSetting || [];
@@ -654,7 +656,7 @@ const UnifiedMapView = () => {
     selectedMetric,
   ]);
 
-  // Polygons with heatmap colors
+ 
   const polygonsWithColors = useMemo(() => {
     if (
       !onlyInsidePolygons ||
@@ -968,17 +970,12 @@ const UnifiedMapView = () => {
               defaultZoom={13}
               fitToLocations={showDataCircles && filteredLocations.length > 0}
               onLoad={handleMapLoad}
-            >
-              {/* ✅ FIXED: Polygon Rendering with Debug Logs */}
-              {/* {(() => {
+              
+              radiusMeters={24} 
+               
              
-                
-                if (showPolygons && visiblePolygons.length > 0) {
-                
-                }
-                
-                return null;
-              })()} */}
+            >
+              
 
               {showPolygons &&
                 visiblePolygons.length > 0 &&
