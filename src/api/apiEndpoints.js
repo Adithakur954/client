@@ -298,7 +298,43 @@ export const adminApi = {
   getReactDashboardData: () => api.get("/Admin/GetReactDashboardData"),
   getDashboardGraphData: () => api.get("/Admin/GetDashboardGraphData"),
   getAllUsers: (filters) => api.post("/Admin/GetAllUsers", filters),
-  getNetworkDurations:(params) => api.get("/Admin/GetNetworkDurations", {params}),
+
+getNetworkDurations: async (startDate, endDate) => {
+  // ✅ Format date in LOCAL timezone (not UTC)
+  const formatDateLocal = (d) => {
+    try {
+      if (!d) return null;
+      const dateObj = d instanceof Date ? d : new Date(d);
+      if (isNaN(dateObj.getTime())) return null;
+      
+      // ✅ Use local date components (not UTC)
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      
+      return `${year}-${month}-${day}`;
+    } catch (err) {
+      console.warn("Invalid date conversion:", d, err);
+      return null;
+    }
+  };
+
+  const from = formatDateLocal(startDate);
+  const to = formatDateLocal(endDate);
+
+  if (!from || !to) {
+    console.warn("❌ Invalid date(s):", { startDate, endDate, from, to });
+    throw new Error("Invalid date range");
+  }
+
+  const url = `/Admin/GetNetworkDurations?fromDate=${encodeURIComponent(from)}&toDate=${encodeURIComponent(to)}`;
+  console.log("✅ Final URL:", url);
+
+  return api.get(url);
+},
+
+
+
   getUsers: (params) => api.get("/Admin/GetUsers", { params }),
   getOnlineUsers: () => api.get("/Admin/GetOnlineUsers"),
   getOperatorCoverageRanking: ({ min, max }) =>

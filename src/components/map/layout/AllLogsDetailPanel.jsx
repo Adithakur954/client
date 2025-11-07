@@ -1,20 +1,9 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { X, Download, Clock } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 
 import Spinner from "@/components/common/Spinner";
-import { adminApi, mapViewApi } from "@/api/apiEndpoints";
+import { adminApi } from "@/api/apiEndpoints";
 
-// Metric config with units and proper threshold mapping
 const resolveMetricConfig = (selectedMetric) => {
   const key = String(selectedMetric || "").toLowerCase();
   const map = {
@@ -76,7 +65,6 @@ const quantile = (sorted, q) => {
   return sorted[base];
 };
 
-// Format duration from hours to readable format
 const formatDuration = (hours) => {
   if (!hours || hours < 0.001) return "0s";
 
@@ -88,25 +76,129 @@ const formatDuration = (hours) => {
   const parts = [];
   if (h > 0) parts.push(`${h}h`);
   if (m > 0) parts.push(`${m}m`);
-  if (s > 0 && h === 0) parts.push(`${s}s`); // Only show seconds if less than an hour
+  if (s > 0 && h === 0) parts.push(`${s}s`);
 
   return parts.join(" ") || "0s";
 };
 
-// Update the normalizeOperator function to handle more edge cases
+const normalizeProviderName = (provider) => {
+  if (!provider || provider === null || provider === undefined || provider.trim() === "") {
+    return "Unknown";
+  }
+
+  const cleaned = String(provider).trim().toUpperCase().replace(/[\s\-_]/g, "");
+
+  if (
+    cleaned.includes("JIO") ||
+    cleaned === "JIOTRUE5G" ||
+    cleaned === "JIO4G" ||
+    cleaned === "JIO5G" ||
+    cleaned === "INDJIO"
+  ) {
+    return "JIO";
+  }
+
+  if (
+    cleaned.includes("AIRTEL") ||
+    cleaned === "INDAIRTEL" ||
+    cleaned === "AIRTEL5G"
+  ) {
+    return "Airtel";
+  }
+
+  if (
+    cleaned === "VI" ||
+    cleaned === "VIINDIA" ||
+    cleaned.includes("VODAFONE") ||
+    cleaned.includes("IDEA")
+  ) {
+    return "VI";
+  }
+
+  if (cleaned.includes("BSNL")) {
+    return "BSNL";
+  }
+
+  return "Unknown";
+};
+
+const normalizeNetworkType = (network) => {
+  if (!network || network === null || network === undefined) {
+    return "Unknown";
+  }
+
+  const n = String(network).trim().toUpperCase();
+
+  if (n === "" || n === "NULL" || n === "UNDEFINED" || n === "UNKNOWN") {
+    return "Unknown";
+  }
+
+  if (n.includes("5G") && n.includes("SA") && !n.includes("NSA")) {
+    return "5G SA";
+  }
+
+  if (n.includes("5G") && n.includes("NSA")) {
+    return "5G NSA";
+  }
+
+  if (n.includes("5G") || n.includes("NR")) {
+    return "5G";
+  }
+
+  if (n.includes("4G") || n.includes("LTE")) {
+    return "4G";
+  }
+
+  if (n.includes("3G") || n.includes("WCDMA") || n.includes("UMTS")) {
+    return "3G";
+  }
+
+  if (n.includes("2G") || n.includes("EDGE") || n.includes("GPRS") || n.includes("GSM")) {
+    return "2G";
+  }
+
+  return "Unknown";
+};
+
+const normalizeAndAggregateDurations = (data) => {
+  const aggregated = new Map();
+
+  data.forEach((item) => {
+    const provider = normalizeProviderName(item.Provider);
+    const network = normalizeNetworkType(item.Network);
+    const key = `${provider}|${network}`;
+
+    if (aggregated.has(key)) {
+      const existing = aggregated.get(key);
+      existing.TotalDurationSeconds += item.TotalDurationSeconds || 0;
+      existing.TotalDurationMinutes += item.TotalDurationMinutes || 0;
+      existing.TotalDurationHours += item.TotalDurationHours || 0;
+    } else {
+      aggregated.set(key, {
+        Provider: provider,
+        Network: network,
+        TotalDurationSeconds: item.TotalDurationSeconds || 0,
+        TotalDurationMinutes: item.TotalDurationMinutes || 0,
+        TotalDurationHours: item.TotalDurationHours || 0,
+      });
+    }
+  });
+
+  return Array.from(aggregated.values())
+    .sort((a, b) => b.TotalDurationHours - a.TotalDurationHours);
+};
+
 const normalizeOperator = (raw) => {
   if (!raw || raw === null || raw === undefined) return "Unknown";
 
   const s = String(raw).trim();
 
-  // Handle empty, null, or special characters
   if (s === "" || s === "null" || s === "undefined") return "Unknown";
   if (/^\/+$/.test(s)) return "Unknown";
   if (s === "404011") return "Unknown";
 
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
 
-  // JIO variations
   if (
     cleaned.includes("JIO") ||
     cleaned.includes("JIOTRUE") ||
@@ -117,7 +209,6 @@ const normalizeOperator = (raw) => {
     return "JIO";
   }
 
-  // Airtel variations
   if (
     cleaned.includes("AIRTEL") ||
     cleaned === "INDAIRTEL" ||
@@ -126,7 +217,6 @@ const normalizeOperator = (raw) => {
     return "Airtel";
   }
 
-  // VI/Vodafone/Idea variations
   if (
     cleaned === "VI" ||
     cleaned.includes("VIINDIA") ||
@@ -136,7 +226,6 @@ const normalizeOperator = (raw) => {
     return "VI India";
   }
 
-  // BSNL
   if (cleaned.includes("BSNL")) {
     return "BSNL";
   }
@@ -144,43 +233,6 @@ const normalizeOperator = (raw) => {
   return "Unknown";
 };
 
-const normalizeNetwork = (network) => {
-  if (!network || network === null || network === undefined) return "Unknown";
-
-  const n = String(network).trim().toUpperCase();
-
-  if (n === "" || n === "NULL" || n === "UNDEFINED") return "Unknown";
-
-  // 5G variations
-  if (n.includes("5G") || n.includes("NR")) {
-    if (n.includes("SA")) return "5G SA";
-    if (n.includes("NSA")) return "5G NSA";
-    return "5G";
-  }
-
-  // 4G variations
-  if (n.includes("4G") || n.includes("LTE")) return "4G";
-
-  // 3G variations
-  if (n.includes("3G") || n.includes("WCDMA") || n.includes("UMTS"))
-    return "3G";
-
-  // 2G variations
-  if (
-    n.includes("2G") ||
-    n.includes("EDGE") ||
-    n.includes("GPRS") ||
-    n.includes("GSM")
-  )
-    return "2G";
-
-  // Unknown
-  if (n === "UNKNOWN") return "Unknown";
-
-  return "Unknown";
-};
-
-// Network type color mapping
 const getNetworkColor = (network) => {
   const colors = {
     "5G SA": "#ec4899",
@@ -352,7 +404,6 @@ const AllLogsDetailPanel = ({
   const [isDurationsLoading, setIsDurationsLoading] = useState(false);
   const [durationsError, setDurationsError] = useState(null);
 
-  // Ensure logs is always an array
   const safeLogsList = Array.isArray(logs) ? logs : [];
 
   const cfg = resolveMetricConfig(selectedMetric);
@@ -383,7 +434,6 @@ const AllLogsDetailPanel = ({
     return `${formatDate(startDate)} - ${formatDate(endDate)}`;
   };
 
-  // Fetch and process network durations data - Keeping this for future use but not displaying
   useEffect(() => {
     if (!startDate || !endDate) return;
 
@@ -391,14 +441,8 @@ const AllLogsDetailPanel = ({
       setIsDurationsLoading(true);
       setDurationsError(null);
       try {
-        const res = await adminApi.getNetworkDurations({
-          startDate,
-          endDate,
-        });
+        const res = await adminApi.getNetworkDurations(startDate, endDate);
 
-        console.log("Network durations API response:", res);
-
-        // Handle the response format
         let rawData = [];
         if (res?.Data && Array.isArray(res.Data)) {
           rawData = res.Data;
@@ -406,10 +450,9 @@ const AllLogsDetailPanel = ({
           rawData = res;
         }
 
-        // We're not displaying this data, but we can keep the fetch for future use
-        setNetworkDurations([]);
+        const processedData = normalizeAndAggregateDurations(rawData);
+        setNetworkDurations(processedData);
       } catch (error) {
-        console.error("Failed to fetch network durations:", error);
         setDurationsError(error.message || "Failed to load network durations");
         setNetworkDurations([]);
       } finally {
@@ -489,7 +532,6 @@ const AllLogsDetailPanel = ({
     [safeLogsList]
   );
 
-  // Safe array checks
   const safeBuckets = Array.isArray(buckets) ? buckets : [];
   const safeProviderTop = Array.isArray(providerTop) ? providerTop : [];
   const safeNetworkTop = Array.isArray(networkTop) ? networkTop : [];
@@ -501,7 +543,6 @@ const AllLogsDetailPanel = ({
   return (
     <div className="fixed top-0 right-0 h-screen w-[26rem] max-w-[100vw] text-white bg-slate-900 shadow-2xl z-50">
       <div className="flex flex-col h-full">
-        {/* Header */}
         <div className="p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
           <div>
             <h3 className="text-lg font-bold">All Logs Metric Summary</h3>
@@ -540,7 +581,6 @@ const AllLogsDetailPanel = ({
           </div>
         </div>
 
-        {/* Body */}
         <div className="flex-grow overflow-y-auto p-4 space-y-4">
           {isLoading ? (
             <div className="flex justify-center items-center h-full">
@@ -548,7 +588,6 @@ const AllLogsDetailPanel = ({
             </div>
           ) : (
             <>
-              {/* Summary */}
               <div className="bg-slate-800/60 rounded-lg p-3">
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
@@ -593,7 +632,6 @@ const AllLogsDetailPanel = ({
                 </div>
               </div>
 
-              {/* Distribution */}
               <div>
                 <h4 className="font-semibold mb-2">Distribution</h4>
                 <div className="space-y-2">
@@ -637,9 +675,7 @@ const AllLogsDetailPanel = ({
                 </div>
               </div>
 
-              {/* Breakdowns */}
               <div className="grid grid-cols-1 gap-3">
-                {/* Providers */}
                 <div className="bg-slate-800/60 rounded-lg p-3">
                   <div className="font-semibold mb-2">Providers</div>
                   <div className="space-y-2">
@@ -668,7 +704,6 @@ const AllLogsDetailPanel = ({
                   </div>
                 </div>
 
-                {/* Network */}
                 <div className="bg-slate-800/60 rounded-lg p-3">
                   <div className="font-semibold mb-2">Network</div>
                   <div className="space-y-2">
@@ -697,7 +732,73 @@ const AllLogsDetailPanel = ({
                   </div>
                 </div>
 
-                {/* Operator vs Network */}
+                {!isDurationsLoading && networkDurations.length > 0 && (
+                  <div className="bg-slate-800/60 rounded-lg p-3">
+                    <div className="font-semibold mb-3 flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Network Durations
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {networkDurations.map((item, idx) => {
+                        const isUnknown = item.Provider === "Unknown" || item.Network === "Unknown";
+                        
+                        return (
+                          <div
+                            key={`${item.Provider}-${item.Network}-${idx}`}
+                            className={`text-sm p-2 rounded ${
+                              isUnknown ? 'bg-slate-700/30 text-slate-400' : 'bg-slate-700/50'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: getNetworkColor(item.Network) }}
+                                />
+                                <span className="font-medium">{item.Provider}</span>
+                                <span className="text-slate-400">•</span>
+                                <span className="text-slate-300">{item.Network}</span>
+                              </div>
+                              <span className="font-semibold text-emerald-400">
+                                {formatDuration(item.TotalDurationHours)}
+                              </span>
+                            </div>
+                            {networkDurations.length > 0 && (
+                              <div className="mt-1">
+                                <div className="h-1 bg-slate-600 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-all"
+                                    style={{
+                                      width: `${(item.TotalDurationHours / networkDurations[0].TotalDurationHours) * 100}%`,
+                                      backgroundColor: getNetworkColor(item.Network),
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {!isDurationsLoading && networkDurations.length === 0 && !durationsError && (
+                  <div className="bg-slate-800/60 rounded-lg p-3">
+                    <div className="text-sm text-slate-400 text-center">
+                      No network duration data available
+                    </div>
+                  </div>
+                )}
+
+                {durationsError && (
+                  <div className="bg-red-900/20 rounded-lg p-3 border border-red-800">
+                    <div className="text-sm text-red-400">
+                      ⚠️ {durationsError}
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-slate-800/60 rounded-lg p-3">
                   <div className="font-semibold mb-2">Operator vs Network</div>
                   <div className="space-y-2">
@@ -731,7 +832,6 @@ const AllLogsDetailPanel = ({
                   </div>
                 </div>
 
-                {/* Bands */}
                 <div className="bg-slate-800/60 rounded-lg p-3">
                   <div className="font-semibold mb-2">Bands</div>
                   <div className="space-y-2">

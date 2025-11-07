@@ -3,11 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { PolygonF } from "@react-google-maps/api";
 import { cellSiteApi } from "@/api/apiEndpoints";
 
-// ========================================
-// HELPER FUNCTIONS
-// ========================================
 
-// Compute offset point given center, distance (m) and heading (deg)
 function computeOffset(center, distanceMeters, headingDegrees) {
   const earthRadius = 6371000; // Earth radius in meters
   const lat1 = (center.lat * Math.PI) / 180;
@@ -52,11 +48,11 @@ function generateSectorsFromSite(site) {
   const color = getColorForNetwork(site.network);
   
   // Default range based on network type
-  let range = 120; // default
+  let range = 60; 
   if (site.network?.toLowerCase().includes("5g") || site.network?.toLowerCase().includes("jio")) {
-    range = 90;
+    range = 45;
   } else if (site.network?.toLowerCase().includes("vi") || site.network?.toLowerCase().includes("900")) {
-    range = 160;
+    range = 80;
   }
   
   // Generate sectors evenly spaced
@@ -109,7 +105,7 @@ const NetworkPlannerMap = ({
   // Use external sectors if provided, otherwise use internal
   const sectors = externalSectors || internalSectors;
 
-  console.log(`🗺️ [Instance ${instanceId.current}] NetworkPlannerMap RENDER:`, {
+  console.log(` [Instance ${instanceId.current}] NetworkPlannerMap RENDER:`, {
     projectId,
     sectorsCount: sectors.length,
     hasExternalSectors: !!externalSectors,

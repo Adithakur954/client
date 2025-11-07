@@ -17,7 +17,7 @@ const COLOR_SCHEMES = {
     "4G": "#8B5CF6",
     "3G": "#10B981",
     "2G": "#6B7280",
-    "Unknown": "#F59E0B",  // Gray
+    "Unknown": "#F59E0B",  
   },
   band: {
    "3": "#EF4444",
@@ -30,7 +30,7 @@ const COLOR_SCHEMES = {
     "1": "#EF4444",
     "2": "#F59E0B",
     "7": "#10B781",
-    "Unknown": "#6B7280",          // Green
+    "Unknown": "#6B7280",         
            
   },
 };
@@ -39,11 +39,11 @@ const MapLegend = ({
   thresholds, 
   selectedMetric, 
   coverageHoleOnly = false,
-  colorBy = null // ✅ Added colorBy prop
+  colorBy = null 
 }) => {
   const { thresholdKey, label, unit } = resolveMetricConfig(selectedMetric);
 
-  // ✅ If colorBy mode is active, show category legend
+  
   if (colorBy && COLOR_SCHEMES[colorBy]) {
     const scheme = COLOR_SCHEMES[colorBy];
     
@@ -69,7 +69,7 @@ const MapLegend = ({
     );
   }
 
-  // ✅ Special handling for Coverage Hole metric
+ 
   if (selectedMetric === "coveragehole" || thresholdKey === "coveragehole") {
     const threshold = thresholds?.coveragehole || -110;
     
@@ -106,7 +106,7 @@ const MapLegend = ({
     );
   }
 
-  // ✅ Standard legend for other metrics
+  
   const list = thresholds?.[thresholdKey] || [];
   if (!list.length) return null;
 
