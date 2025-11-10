@@ -1,7 +1,7 @@
 // src/api/pythonApiService.js
 
-const PYTHON_BASE_URL = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:8080";
-// const PYTHON_BASE_URL = "https://python-ml-backend-iqz0.onrender.com";
+// const PYTHON_BASE_URL = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:8080";
+const PYTHON_BASE_URL = "https://python-ml-backend-iqz0.onrender.com";
 
 /**
  * Python API Service using fetch (similar pattern to your C# service)
