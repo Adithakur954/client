@@ -191,6 +191,7 @@ export default function HighPerfMap() {
     drawPixelateRect: false,
     drawCellSizeMeters: 10,
     drawClearSignal: 0,
+     showNeighbours: false,
   });
 
   const [analysis, setAnalysis] = useState(null);
@@ -650,6 +651,7 @@ export default function HighPerfMap() {
               maxDraw={80000}
               coverageHoleOnly={showCoverageHoleOnly}
               colorBy={colorBy}
+              showNeighbours={ui.showNeighbours}
             />
           )}
 

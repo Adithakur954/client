@@ -265,6 +265,7 @@ export default function LogsCirclesPage() {
           showCircles={true}
           showHeatmap={false}
           visibleBounds={visibleBounds}
+            showNeighbours={ui.showNeighbours} 
           renderVisibleOnly={true}
           canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
           maxDraw={70000}

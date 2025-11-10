@@ -4,10 +4,18 @@ import React, { useEffect, useRef } from "react";
 export default function CanvasPointsOverlay({
   map,
   points,
+  neigh,
   getRadiusPx, // may be function or number
   opacity = 0.9,
   maxDraw = 50000,
   padding = 80,
+  showLabels = true, 
+  labelStyle = {   
+    font: "bold 10px Arial",
+    color: "#000",
+    strokeColor: "#fff",
+    strokeWidth: 2,
+  },
 }) {
   const overlayRef = useRef(null);
   const canvasRef = useRef(null);
@@ -51,7 +59,7 @@ export default function CanvasPointsOverlay({
   useEffect(() => {
     drawCanvas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, getRadiusPx, opacity, maxDraw, padding]);
+  }, [points, getRadiusPx, opacity, maxDraw, padding, neigh, showLabels]);
 
   function resolveRadiusPx(zoom) {
     if (typeof getRadiusPx === "function") return getRadiusPx(zoom);
@@ -105,6 +113,7 @@ export default function CanvasPointsOverlay({
     const n = points?.length || 0;
     const drawCount = Math.min(n, maxDraw);
 
+    // Draw points
     for (let i = 0; i < drawCount; i++) {
       const p = points[i];
       const ll = new window.google.maps.LatLng(p.lat, p.lng);
@@ -120,6 +129,37 @@ export default function CanvasPointsOverlay({
       ctx.fill();
     }
 
+    // Draw labels if neigh is true and showLabels is true
+    if (neigh && showLabels) {
+      ctx.globalAlpha = 1; // Full opacity for text
+      ctx.font = labelStyle.font;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      for (let i = 0; i < drawCount; i++) {
+        const p = points[i];
+        if (!p.label) continue; // Skip if no label
+
+        const ll = new window.google.maps.LatLng(p.lat, p.lng);
+        if (!paddedBounds.contains(ll)) continue;
+
+        const pix = proj.fromLatLngToDivPixel(ll);
+        const x = pix.x - (topLeft.x - padding);
+        const y = pix.y - (topLeft.y - padding);
+
+        // Draw text stroke (outline) for readability
+        if (labelStyle.strokeWidth > 0) {
+          ctx.strokeStyle = labelStyle.strokeColor;
+          ctx.lineWidth = labelStyle.strokeWidth;
+          ctx.strokeText(p.label, x, y);
+        }
+
+        // Draw text fill
+        ctx.fillStyle = labelStyle.color;
+        ctx.fillText(p.label, x, y);
+      }
+    }
+    
     ctx.globalAlpha = 1;
   }
 

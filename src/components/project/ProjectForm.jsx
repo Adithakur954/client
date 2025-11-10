@@ -12,6 +12,7 @@ import {
   CheckSquare,
   Square,
   Download,
+  Info,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -21,7 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { mapViewApi, buildingApi,excelApi, cellSiteApi } from "../../api/apiEndpoints";
+import { mapViewApi, buildingApi, excelApi, cellSiteApi } from "../../api/apiEndpoints";
 import Spinner from "../common/Spinner";
 import {
   BuildingGenerator,
@@ -239,7 +240,51 @@ export const ProjectForm = ({
       errors.push("Please select a polygon");
     }
 
+    // Validate polygon exists in list
+    if (selectedPolygon) {
+      const polygonExists = polygons?.some(p => p.value === selectedPolygon);
+      if (!polygonExists) {
+        errors.push("Selected polygon is no longer available. Please refresh and try again.");
+      }
+    }
+
     return errors;
+  };
+
+  /**
+   * Extract project ID from various response structures
+   */
+  const extractProjectId = (response) => {
+    return (
+      response?.Data?.projectId ||
+      response?.Data?.project_id ||
+      response?.Data?.ProjectId ||
+      response?.Data?.project?.id ||
+      response?.Data?.project?.ID ||
+      response?.Data?.id ||
+      response?.projectId ||
+      response?.project_id ||
+      response?.id
+    );
+  };
+
+  /**
+   * Extract project name from response
+   */
+  const extractProjectName = (response, fallback) => {
+    return (
+      response?.Data?.project?.project_name ||
+      response?.Data?.project?.ProjectName ||
+      response?.Data?.project?.name ||
+      response?.Data?.project_name ||
+      response?.Data?.ProjectName ||
+      response?.Data?.name ||
+      response?.project?.project_name ||
+      response?.project?.ProjectName ||
+      response?.project_name ||
+      response?.ProjectName ||
+      fallback
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -257,6 +302,7 @@ export const ProjectForm = ({
     let projectId = null;
     let projectData = null;
     let buildingsToSave = generatedBuildings;
+    const completedSteps = [];
 
     try {
       // ========================================
@@ -275,9 +321,10 @@ export const ProjectForm = ({
             setGeneratedBuildings(buildingResult.data);
             buildingsToSave = buildingResult.data;
             toast.success(`✓ Generated ${buildingResult.count} buildings`);
+            completedSteps.push("buildings_generated");
           } else {
             console.warn("⚠ No buildings generated:", buildingResult.message);
-            toast.info(buildingResult.message);
+            toast.info(buildingResult.message || "No buildings found in this area");
             buildingsToSave = null;
           }
         } catch (buildingError) {
@@ -292,63 +339,76 @@ export const ProjectForm = ({
       }
 
       // ========================================
-      // STEP 1: CREATE PROJECT
+      // STEP 1: CREATE PROJECT IN C# BACKEND
       // ========================================
-      setCurrentStep("Creating project...");
+      setCurrentStep("Creating project in database...");
+
+      // Validate polygon exists before sending
+      if (selectedPolygon && !polygons?.some(p => p.value === selectedPolygon)) {
+        throw new Error("Selected polygon is invalid or no longer exists. Please refresh.");
+      }
 
       const projectPayload = {
         ProjectName: projectName.trim(),
-        PolygonIds: selectedPolygon ? [selectedPolygon] : [],
-        SessionIds: selectedSessions.length > 0 ? selectedSessions : [],
+        ...(selectedPolygon && { PolygonIds: [selectedPolygon] }),
+        ...(selectedSessions.length > 0 && { SessionIds: selectedSessions }),
       };
 
-      console.log("📤 Creating project with payload:", projectPayload);
+      console.log("📤 Creating project with payload:", JSON.stringify(projectPayload, null, 2));
 
-      const projectRes = await mapViewApi.createProjectWithPolygons(
-        projectPayload
-      );
+      const projectRes = await mapViewApi.createProjectWithPolygons(projectPayload);
 
-      console.log("📥 Project creation response:", projectRes);
+      console.log("📥 Project creation response:", JSON.stringify(projectRes, null, 2));
 
+      // Check response status
       if (!projectRes || projectRes.Status !== 1) {
         const errorMsg =
           projectRes?.Message ||
           projectRes?.message ||
-          "Unknown error creating project";
+          "Project creation failed - no valid response";
         throw new Error(errorMsg);
       }
 
-      projectId =
-        projectRes.Data?.projectId ||
-        projectRes.Data?.project_id ||
-        projectRes.Data?.ProjectId ||
-        projectRes.Data?.project?.id ||
-        projectRes.Data?.project?.ID ||
-        projectRes.projectId ||
-        projectRes.project_id;
+      // Extract project ID
+      projectId = extractProjectId(projectRes);
+
+      if (!projectId) {
+        console.error("❌ Failed to extract project ID from response:", projectRes);
+        throw new Error("No project ID received from server. Project may not have been created.");
+      }
 
       projectData = projectRes.Data?.project || projectRes.Data || projectRes;
 
-      if (!projectId) {
-        console.error(
-          "❌ Failed to extract project ID from response:",
-          projectRes
-        );
-        throw new Error("No project ID received from server.");
-      }
+      const projectNameDisplay = extractProjectName(projectRes, projectName);
 
-      const projectNameDisplay =
-        projectData?.project_name ||
-        projectData?.ProjectName ||
-        projectData?.name ||
-        projectName;
+      console.log(`✅ Project created successfully! ID: ${projectId}, Name: "${projectNameDisplay}"`);
+      toast.success(`✅ Project "${projectNameDisplay}" created! ID: ${projectId}`);
+      completedSteps.push("project_created");
 
-      toast.success(
-        `✅ Project "${projectNameDisplay}" created! ID: ${projectId}`
-      );
+      // Small delay to ensure database commit
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // ========================================
-      // STEP 2: SAVE BUILDINGS
+      // STEP 2: VERIFY PROJECT EXISTS
+      // ========================================
+      setCurrentStep("Verifying project...");
+
+      try {
+        const verification = await cellSiteApi.verifyProject(projectId);
+        
+        if (!verification.exists) {
+          console.warn("⚠️ Project not found in Python backend, but continuing...");
+          // Don't throw error, just log - Python backend might not have the project yet
+        } else {
+          console.log(`✅ Project ${projectId} verified in Python backend`);
+        }
+      } catch (verifyError) {
+        console.warn("⚠️ Project verification failed, but continuing:", verifyError);
+        // Don't fail the whole process if verification fails
+      }
+
+      // ========================================
+      // STEP 3: SAVE BUILDINGS TO PYTHON BACKEND
       // ========================================
       if (buildingsToSave && selectedPolygonData) {
         setCurrentStep("Saving buildings to project...");
@@ -361,30 +421,30 @@ export const ProjectForm = ({
             buildings_geojson: buildingsToSave,
           };
 
-          console.log("📤 Saving buildings...");
+          console.log(`📤 Saving ${buildingsToSave.features?.length || 0} buildings...`);
 
-          const buildingRes = await buildingApi.saveBuildingsWithProject(
-            buildingPayload
-          );
+          const buildingRes = await buildingApi.saveBuildingsWithProject(buildingPayload);
 
           if (buildingRes.Status === 1 || buildingRes.success) {
             const count = buildingsToSave.features?.length || 0;
             toast.success(`✅ ${count} buildings saved to project!`);
+            completedSteps.push("buildings_saved");
           } else {
             toast.warn("⚠ Buildings could not be saved, but project was created");
           }
         } catch (buildingError) {
           console.error("❌ Building save error:", buildingError);
           toast.warn(`⚠ Building save failed: ${buildingError.message}`);
+          // Don't fail the whole process
         }
       }
 
       // ========================================
-      // STEP 3: UPLOAD SITE FILE (if provided)
+      // STEP 4: UPLOAD SITE FILE (if provided)
       // ========================================
       if (siteFile) {
-        setCurrentStep("Processing site file...");
-        console.log("📤 Uploading site file:", siteFile.name);
+        setCurrentStep(`Processing site file: ${siteFile.name}...`);
+        console.log(`📤 Uploading site file: ${siteFile.name} (${(siteFile.size / 1024).toFixed(2)} KB)`);
 
         try {
           const formData = new FormData();
@@ -406,7 +466,19 @@ export const ProjectForm = ({
               formData.append("train_path", uploadParams.trainPath);
           }
 
+          // Log FormData for debugging
+          console.log("📋 FormData contents:");
+          for (let [key, value] of formData.entries()) {
+            if (value instanceof File) {
+              console.log(`  ${key}: ${value.name} (${value.size} bytes)`);
+            } else {
+              console.log(`  ${key}: ${value}`);
+            }
+          }
+
           const uploadRes = await cellSiteApi.uploadSite(formData);
+
+          console.log("📥 Site upload response:", uploadRes);
 
           if (uploadRes.success || uploadRes.Status === 1) {
             const message =
@@ -414,6 +486,7 @@ export const ProjectForm = ({
               uploadRes.Message ||
               "Site file processed successfully!";
             toast.success(`✅ ${message}`);
+            completedSteps.push("site_file_uploaded");
           } else {
             const errorMsg =
               uploadRes.error ||
@@ -424,14 +497,15 @@ export const ProjectForm = ({
         } catch (uploadError) {
           console.error("❌ Site upload error:", uploadError);
           toast.error(`❌ Site upload failed: ${uploadError.message}`);
+          // Don't fail the whole process
         }
       }
 
       // ========================================
-      // STEP 4: UPLOAD SESSIONS (if selected)
+      // STEP 5: UPLOAD SESSIONS (if selected)
       // ========================================
       if (selectedSessions && selectedSessions.length > 0) {
-        setCurrentStep("Sending selected sessions to backend...");
+        setCurrentStep(`Processing ${selectedSessions.length} sessions...`);
 
         try {
           const sessionPayload = {
@@ -442,36 +516,63 @@ export const ProjectForm = ({
             method: uploadMethod,
           };
 
-          console.log("📤 Uploading sessions:", sessionPayload);
+          console.log("📤 Uploading sessions:", JSON.stringify(sessionPayload, null, 2));
 
           const sessionRes = await cellSiteApi.uploadSessions(sessionPayload);
 
           console.log("📥 Session upload response:", sessionRes);
 
           if (sessionRes.success || sessionRes.Status === 1) {
-            toast.success("✅ Sessions uploaded successfully!");
+            const processedCount = sessionRes.sessions_processed || selectedSessions.length;
+            const logsCount = sessionRes.logs_processed || 0;
+            toast.success(
+              `✅ Processed ${processedCount} sessions (${logsCount} network logs)!`
+            );
+            completedSteps.push("sessions_uploaded");
           } else {
             toast.warn(
-              `⚠ Session upload failed: ${
-                sessionRes.Message || sessionRes.error
-              }`
+              `⚠ Session upload issue: ${sessionRes.Message || sessionRes.error || "Unknown error"}`
             );
           }
         } catch (sessionError) {
           console.error("❌ Session upload error:", sessionError);
-          toast.error(`❌ Session upload failed: ${sessionError.message}`);
+          
+          // Provide more specific error message
+          let errorMsg = "Session upload failed";
+          if (sessionError.response?.data?.error) {
+            errorMsg = sessionError.response.data.error;
+          } else if (sessionError.message) {
+            errorMsg = sessionError.message;
+          }
+          
+          toast.error(`❌ ${errorMsg}`);
+          // Don't fail the whole process
         }
       } else {
-        console.log("ℹ No sessions selected to upload.");
+        console.log("ℹ️ No sessions selected to upload.");
       }
 
       // ========================================
-      // STEP 5: FINALIZE AND CLEANUP
+      // STEP 6: FINALIZE AND CLEANUP
       // ========================================
       setCurrentStep("Finalizing...");
 
-      const finalMessage = `Project "${projectNameDisplay}" (ID: ${projectId}) created successfully!`;
-      toast.success(`🎉 ${finalMessage}`);
+      const successSummary = [
+        `✅ Project "${projectNameDisplay}" (ID: ${projectId}) created successfully!`,
+        completedSteps.includes("buildings_saved") && `✅ ${buildingsToSave?.features?.length || 0} buildings saved`,
+        completedSteps.includes("site_file_uploaded") && `✅ Site file processed`,
+        completedSteps.includes("sessions_uploaded") && `✅ ${selectedSessions.length} sessions processed`,
+      ].filter(Boolean).join("\n");
+
+      console.log("\n" + "=".repeat(60));
+      console.log("🎉 PROJECT CREATION SUCCESSFUL!");
+      console.log("=".repeat(60));
+      console.log(successSummary);
+      console.log("=".repeat(60) + "\n");
+
+      toast.success(`🎉 Project created successfully!`, {
+        autoClose: 5000,
+      });
 
       // Reset form
       setProjectName("");
@@ -493,26 +594,46 @@ export const ProjectForm = ({
         fileInputRef.current.value = null;
       }
 
+      // Notify parent component
       if (onProjectCreated) {
         onProjectCreated({
           projectId: projectId,
           projectData: projectData,
+          completedSteps: completedSteps,
         });
       }
+
     } catch (err) {
-      console.error("❌ PROJECT CREATION ERROR:", err);
+      console.error("\n" + "=".repeat(60));
+      console.error("❌ PROJECT CREATION ERROR");
+      console.error("=".repeat(60));
+      console.error("Error object:", err);
+      console.error("Error stack:", err.stack);
+      console.error("=".repeat(60) + "\n");
 
       let errorMessage = "Failed to create project";
+      let technicalDetails = "";
 
       if (err.response?.data) {
         const data = err.response.data;
+        
+        console.log("📋 Error response data:", JSON.stringify(data, null, 2));
 
         if (data?.InnerException) {
+          technicalDetails = data.InnerException;
           errorMessage = `Database Error: ${data.InnerException}`;
-        } else if (data?.Message) {
-          errorMessage = data.Message;
-        } else if (data?.message) {
-          errorMessage = data.message;
+          
+          // Check for specific patterns
+          if (technicalDetails.toLowerCase().includes("foreign key")) {
+            errorMessage = "Invalid polygon or session reference. Please refresh and try again.";
+          } else if (technicalDetails.toLowerCase().includes("unique")) {
+            errorMessage = "A project with this name already exists.";
+          } else if (technicalDetails.toLowerCase().includes("null")) {
+            errorMessage = "Required field is missing. Please ensure all fields are filled.";
+          }
+        } else if (data?.Message || data?.message) {
+          errorMessage = data.Message || data.message;
+          technicalDetails = errorMessage;
         } else if (data?.errors) {
           const validationErrors = Object.entries(data.errors)
             .map(([field, messages]) => {
@@ -521,21 +642,53 @@ export const ProjectForm = ({
             })
             .join("; ");
           errorMessage = `Validation Error: ${validationErrors}`;
+          technicalDetails = validationErrors;
         } else if (typeof data === "string") {
           errorMessage = data;
+          technicalDetails = data;
         }
       } else if (err.request) {
         errorMessage = "No response from server. Please check your connection.";
+        technicalDetails = "Network timeout or server unavailable";
       } else {
         errorMessage = err.message || "Unknown error occurred";
+        technicalDetails = err.message;
       }
 
-      toast.error(errorMessage);
+      // Display user-friendly error
+      toast.error(`❌ ${errorMessage}`, {
+        autoClose: 8000,
+      });
 
+      // Log technical details
+      if (technicalDetails) {
+        console.error("🔍 Technical details:", technicalDetails);
+      }
+
+      // If project was created but other operations failed
       if (projectId) {
+        const partialSuccessMsg = [
+          `ℹ️ Project ID ${projectId} was created, but some operations failed:`,
+          !completedSteps.includes("buildings_saved") && "❌ Buildings not saved",
+          !completedSteps.includes("site_file_uploaded") && siteFile && "❌ Site file not uploaded",
+          !completedSteps.includes("sessions_uploaded") && selectedSessions.length > 0 && "❌ Sessions not uploaded",
+        ].filter(Boolean).join("\n");
+
+        console.warn(partialSuccessMsg);
         toast.info(
-          `ℹ Note: Project ID ${projectId} was created but some operations failed.`
+          `ℹ️ Project ${projectId} was created but some operations failed. Check console for details.`,
+          { autoClose: 10000 }
         );
+
+        // Still call the callback with partial success
+        if (onProjectCreated) {
+          onProjectCreated({
+            projectId: projectId,
+            projectData: projectData,
+            completedSteps: completedSteps,
+            partialSuccess: true,
+          });
+        }
       }
     } finally {
       setLoading(false);
@@ -598,8 +751,9 @@ export const ProjectForm = ({
             )}
 
             {selectedPolygonData && !generatedBuildings && (
-              <div className="text-sm text-blue-600 mt-1">
-                ℹ Buildings will be generated automatically
+              <div className="flex items-center gap-2 text-sm text-blue-600 mt-1 p-2 bg-blue-50 rounded">
+                <Info className="h-4 w-4" />
+                <span>Buildings will be generated automatically from OpenStreetMap</span>
               </div>
             )}
 
@@ -624,7 +778,19 @@ export const ProjectForm = ({
 
           {/* Site File Upload Section */}
           <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
-            <Label>Upload Site Data (Optional)</Label>
+            <div className="flex items-center justify-between">
+              <Label>Upload Site Data (Optional)</Label>
+              <Button
+                type="button"
+                onClick={() => excelApi.downloadTemplate(3)}
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+              >
+                <Download className="mr-1 h-3 w-3" />
+                Download Template
+              </Button>
+            </div>
 
             {!siteFile ? (
               <div className="flex items-center gap-2">
@@ -663,12 +829,12 @@ export const ProjectForm = ({
             )}
           </div>
 
-         
+          {/* Submit Button */}
           <div className="flex justify-end gap-2 pt-4">
-            
             <Button
               type="submit"
               disabled={loading || !canSubmit || isLoadingPolygons}
+              className="min-w-[200px]"
             >
               {loading ? (
                 <>
@@ -683,30 +849,14 @@ export const ProjectForm = ({
 
           {/* Progress Status */}
           {loading && currentStep && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-900">
                 <strong>Progress:</strong> {currentStep}
               </AlertDescription>
             </Alert>
           )}
         </form>
-        <div>
-          <Button
-                        onClick={() =>
-                        {
-                          excelApi.downloadTemplate(3)
-                          console.log("download is not working")
-                        }
-                        }
-                        variant="outline"
-                        size="lg"
-                        className="bg-white text-gray-700 hover:bg-blue-200"
-                      >
-                        <Download className="mr-2 h-4 w-4"  />
-                        Download Template
-                      </Button>
-         </div>
       </CardContent>
     </Card>
   );

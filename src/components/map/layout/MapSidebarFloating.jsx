@@ -256,6 +256,12 @@ export default function MapSidebarFloating({
   const handleFilterChange = (key, value) =>
     setFilters((prev) => ({ ...prev, [key]: value }));
 
+  const handleNeighChange = (event) => {
+    const checked = event.target.checked;
+    // Pass the showNeighbours state up to parent via onUIChange
+    onUIChange?.({ showNeighbours: checked });
+  }
+
   const handleColorByChange = (type) => {
     setFilters((prev) => ({
       ...prev,
@@ -495,8 +501,6 @@ export default function MapSidebarFloating({
                 </div>
               </label>
 
-              
-
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -507,6 +511,15 @@ export default function MapSidebarFloating({
                   disabled={!ui?.showSessions || hasActiveFilters}
                 />
                 Cluster Sessions
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input 
+                  type="checkbox"
+                  checked={ui?.showNeighbours || false}
+                  onChange={handleNeighChange} 
+                />
+                Show Neighbours
               </label>
 
               <label className="flex items-center gap-2">
@@ -522,6 +535,8 @@ export default function MapSidebarFloating({
               </label>
             </div>
           </PanelSection>
+
+          {filters.colorBy && <ColorLegend colorBy={filters.colorBy} />}
         </div>
 
         <div className="p-3 border-t flex gap-2">
