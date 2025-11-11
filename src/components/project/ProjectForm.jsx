@@ -309,7 +309,7 @@ export const ProjectForm = ({
       // STEP 0: AUTO-GENERATE BUILDINGS
       // ========================================
       if (selectedPolygonData && !generatedBuildings) {
-        setCurrentStep("Generating buildings from OpenStreetMap...");
+        setCurrentStep("Generating buildings...");
         setBuildingLoading(true);
 
         try {
@@ -414,12 +414,13 @@ export const ProjectForm = ({
         setCurrentStep("Saving buildings to project...");
 
         try {
-          const buildingPayload = {
-            project_id: projectId,
-            polygon_wkt: selectedPolygonData.wkt,
-            polygon_label: selectedPolygonData.label,
-            buildings_geojson: buildingsToSave,
-          };
+          // ✅ CORRECT - Updated code
+const buildingPayload = {
+  Project_Id: projectId,             
+  Data: buildingsToSave,              
+  polygon_wkt: selectedPolygonData.wkt,
+  polygon_label: selectedPolygonData.label,
+};
 
           console.log(`📤 Saving ${buildingsToSave.features?.length || 0} buildings...`);
 
@@ -753,7 +754,7 @@ export const ProjectForm = ({
             {selectedPolygonData && !generatedBuildings && (
               <div className="flex items-center gap-2 text-sm text-blue-600 mt-1 p-2 bg-blue-50 rounded">
                 <Info className="h-4 w-4" />
-                <span>Buildings will be generated automatically from OpenStreetMap</span>
+                <span>Buildings will be generated automatically</span>
               </div>
             )}
 

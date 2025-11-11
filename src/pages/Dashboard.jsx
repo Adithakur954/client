@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   BarChart2, RefreshCw, Users, Car, Waypoints, FileText, 
-  Wifi, Radio, Layers 
+  Wifi, Radio, Layers, Home, MapPin 
 } from 'lucide-react';
 
 import MonthlySamplesChart from '@/components/dashboard/charts/MonthlySamplesChart';
@@ -20,7 +20,9 @@ import {
   useTotals, 
   useOperatorsAndNetworks, 
   useNetworkDistribution, 
-  useBandDistribution 
+  useBandDistribution,
+  useIndoorCount,
+  useOutdoorCount
 } from '@/hooks/useDashboardData';
 
 const DashboardPage = () => {
@@ -28,52 +30,64 @@ const DashboardPage = () => {
   const [chartFilters, setChartFilters] = useState({});
 
   // Fetch totals and available operators/networks
-  const { data: totalsData, isLoading: isTotalsLoading } = useTotals();
-  const { operators, networks, operatorCount } = useOperatorsAndNetworks();
+  const { data: totalsData = {}, isLoading: isTotalsLoading } = useTotals();
+  const { operators = [], networks = [], operatorCount = 0 } = useOperatorsAndNetworks();
   
   // Fetch additional data for KPIs
-  const { data: networkDistData } = useNetworkDistribution({});
-  const { data: bandDistData } = useBandDistribution({});
-
-  // Calculate normalized counts for Technologies and Bands
+  const { data: networkDistData = [] } = useNetworkDistribution({});
+  const { data: bandDistData = [] } = useBandDistribution({});
   
+  // Fetch indoor and outdoor counts
+  const { data: indoorData = {}, isLoading: isIndoorLoading } = useIndoorCount();
+  const { data: outdoorData = {}, isLoading: isOutdoorLoading } = useOutdoorCount();
 
+  // Calculate normalized counts for Bands
   const bandCount = useMemo(() => {
     if (!bandDistData || bandDistData.length === 0) return 0;
-    
-    // Count unique bands (they're already in "Band XX" format)
     return bandDistData.length;
   }, [bandDistData]);
 
-  // Stats for KPI cards - ALL 7 KPIs
+  
+
+  // Extract indoor/outdoor counts
+  // const indoorCount = useMemo(() => {
+  //   return indoorData?.Count ??  0;
+  // }, [indoorData]);
+
+  // const outdoorCount = useMemo(() => {
+  //   return outdoorData?.Count ?? 0;
+  // }, [outdoorData]);
+
+  // Check if any KPI data is loading
+  const isKPILoading = isTotalsLoading || isIndoorLoading || isOutdoorLoading;
+
+  // Stats for KPI cards - ALL 8 KPIs
   const stats = useMemo(() => {
-    if (!totalsData) return [];
-    
     return [
       {
         title: "Total Users",
-        value: totalsData.totalUsers,
+        value: totalsData?.totalUsers ?? 0,
         icon: Users,
         color: "bg-gradient-to-br from-purple-500 to-purple-600",
         description: "Registered users"
       },
       {
         title: "Drive Sessions",
-        value: totalsData.totalSessions,
+        value: totalsData?.totalSessions ?? 0,
         icon: Car,
         color: "bg-gradient-to-br from-teal-500 to-teal-600",
         description: "Total drive sessions"
       },
       {
         title: "Online Sessions",
-        value: totalsData.totalOnlineSessions,
+        value: totalsData?.totalOnlineSessions ?? 0,
         icon: Waypoints,
         color: "bg-gradient-to-br from-orange-500 to-orange-600",
         description: "Currently active"
       },
       {
         title: "Total Samples",
-        value: totalsData.totalSamples,
+        value: totalsData?.totalSamples ?? 0,
         icon: FileText,
         color: "bg-gradient-to-br from-amber-500 to-amber-600",
         description: "Network log samples"
@@ -85,13 +99,6 @@ const DashboardPage = () => {
         color: "bg-gradient-to-br from-sky-500 to-sky-600",
         description: "Unique network operators"
       },
-      // {
-      //   title: "Technologies",
-      //   value: technologyCount,
-      //   icon: Radio,
-      //   color: "bg-gradient-to-br from-pink-500 to-pink-600",
-      //   description: "Network types (2G, 3G, 4G, 5G)"
-      // },
       {
         title: "Bands",
         value: bandCount,
@@ -99,19 +106,23 @@ const DashboardPage = () => {
         color: "bg-gradient-to-br from-indigo-500 to-indigo-600",
         description: "Frequency bands detected"
       },
+      {
+        title: "Indoor Samples",
+        value: indoorData,
+        icon: Home,
+        color: "bg-gradient-to-br from-green-500 to-green-600",
+        description: "Indoor measurements"
+      },
+      {
+        title: "Outdoor Samples",
+        value: outdoorData,
+        icon: MapPin,
+        color: "bg-gradient-to-br from-blue-500 to-blue-600",
+        description: "Outdoor measurements"
+      },
     ];
-  }, [totalsData, operatorCount,  bandCount]);
-  // const technologyCount = useMemo(() => {
-  //   if (!networkDistData || networkDistData.length === 0) return 0;
-    
-  //   // Get unique network types
-  //   const uniqueNetworks = new Set(
-  //     networkDistData.map(item => item.network).filter(Boolean)
-  //   );
-    
-  //   return uniqueNetworks.size;
-  // }, [networkDistData]);
-
+  }, [totalsData, operatorCount, bandCount, indoorData, outdoorData]);
+ 
   const handleChartFilterChange = (chartKey, newFilters) => {
     setChartFilters(prev => ({
       ...prev,
@@ -126,7 +137,7 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
       <div className="max-w-[1920px] mx-auto p-6 space-y-6">
-        {/* Header */}
+       
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -135,7 +146,6 @@ const DashboardPage = () => {
               </div>
               Dashboard Analytics
             </h1>
-           
           </div>
           <button
             onClick={handleRefreshAll}
@@ -146,10 +156,10 @@ const DashboardPage = () => {
           </button>
         </div>
 
-        {/* KPIs - ALL 7 with Flex Wrap for Responsive Design */}
+       
         <div className="flex flex-wrap gap-6">
-          {isTotalsLoading ? (
-            Array.from({ length: 7 }).map((_, i) => (
+          {isKPILoading ? (
+            Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex-1 min-w-[280px] max-w-[320px]">
                 <StatCardSkeleton />
               </div>
@@ -163,9 +173,9 @@ const DashboardPage = () => {
           )}
         </div>
 
-        {/* Charts */}
+    
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Monthly Samples */}
+         
           <MonthlySamplesChart
             chartFilters={chartFilters['monthlySamples']}
             onChartFiltersChange={(f) => handleChartFilterChange('monthlySamples', f)}
@@ -173,7 +183,7 @@ const DashboardPage = () => {
             networks={networks}
           />
 
-          {/* Operator Network Distribution */}
+          
           <OperatorNetworkChart
             chartFilters={chartFilters['operatorSamples']}
             onChartFiltersChange={(f) => handleChartFilterChange('operatorSamples', f)}

@@ -41,7 +41,7 @@ const normalizeProviderName = (raw) => {
   
   // Handle Jio variations (including "Jio True5G")
   if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) {
-    return "JIO";
+    return "Jio";
   }
   if (cleaned.includes("AIRTEL")) {
     return "Airtel";
@@ -224,9 +224,11 @@ export default function MapSidebarFloating({
         ]);
 
         const provList = Array.isArray(provRes) ? provRes : [];
+        console.log("🏢 Raw providers from API:", provList);
         const normalizedSet = new Set(
           provList.map((p) => normalizeProviderName(p.name))
         );
+         console.log("✨ Normalized providers:", Array.from(normalizedSet));
         const normalizedProviders = Array.from(normalizedSet).map((name) => ({
           id: name,
           name,

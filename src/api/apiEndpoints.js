@@ -332,6 +332,8 @@ export const authApi = {
 export const adminApi = {
   getReactDashboardData: () => api.get("/Admin/GetReactDashboardData"),
   getDashboardGraphData: () => api.get("/Admin/GetDashboardGraphData"),
+  getIndoorCount: () => api.get("/Admin/IndoorCount"),
+  getOutdoorCount: () => api.get("/Admin/OutdoorCount"),
   getAllUsers: (filters) => api.post("/Admin/GetAllUsers", filters),
   
   getAppValue: (startDate, endDate) => 

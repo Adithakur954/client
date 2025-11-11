@@ -219,6 +219,35 @@ export const useBandDistribution = (filters) => {
     }
   );
 };
+export const useIndoorCount = () => {
+  return useSWR('indoorCount', async () => {
+    const resp = await adminApi.getIndoorCount?.() || {};
+    console.log('Indoor Count Response:', resp);
+    
+    // Validate status
+    if (resp?.Status === 0) {
+      console.error('Indoor count API error');
+      return 0;
+    }
+    
+    // Always return a number
+    return Number(resp?.Count) || 0;
+  });
+};
+
+export const useOutdoorCount = () => {
+  return useSWR('outdoorCount', async () => {
+    const resp = await adminApi.getOutdoorCount?.() || {};
+    console.log('Outdoor Count Response:', resp);
+    
+    if (resp?.Status === 0) {
+      console.error('Outdoor count API error');
+      return 0;
+    }
+    
+    return Number(resp?.Count) || 0;
+  });
+};
 
 export const useHandsetPerformance = () => {
   return useSWR('handsetAvg', async () => {

@@ -65,8 +65,17 @@ export default function LogCirclesLayer({
       setIsLoading?.(true);
       try {
         const apiParams = JSON.parse(filterSignature);
+        console.log("🚀 API Request Params:", apiParams);
+    console.log("📊 Provider value being sent:", apiParams.Provider)
 
         const fetched = await mapViewApi.getLogsByDateRange(apiParams);
+         console.log("✅ Fetched logs count:", fetched);
+
+           if (fetched?.length > 0) {
+      console.log("📋 Sample log providers:", 
+        [...new Set(fetched.slice(0, 10).map(l => l.provider || l.Provider))]
+      );
+    }
 
         if (cancelled) return;
 
