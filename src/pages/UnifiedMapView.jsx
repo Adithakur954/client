@@ -21,6 +21,8 @@ import { useSiteData } from "@/hooks/useSiteData";
 import UnifiedHeader from "@/components/unifiedMap/unifiedMapHeader";
 import UnifiedDetailLogs from "@/components/unifiedMap/UnifiedDetailLogs";
 import MapLegend from "@/components/MapLegend";
+import { useNeighborCollisions } from '@/hooks/useNeighborCollisions';
+import NeighborCollisionLayer from '@/components/unifiedMap/NeighborCollisionLayer';
 
 const defaultThresholds = {
   rsrp: [],
@@ -33,6 +35,13 @@ const defaultThresholds = {
 };
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
+
+// ✅ Default coverage hole filter values
+const DEFAULT_COVERAGE_FILTERS = {
+  rsrp: { enabled: false, threshold: -110 },
+  rsrq: { enabled: false, threshold: -15 },
+  sinr: { enabled: false, threshold: 0 }
+};
 
 function debounce(func, wait) {
   let timeout;
@@ -188,15 +197,17 @@ const UnifiedMapView = () => {
 
   const [onlyInsidePolygons, setOnlyInsidePolygons] = useState(false);
 
-  // ✅ SIMPLIFIED POLYGON STATE
   const [polygonSource, setPolygonSource] = useState("map");
   const [showPolygons, setShowPolygons] = useState(false);
 
   const [showSiteMarkers, setShowSiteMarkers] = useState(true);
   const [showSiteSectors, setShowSiteSectors] = useState(true);
 
-  const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false);
-  const [coverageHoleThreshold, setCoverageHoleThreshold] = useState(-110);
+  // ✅ NEW: Multi-metric coverage hole filters
+  const [coverageHoleFilters, setCoverageHoleFilters] = useState(DEFAULT_COVERAGE_FILTERS);
+
+  const [showNeighbors, setShowNeighbors] = useState(false);
+  const [showCollisionsOnly, setShowCollisionsOnly] = useState(false);
 
   const projectId = useMemo(() => {
     const param =
@@ -232,6 +243,18 @@ const UnifiedMapView = () => {
     autoFetch: true,
   });
 
+  const {
+    collisions,
+    allNeighbors,
+    stats: neighborStats,
+    loading: neighborLoading,
+    refetch: refetchNeighbors,
+  } = useNeighborCollisions({
+    sessionIds,
+    enabled: showNeighbors,
+    selectedMetric,
+  });
+
   const isLoading = loading || siteLoading;
 
   // Load thresholds
@@ -258,25 +281,28 @@ const UnifiedMapView = () => {
     loadThresholds();
   }, []);
 
-  // Load coverage hole threshold
+  // ✅ Load coverage hole thresholds (RSRP from DB, others use defaults)
   useEffect(() => {
-    const loadThreshold = async () => {
+    const loadCoverageThresholds = async () => {
       try {
         const res = await settingApi.getThresholdSettings();
         if (res?.Data?.coveragehole_json) {
-          const threshold = parseFloat(res.Data.coveragehole_json);
-          if (!isNaN(threshold)) {
-            setCoverageHoleThreshold(threshold);
+          const rsrpThreshold = parseFloat(res.Data.coveragehole_json);
+          if (!isNaN(rsrpThreshold)) {
+            setCoverageHoleFilters(prev => ({
+              ...prev,
+              rsrp: { ...prev.rsrp, threshold: rsrpThreshold }
+            }));
           }
         }
       } catch (error) {
         console.error("Failed to load coverage hole threshold:", error);
       }
     };
-    loadThreshold();
+    loadCoverageThresholds();
   }, []);
 
-  // ✅ FIXED: Fetch polygons with correct response parsing
+  // Fetch polygons
   const fetchPolygons = useCallback(async () => {
     if (!projectId) {
       return;
@@ -288,12 +314,10 @@ const UnifiedMapView = () => {
         polygonSource
       );
 
-      // ✅ FIXED: Handle all possible response structures
       let items;
       if (Array.isArray(res)) {
         items = res;
       } else if (res?.data?.Data) {
-        // ✅ This is your actual response structure!
         items = res.data.Data;
       } else if (res?.Data) {
         items = res.Data;
@@ -305,7 +329,6 @@ const UnifiedMapView = () => {
 
       if (items.length === 0) {
         setPolygons([]);
-
         return;
       }
 
@@ -313,13 +336,10 @@ const UnifiedMapView = () => {
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-
-        // ✅ FIXED: Handle different WKT field names (capital W!)
         const wktField = item.Wkt || item.wkt || item.WKT;
 
         if (!wktField) {
           console.warn(`❌ Item ${item.Id || item.id} has no WKT data`);
-          console.warn(`   Available fields:`, Object.keys(item));
           continue;
         }
 
@@ -350,10 +370,7 @@ const UnifiedMapView = () => {
       setPolygons(parsed);
       toast.success(`${parsed.length} polygon(s) loaded from ${polygonSource}`);
     } catch (error) {
-      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.error("❌ POLYGON FETCH ERROR:");
-      console.error(error);
-      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.error("❌ POLYGON FETCH ERROR:", error);
       toast.error(
         `Failed to load polygons from ${polygonSource}: ${error.message}`
       );
@@ -361,7 +378,7 @@ const UnifiedMapView = () => {
     }
   }, [projectId, polygonSource]);
 
-  // ✅ Polygon loading effect
+  // Polygon loading effect
   useEffect(() => {
     if (projectId && showPolygons) {
       fetchPolygons();
@@ -422,7 +439,6 @@ const UnifiedMapView = () => {
           .filter(Boolean);
 
         setLocations(formatted);
-
         toast.success(`${formatted.length} sample points loaded`);
       }
     } catch (err) {
@@ -451,7 +467,6 @@ const UnifiedMapView = () => {
         metric: String(selectedMetric).toUpperCase(),
       });
 
-      console.log(res);
       if (res?.Status === 1 && res?.Data) {
         const dataList = res.Data.dataList || [];
         const colorSettings = res.Data.colorSetting || [];
@@ -467,7 +482,7 @@ const UnifiedMapView = () => {
               lng,
               radius: 10,
               [selectedMetric]: point.prm,
-              isPrediction: true,  
+              isPrediction: true,
               rawData: point,
             };
           })
@@ -577,6 +592,9 @@ const UnifiedMapView = () => {
     if (projectId && showPolygons) {
       fetchPolygons();
     }
+    if (showNeighbors) {
+      refetchNeighbors();
+    }
   }, [
     enableDataToggle,
     enableSiteToggle,
@@ -588,6 +606,8 @@ const UnifiedMapView = () => {
     fetchPredictionData,
     fetchPolygons,
     refetchSites,
+    showNeighbors,
+    refetchNeighbors,
   ]);
 
   const handleSiteClick = useCallback((site) => {
@@ -605,6 +625,14 @@ const UnifiedMapView = () => {
       autoClose: 3000,
     });
   }, []);
+
+  const handleNeighborClick = useCallback((neighbor) => {
+    const message = neighbor.isCollision
+      ? `⚠️ COLLISION - PCI ${neighbor.pci}\nCell: ${neighbor.id}\n${selectedMetric.toUpperCase()}: ${neighbor[selectedMetric]}`
+      : `PCI ${neighbor.pci} - Cell: ${neighbor.id}\n${selectedMetric.toUpperCase()}: ${neighbor[selectedMetric]}`;
+
+    toast.info(message, { autoClose: 3000 });
+  }, [selectedMetric]);
 
   // Effective thresholds with prediction color settings
   const effectiveThresholds = useMemo(() => {
@@ -707,27 +735,46 @@ const UnifiedMapView = () => {
     effectiveThresholds,
   ]);
 
-  // Filtered locations (coverage holes + polygon filtering)
+  // ✅ NEW: Multi-metric coverage hole filtering with polygon filtering
   const filteredLocations = useMemo(() => {
     let result = locations;
 
-    // Coverage hole filtering
-    if (showCoverageHoleOnly && result.length > 0) {
+    // ✅ Apply multi-metric coverage hole filters
+    const activeFilters = Object.entries(coverageHoleFilters).filter(
+      ([_, config]) => config.enabled
+    );
+
+    if (activeFilters.length > 0 && result.length > 0) {
       const beforeCount = result.length;
+      
       result = result.filter((location) => {
-        const rsrp = parseFloat(location.rsrp);
-        const isCoverageHole = !isNaN(rsrp) && rsrp < coverageHoleThreshold;
-        return isCoverageHole;
+        // ALL active filters must pass (AND logic)
+        return activeFilters.every(([metric, config]) => {
+          const value = parseFloat(location[metric]);
+          
+          // If value is missing or invalid, exclude this point
+          if (isNaN(value) || value === null || value === undefined) {
+            return false;
+          }
+          
+          // Check if value is below threshold
+          return value < config.threshold;
+        });
       });
 
+      // Show toast notification
       if (result.length > 0) {
+        const filterDescriptions = activeFilters.map(
+          ([metric, config]) => `${metric.toUpperCase()} < ${config.threshold}`
+        );
+        
         toast.info(
-          `🔴 ${result.length} coverage holes found (RSRP < ${coverageHoleThreshold} dBm)`,
-          { autoClose: 3000 }
+          `🔴 ${result.length} coverage hole(s) found:\n${filterDescriptions.join(' AND ')}`,
+          { autoClose: 4000 }
         );
       } else if (beforeCount > 0) {
         toast.warn(
-          `No coverage holes found with RSRP < ${coverageHoleThreshold} dBm`,
+          `No coverage holes found matching all filter criteria`,
           { autoClose: 3000 }
         );
       }
@@ -741,14 +788,27 @@ const UnifiedMapView = () => {
     return result;
   }, [
     locations,
-    showCoverageHoleOnly,
-    coverageHoleThreshold,
+    coverageHoleFilters,
     onlyInsidePolygons,
     showPolygons,
     polygons.length,
   ]);
 
-  // ✅ FIXED: Visible polygons calculation with logging
+  // ✅ Count active coverage filters for display
+  const activeCoverageFiltersCount = useMemo(() => {
+    return Object.values(coverageHoleFilters).filter(f => f.enabled).length;
+  }, [coverageHoleFilters]);
+
+  // ✅ Get active filter descriptions
+  const activeCoverageFilterDesc = useMemo(() => {
+    const active = Object.entries(coverageHoleFilters)
+      .filter(([_, config]) => config.enabled)
+      .map(([metric, config]) => `${metric.toUpperCase()} < ${config.threshold}`);
+    
+    return active.join(', ');
+  }, [coverageHoleFilters]);
+
+  // Visible polygons calculation
   const visiblePolygons = useMemo(() => {
     if (!showPolygons || polygonsWithColors.length === 0) {
       return [];
@@ -828,38 +888,29 @@ const UnifiedMapView = () => {
 
       {showAnalytics && (
         <UnifiedDetailLogs
-          // Data Layer
           locations={filteredLocations}
           totalLocations={locations.length}
           filteredCount={filteredLocations.length}
           dataToggle={dataToggle}
           enableDataToggle={enableDataToggle}
           selectedMetric={selectedMetric}
-          // Site Layer
           siteData={siteData}
           siteToggle={siteToggle}
           enableSiteToggle={enableSiteToggle}
           showSiteMarkers={showSiteMarkers}
           showSiteSectors={showSiteSectors}
-          // Polygon Layer
           polygons={polygonsWithColors}
           visiblePolygons={visiblePolygons}
           polygonSource={polygonSource}
           showPolygons={showPolygons}
           onlyInsidePolygons={onlyInsidePolygons}
-          // Coverage Holes
-          showCoverageHoleOnly={showCoverageHoleOnly}
-          coverageHoleThreshold={coverageHoleThreshold}
-          // Map State
+          coverageHoleFilters={coverageHoleFilters}
           viewport={viewport}
           mapCenter={mapCenter}
-          // IDs
           projectId={projectId}
           sessionIds={sessionIds}
-          // UI State
           isLoading={isLoading}
           thresholds={effectiveThresholds}
-          // ✅ ADD CLOSE HANDLER
           onClose={() => setShowAnalytics(false)}
         />
       )}
@@ -879,10 +930,8 @@ const UnifiedMapView = () => {
         sessionIds={sessionIds}
         metric={selectedMetric}
         setMetric={setSelectedMetric}
-        showCoverageHoleOnly={showCoverageHoleOnly}
-        setShowCoverageHoleOnly={setShowCoverageHoleOnly}
-        coverageHoleThreshold={coverageHoleThreshold}
-        setCoverageHoleThreshold={setCoverageHoleThreshold}
+        coverageHoleFilters={coverageHoleFilters}
+        setCoverageHoleFilters={setCoverageHoleFilters}
         ui={ui}
         onUIChange={handleUIChange}
         showPolygons={showPolygons}
@@ -898,10 +947,15 @@ const UnifiedMapView = () => {
         setShowSiteSectors={setShowSiteSectors}
         loading={isLoading}
         reloadData={reloadData}
+        showNeighbors={showNeighbors}
+        setShowNeighbors={setShowNeighbors}
+        showCollisionsOnly={showCollisionsOnly}
+        setShowCollisionsOnly={setShowCollisionsOnly}
+        neighborStats={neighborStats}
       />
 
       <div className="flex-grow rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden relative">
-        {/* Info Panel */}
+        {/* ✅ Updated Info Panel */}
         <div className="absolute bottom-2 left-2 z-10 bg-white/90 dark:bg-gray-800/90 p-2 px-3 rounded text-xs text-gray-700 dark:text-gray-300 shadow-lg space-y-1 max-w-xs">
           {enableDataToggle && (
             <div className="font-semibold">
@@ -923,9 +977,13 @@ const UnifiedMapView = () => {
             </div>
           )}
 
-          {showCoverageHoleOnly && (
+          {/* ✅ NEW: Multi-metric coverage hole display */}
+          {activeCoverageFiltersCount > 0 && (
             <div className="text-red-600 dark:text-red-400 font-semibold">
-              🔴 Coverage Holes &lt; {coverageHoleThreshold} dBm
+              🔴 Coverage Holes ({activeCoverageFiltersCount} filter{activeCoverageFiltersCount > 1 ? 's' : ''})
+              <div className="text-xs text-red-500 dark:text-red-300 mt-0.5">
+                {activeCoverageFilterDesc}
+              </div>
             </div>
           )}
 
@@ -939,6 +997,17 @@ const UnifiedMapView = () => {
           {isLoading && (
             <div className="text-yellow-600 dark:text-yellow-400 animate-pulse">
               ⏳ Loading...
+            </div>
+          )}
+
+          {showNeighbors && neighborStats.total > 0 && (
+            <div className="text-blue-600 dark:text-blue-400 font-semibold">
+              📡 {neighborStats.total} Neighbor Cells
+              {neighborStats.collisions > 0 && (
+                <span className="text-red-600 dark:text-red-400 ml-1">
+                  ({neighborStats.collisions} collisions)
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -993,7 +1062,7 @@ const UnifiedMapView = () => {
                         strokeOpacity: 0.9,
                         clickable: true,
                         zIndex: 50,
-                        visible: true, // ✅ Explicitly set
+                        visible: true,
                       }}
                       onClick={() => {
                         if (poly.avgValue !== null) {
@@ -1015,7 +1084,6 @@ const UnifiedMapView = () => {
                   );
                 })}
 
-              {/* Site Markers */}
               {enableSiteToggle && showSiteMarkers && (
                 <SiteMarkers
                   sites={siteData}
@@ -1030,7 +1098,18 @@ const UnifiedMapView = () => {
                 <MapLegend showOperators={true} showSignalQuality={false} />
               )}
 
-              {/* Network Sectors */}
+              {showNeighbors && (
+                <NeighborCollisionLayer
+                  allNeighbors={allNeighbors}
+                  collisions={collisions}
+                  showNeighbors={showNeighbors}
+                  showCollisionsOnly={showCollisionsOnly}
+                  selectedMetric={selectedMetric}
+                  thresholds={effectiveThresholds[selectedMetric] || []}
+                  onNeighborClick={handleNeighborClick}
+                />
+              )}
+
               {enableSiteToggle && showSiteSectors && (
                 <NetworkPlannerMap
                   defaultRadius={10}

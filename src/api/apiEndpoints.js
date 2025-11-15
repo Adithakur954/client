@@ -245,11 +245,7 @@ export const cellSiteApi = {
     }
   },
 
-  /**
-   * ============================================
-   * FILE DOWNLOAD METHODS
-   * ============================================
-   */
+  
   downloadFile: (outputDir, filename) => {
     const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:8080";
     const url = `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`;

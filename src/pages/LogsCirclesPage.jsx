@@ -5,6 +5,7 @@ import MapLegend from "@/components/map/MapLegend";
 import DrawingToolsLayer from "@/components/map/tools/DrawingToolsLayer";
 import { settingApi } from "@/api/apiEndpoints";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
+import PCILegend from "@/components/map/PCILegend";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
@@ -116,6 +117,7 @@ export default function LogsCirclesPage() {
             <option value="ul-throughput">UL Throughput</option>
             <option value="mos">MOS</option>
             <option value="lte-bler">LTE BLER</option>
+            <option value="pci">PCI</option>
           </select>
         </label>
 
@@ -291,6 +293,7 @@ export default function LogsCirclesPage() {
       </GoogleMap>
 
       <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} colorBy={colorBy} />
+      <PCILegend show={selectedMetric === 'pci'} />
 
       {analysis && (
         <div

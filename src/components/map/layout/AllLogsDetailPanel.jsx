@@ -96,11 +96,19 @@ const formatDuration = (hours) => {
 
 // Normalize provider names
 const normalizeProviderName = (provider) => {
-  if (!provider || provider === null || provider === undefined || provider.trim() === "") {
+  if (
+    !provider ||
+    provider === null ||
+    provider === undefined ||
+    provider.trim() === ""
+  ) {
     return "Unknown";
   }
 
-  const cleaned = String(provider).trim().toUpperCase().replace(/[\s\-_]/g, "");
+  const cleaned = String(provider)
+    .trim()
+    .toUpperCase()
+    .replace(/[\s\-_]/g, "");
 
   // JIO variations
   if (
@@ -178,7 +186,12 @@ const normalizeNetworkType = (network) => {
   }
 
   // 2G
-  if (n.includes("2G") || n.includes("EDGE") || n.includes("GPRS") || n.includes("GSM")) {
+  if (
+    n.includes("2G") ||
+    n.includes("EDGE") ||
+    n.includes("GPRS") ||
+    n.includes("GSM")
+  ) {
     return "2G";
   }
 
@@ -211,8 +224,9 @@ const normalizeAndAggregateDurations = (data) => {
   });
 
   // Convert map to array and sort by duration (descending)
-  return Array.from(aggregated.values())
-    .sort((a, b) => b.TotalDurationHours - a.TotalDurationHours);
+  return Array.from(aggregated.values()).sort(
+    (a, b) => b.TotalDurationHours - a.TotalDurationHours
+  );
 };
 // Update the normalizeOperator function to handle more edge cases
 const normalizeOperator = (raw) => {
@@ -504,39 +518,38 @@ const AllLogsDetailPanel = ({
   };
 
   useEffect(() => {
-  if (!startDate || !endDate) return;
+    if (!startDate || !endDate) return;
 
-  const fetchNetworkDurations = async () => {
-    setIsDurationsLoading(true);
-    setDurationsError(null);
-    try {
-      const res = await adminApi.getNetworkDurations(startDate, endDate);
+    const fetchNetworkDurations = async () => {
+      setIsDurationsLoading(true);
+      setDurationsError(null);
+      try {
+        const res = await adminApi.getNetworkDurations(startDate, endDate);
 
-      console.log("Network durations API response:", res);
+        console.log("Network durations API response:", res);
 
-      let rawData = [];
-      if (res?.Data && Array.isArray(res.Data)) {
-        rawData = res.Data;
-      } else if (Array.isArray(res)) {
-        rawData = res;
+        let rawData = [];
+        if (res?.Data && Array.isArray(res.Data)) {
+          rawData = res.Data;
+        } else if (Array.isArray(res)) {
+          rawData = res;
+        }
+
+        const processedData = normalizeAndAggregateDurations(rawData);
+
+        setNetworkDurations(processedData);
+        console.log("Processed durations:", processedData);
+      } catch (error) {
+        console.error("Failed to fetch network durations:", error);
+        setDurationsError(error.message || "Failed to load network durations");
+        setNetworkDurations([]);
+      } finally {
+        setIsDurationsLoading(false);
       }
+    };
 
-      
-      const processedData = normalizeAndAggregateDurations(rawData);
-      
-      setNetworkDurations(processedData);
-      console.log("Processed durations:", processedData);
-    } catch (error) {
-      console.error("Failed to fetch network durations:", error);
-      setDurationsError(error.message || "Failed to load network durations");
-      setNetworkDurations([]);
-    } finally {
-      setIsDurationsLoading(false);
-    }
-  };
-
-  fetchNetworkDurations();
-}, [startDate, endDate]);
+    fetchNetworkDurations();
+  }, [startDate, endDate]);
 
   const providerNetworkTop = useMemo(
     () => buildOperatorNetworkCombo(safeLogsList),
@@ -815,22 +828,30 @@ const AllLogsDetailPanel = ({
                 </div>
 
                 {/*================================================================================================================*/}
-                {isDurationsLoading ? <Spinner />:(
+                {isDurationsLoading ? (
+                  <Spinner />
+                ) : (
                   <div className="bg-slate-800/60 rounded-lg p-3">
                     <div className="font-semibold mb-2">Network Durations</div>
-                    {networkDurations.map((n) => (
-                      <div
-                        key={n.Provider}
-                        className="text-sm flex justify-between"
-                      >
-                        <span>{n.Provider}</span>
-                        <span>{n.Network}</span>
-                        <span>{formatDuration(n.TotalDurationHours)}</span>
-                      </div>
-                    ))}
+
+                    <table className="w-full text-sm border-collapse">
+                      <tbody>
+                        {networkDurations.map((n) => (
+                          <tr
+                            key={n.Provider}
+                            className="hover:bg-slate-700/20"
+                          >
+                            <td className="py-1">{n.Provider}</td>
+                            <td className="py-1">{n.Network}</td>
+                            <td className="py-1 text-right">
+                              {formatDuration(n.TotalDurationHours)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
-                
 
                 {/*================================================================================================================*/}
                 <div className="bg-slate-800/60 rounded-lg p-3">

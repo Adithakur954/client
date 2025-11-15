@@ -4,6 +4,7 @@ import {
   Bar,
   Legend,
   XAxis,
+  Line,
   YAxis,
   CartesianGrid,
   Tooltip,
@@ -91,8 +92,7 @@ function AppChart() {
             ))}
           </div>
         ),
-        onApply: () =>
-          console.log("Selected metrics:", selectedMetrics),
+        onApply: () => console.log("Selected metrics:", selectedMetrics),
       }}
     >
       {chartData.length > 0 ? (
@@ -100,79 +100,114 @@ function AppChart() {
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={chartData}
-              margin={{ top: 20, right: 30, left: 30, bottom: 60 }}
+              margin={{ top: 20, right: 50, left: 30, bottom: 60 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
+
+              {/* X Axis */}
               <XAxis
                 dataKey="appName"
                 angle={-45}
-                textAnchor="end"
                 interval={0}
-                height={80}
-                tick={{
-                  fill: "#111827",
-                  fontSize: 11,
-                  fontWeight: 600,
-                }}
-              />
-              <YAxis
-                label={{
-                  value: "Throughput (Mbps)",
-                  angle: -90,
-                  position: "insideLeft",
-                  offset: 10,
-                  style: {
-                    textAnchor: "middle",
-                    fill: "#6b7280",
-                    fontSize: 12,
-                  },
-                }}
-                tick={{ fill: "#6b7280", fontSize: 11 }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #ddd",
-                  borderRadius: "8px",
-                  padding: "10px",
-                }}
-              />
-              <Legend
-                verticalAlign="top"
-                height={36}
-                wrapperStyle={{ paddingBottom: "10px" }}
+                textAnchor="end"
+                height={70}
+                tick={{ fill: "#111827", fontSize: 11, fontWeight: 600 }}
               />
 
-              {selectedMetrics.map((metric, idx) => (
-                <Bar
-                  key={metric}
-                  dataKey={metric}
-                  name={
-                    {
-                      avgDlTptMbps: "Download Mbps",
-                      avgUlTptMbps: "Upload Mbps",
-                      avgMos: "MOS",
-                      sampleCount: "Samples",
-                      avgRsrp: "RSRP",
-                      avgRsrq: "RSRQ",
-                      avgSinr: "SINR",
-                    }[metric]
-                  }
-                  fill={
-                    [
-                      "#3B82F6",
-                      "#10B981",
-                      "#F59E0B",
-                      "#8B5CF6",
-                      "#EF4444",
-                      "#6366F1",
-                      "#14B8A6",
-                    ][idx % 7]
-                  }
-                  radius={[4, 4, 0, 0]}
-                  barSize={20}
+              {/* LEFT Y AXIS — Main Metrics */}
+              <YAxis
+                yAxisId="left"
+                tick={{ fill: "#6b7280", fontSize: 11 }}
+                label={{
+                  value: "Performance Metrics",
+                  angle: -90,
+                  position: "insideLeft",
+                  style: { fill: "#6b7280", fontSize: 12 },
+                }}
+              />
+
+              {/* RIGHT Y AXIS — Sample Count */}
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fill: "#EF4444", fontSize: 11 }}
+                label={{
+                  value: "Samples",
+                  angle: 90,
+                  position: "insideRight",
+                  style: { fill: "#EF4444", fontSize: 12 },
+                }}
+              />
+
+              {/* Tooltip + Legend */}
+              <Tooltip />
+              <Legend />
+
+              {/* ZIG-ZAG LINE FOR SAMPLE COUNT */}
+              <defs>
+                <pattern
+                  id="zigzagStroke"
+                  width="6"
+                  height="6"
+                  patternUnits="userSpaceOnUse"
+                >
+                  <path
+                    d="M0 3 L3 0 L6 3 L3 6 Z"
+                    fill="none"
+                    stroke="#EF4444"
+                    strokeWidth="1.5"
+                  />
+                </pattern>
+              </defs>
+
+             
+
+              {/* METRIC BARS */}
+              {selectedMetrics
+                .filter((m) => m !== "sampleCount")
+                .map((metric, idx) => (
+                  <Bar
+                    key={metric}
+                    yAxisId="left"
+                    dataKey={metric}
+                    name={
+                      {
+                        avgDlTptMbps: "Download Mbps",
+                        avgUlTptMbps: "Upload Mbps",
+                        avgMos: "MOS",
+                        avgRsrp: "RSRP",
+                        avgRsrq: "RSRQ",
+                        avgSinr: "SINR",
+                      }[metric]
+                    }
+                    fill={
+                      [
+                        "#3B82F6",
+                        "#10B981",
+                        "#F59E0B",
+                        "#8B5CF6",
+                        "#EF4444",
+                        "#6366F1",
+                        "#14B8A6",
+                      ][idx % 7]
+                    }
+                    barSize={20}
+                    radius={[4, 4, 0, 0]}
+                  />
+                ))}
+
+              {/* SAMPLE COUNT LINE (ZIGZAG) */}
+              {selectedMetrics.includes("sampleCount") && (
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="sampleCount"
+                  name="Sample Count"
+                  stroke="url(#zigzagStroke)"
+                  strokeWidth={3}
+                  dot={{ r: 3, fill: "#EF4444" }}
                 />
-              ))}
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>

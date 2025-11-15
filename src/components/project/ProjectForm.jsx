@@ -22,7 +22,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { mapViewApi, buildingApi, excelApi, cellSiteApi } from "../../api/apiEndpoints";
+import {
+  mapViewApi,
+  buildingApi,
+  excelApi,
+  cellSiteApi,
+} from "../../api/apiEndpoints";
 import Spinner from "../common/Spinner";
 import {
   BuildingGenerator,
@@ -58,10 +63,10 @@ const PolygonDropdown = ({ polygons, selectedPolygon, setSelectedPolygon }) => {
 
       <div className="text-xs text-gray-500 mt-1">
         {safePolygons.length === 0 ? (
-          <span className="text-orange-600">⚠ No polygons loaded yet</span>
+          <span className="text-orange-600">No polygons loaded yet</span>
         ) : (
           <span className="text-green-600">
-            ✓ {safePolygons.length} polygon(s) available
+            {safePolygons.length} polygon(s) available
           </span>
         )}
       </div>
@@ -145,10 +150,10 @@ const PolygonSessionSelector = ({
 
       <div className="text-xs text-blue-600 mt-2">
         {selectedSessions.length === 0
-          ? "⚠ No sessions selected"
+          ? "No sessions selected"
           : selectedSessions.length === sessions.length
-          ? `✓ All ${sessions.length} sessions selected`
-          : `✓ ${selectedSessions.length} of ${sessions.length} sessions selected`}
+          ? `All ${sessions.length} sessions selected`
+          : `${selectedSessions.length} of ${sessions.length} sessions selected`}
       </div>
     </div>
   );
@@ -167,8 +172,6 @@ export const ProjectForm = ({
   const [buildingLoading, setBuildingLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState("");
-
-  // File upload states
   const [siteFile, setSiteFile] = useState(null);
   const [uploadMethod, setUploadMethod] = useState("noml");
   const [uploadParams, setUploadParams] = useState({
@@ -183,11 +186,9 @@ export const ProjectForm = ({
 
   const fileInputRef = useRef(null);
 
-  // Update polygon data when selection changes
   useEffect(() => {
     if (selectedPolygon) {
       const polygon = polygons.find((p) => p.value === selectedPolygon);
-
       setSelectedPolygonData(polygon);
       setGeneratedBuildings(null);
 
@@ -203,16 +204,15 @@ export const ProjectForm = ({
     }
   }, [selectedPolygon, polygons]);
 
-  // File upload handlers
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
       const ext = selectedFile.name.split(".").pop().toLowerCase();
       if (["csv", "xlsx", "xls"].includes(ext)) {
         setSiteFile(selectedFile);
-        toast.success(`✓ File selected: ${selectedFile.name}`);
+        toast.success(`File selected: ${selectedFile.name}`);
       } else {
-        toast.error("❌ Invalid file type. Only CSV, XLSX, XLS allowed");
+        toast.error("Invalid file type. Only CSV, XLSX, XLS allowed");
         e.target.value = null;
       }
     }
@@ -240,9 +240,8 @@ export const ProjectForm = ({
       errors.push("Please select a polygon");
     }
 
-    // Validate polygon exists in list
     if (selectedPolygon) {
-      const polygonExists = polygons?.some(p => p.value === selectedPolygon);
+      const polygonExists = polygons?.some((p) => p.value === selectedPolygon);
       if (!polygonExists) {
         errors.push("Selected polygon is no longer available. Please refresh and try again.");
       }
@@ -251,9 +250,6 @@ export const ProjectForm = ({
     return errors;
   };
 
-  /**
-   * Extract project ID from various response structures
-   */
   const extractProjectId = (response) => {
     return (
       response?.Data?.projectId ||
@@ -268,9 +264,6 @@ export const ProjectForm = ({
     );
   };
 
-  /**
-   * Extract project name from response
-   */
   const extractProjectName = (response, fallback) => {
     return (
       response?.Data?.project?.project_name ||
@@ -292,164 +285,85 @@ export const ProjectForm = ({
 
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
-      const errorMsg = validationErrors.join(", ");
-      toast.error(errorMsg);
-      console.error("❌ Validation errors:", validationErrors);
+      toast.error(validationErrors.join(", "));
       return;
     }
 
     setLoading(true);
     let projectId = null;
     let projectData = null;
-    let buildingsToSave = generatedBuildings;
+    let buildingsToSave = null;
     const completedSteps = [];
 
     try {
-      // ========================================
-      // STEP 0: AUTO-GENERATE BUILDINGS
-      // ========================================
-      if (selectedPolygonData && !generatedBuildings) {
-        setCurrentStep("Generating buildings...");
-        setBuildingLoading(true);
-
-        try {
-          const buildingResult = await generateBuildingsForPolygon(
-            selectedPolygonData
-          );
-
-          if (buildingResult.success && buildingResult.data) {
-            setGeneratedBuildings(buildingResult.data);
-            buildingsToSave = buildingResult.data;
-            toast.success(`✓ Generated ${buildingResult.count} buildings`);
-            completedSteps.push("buildings_generated");
-          } else {
-            console.warn("⚠ No buildings generated:", buildingResult.message);
-            toast.info(buildingResult.message || "No buildings found in this area");
-            buildingsToSave = null;
-          }
-        } catch (buildingError) {
-          console.error("❌ Building generation error:", buildingError);
-          toast.warn(`⚠ Could not generate buildings: ${buildingError.message}`);
-          buildingsToSave = null;
-        } finally {
-          setBuildingLoading(false);
-        }
-      } else if (generatedBuildings) {
-        buildingsToSave = generatedBuildings;
-      }
-
-      // ========================================
-      // STEP 1: CREATE PROJECT IN C# BACKEND
-      // ========================================
+      // STEP 1: Create Project FIRST
       setCurrentStep("Creating project in database...");
-
-      // Validate polygon exists before sending
-      if (selectedPolygon && !polygons?.some(p => p.value === selectedPolygon)) {
-        throw new Error("Selected polygon is invalid or no longer exists. Please refresh.");
-      }
 
       const projectPayload = {
         ProjectName: projectName.trim(),
-        ...(selectedPolygon && { PolygonIds: [selectedPolygon] }),
-        ...(selectedSessions.length > 0 && { SessionIds: selectedSessions }),
+        PolygonIds: selectedPolygon ? [selectedPolygon] : [],
+        SessionIds: selectedSessions.length > 0 ? selectedSessions : []
       };
-
-      console.log("📤 Creating project with payload:", JSON.stringify(projectPayload, null, 2));
 
       const projectRes = await mapViewApi.createProjectWithPolygons(projectPayload);
 
-      console.log("📥 Project creation response:", JSON.stringify(projectRes, null, 2));
-
-      // Check response status
       if (!projectRes || projectRes.Status !== 1) {
-        const errorMsg =
-          projectRes?.Message ||
-          projectRes?.message ||
-          "Project creation failed - no valid response";
-        throw new Error(errorMsg);
+        throw new Error(projectRes?.Message || "Project creation failed");
       }
 
-      // Extract project ID
       projectId = extractProjectId(projectRes);
-
       if (!projectId) {
-        console.error("❌ Failed to extract project ID from response:", projectRes);
-        throw new Error("No project ID received from server. Project may not have been created.");
+        throw new Error("No project ID received from server");
       }
 
       projectData = projectRes.Data?.project || projectRes.Data || projectRes;
-
       const projectNameDisplay = extractProjectName(projectRes, projectName);
 
-      console.log(`✅ Project created successfully! ID: ${projectId}, Name: "${projectNameDisplay}"`);
-      toast.success(`✅ Project "${projectNameDisplay}" created! ID: ${projectId}`);
+      toast.success(`Project "${projectNameDisplay}" created! ID: ${projectId}`);
       completedSteps.push("project_created");
 
-      // Small delay to ensure database commit
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // ========================================
-      // STEP 2: VERIFY PROJECT EXISTS
-      // ========================================
-      setCurrentStep("Verifying project...");
-
-      try {
-        const verification = await cellSiteApi.verifyProject(projectId);
-        
-        if (!verification.exists) {
-          console.warn("⚠️ Project not found in Python backend, but continuing...");
-          // Don't throw error, just log - Python backend might not have the project yet
-        } else {
-          console.log(`✅ Project ${projectId} verified in Python backend`);
-        }
-      } catch (verifyError) {
-        console.warn("⚠️ Project verification failed, but continuing:", verifyError);
-        // Don't fail the whole process if verification fails
-      }
-
-      // ========================================
-      // STEP 3: SAVE BUILDINGS TO PYTHON BACKEND
-      // ========================================
-      if (buildingsToSave && selectedPolygonData) {
-        setCurrentStep("Saving buildings to project...");
+      // STEP 2: Generate and Save Buildings WITH project_id
+      if (selectedPolygonData && selectedPolygonData.wkt) {
+        setCurrentStep("Generating and saving buildings...");
+        setBuildingLoading(true);
 
         try {
-          // ✅ CORRECT - Updated code
-const buildingPayload = {
-  Project_Id: projectId,             
-  Data: buildingsToSave,              
-  polygon_wkt: selectedPolygonData.wkt,
-  polygon_label: selectedPolygonData.label,
-};
+          // Use correct case for keys as expected by Python backend
+          const buildingPayload = {
+            WKT: selectedPolygonData.wkt,  // Uppercase WKT
+            Name: selectedPolygonData.label,  // Capitalized Name
+            project_id: projectId  // lowercase project_id
+          };
 
-          console.log(`📤 Saving ${buildingsToSave.features?.length || 0} buildings...`);
+          console.log("Building payload:", buildingPayload);
 
-          const buildingRes = await buildingApi.saveBuildingsWithProject(buildingPayload);
+          const buildingRes = await buildingApi.generateBuildings(buildingPayload);
 
           if (buildingRes.Status === 1 || buildingRes.success) {
-            const count = buildingsToSave.features?.length || 0;
-            toast.success(`✅ ${count} buildings saved to project!`);
-            completedSteps.push("buildings_saved");
+            const count = buildingRes.Stats?.extracted || 0;
+            const savedCount = buildingRes.Stats?.saved_to_db || 0;
+            buildingsToSave = buildingRes.Data;
+            toast.success(`Generated ${count} buildings, saved ${savedCount} to project`);
+            completedSteps.push("buildings_generated");
           } else {
-            toast.warn("⚠ Buildings could not be saved, but project was created");
+            toast.info(buildingRes.Message || "No buildings found in this area");
           }
         } catch (buildingError) {
-          console.error("❌ Building save error:", buildingError);
-          toast.warn(`⚠ Building save failed: ${buildingError.message}`);
-          // Don't fail the whole process
+          console.error("Building generation error:", buildingError);
+          toast.warn(`Could not generate buildings: ${buildingError.message}`);
+        } finally {
+          setBuildingLoading(false);
         }
       }
 
-      // ========================================
-      // STEP 4: UPLOAD SITE FILE (if provided)
-      // ========================================
+      // STEP 3: Upload Site File (if provided)
       if (siteFile) {
         setCurrentStep(`Processing site file: ${siteFile.name}...`);
-        console.log(`📤 Uploading site file: ${siteFile.name} (${(siteFile.size / 1024).toFixed(2)} KB)`);
-
+        
         try {
           const formData = new FormData();
-
           formData.append("file", siteFile);
           formData.append("project_id", projectId.toString());
           formData.append("project_name", projectNameDisplay);
@@ -461,51 +375,23 @@ const buildingPayload = {
           formData.append("make_map", uploadParams.makeMap.toString());
 
           if (uploadMethod === "ml") {
-            if (uploadParams.modelPath)
-              formData.append("model_path", uploadParams.modelPath);
-            if (uploadParams.trainPath)
-              formData.append("train_path", uploadParams.trainPath);
-          }
-
-          // Log FormData for debugging
-          console.log("📋 FormData contents:");
-          for (let [key, value] of formData.entries()) {
-            if (value instanceof File) {
-              console.log(`  ${key}: ${value.name} (${value.size} bytes)`);
-            } else {
-              console.log(`  ${key}: ${value}`);
-            }
+            if (uploadParams.modelPath) formData.append("model_path", uploadParams.modelPath);
+            if (uploadParams.trainPath) formData.append("train_path", uploadParams.trainPath);
           }
 
           const uploadRes = await cellSiteApi.uploadSite(formData);
-
-          console.log("📥 Site upload response:", uploadRes);
-
+          
           if (uploadRes.success || uploadRes.Status === 1) {
-            const message =
-              uploadRes.message ||
-              uploadRes.Message ||
-              "Site file processed successfully!";
-            toast.success(`✅ ${message}`);
-            completedSteps.push("site_file_uploaded");
-          } else {
-            const errorMsg =
-              uploadRes.error ||
-              uploadRes.Message ||
-              "Site file processing failed";
-            toast.warn(`⚠ Site processing issue: ${errorMsg}`);
+            toast.success("Site file processed successfully");
+            completedSteps.push("site_uploaded");
           }
-        } catch (uploadError) {
-          console.error("❌ Site upload error:", uploadError);
-          toast.error(`❌ Site upload failed: ${uploadError.message}`);
-          // Don't fail the whole process
+        } catch (siteError) {
+          toast.warn(`Site upload failed: ${siteError.message}`);
         }
       }
 
-      // ========================================
-      // STEP 5: UPLOAD SESSIONS (if selected)
-      // ========================================
-      if (selectedSessions && selectedSessions.length > 0) {
+      // STEP 4: Upload Sessions
+      if (selectedSessions.length > 0) {
         setCurrentStep(`Processing ${selectedSessions.length} sessions...`);
 
         try {
@@ -517,63 +403,25 @@ const buildingPayload = {
             method: uploadMethod,
           };
 
-          console.log("📤 Uploading sessions:", JSON.stringify(sessionPayload, null, 2));
-
           const sessionRes = await cellSiteApi.uploadSessions(sessionPayload);
-
-          console.log("📥 Session upload response:", sessionRes);
 
           if (sessionRes.success || sessionRes.Status === 1) {
             const processedCount = sessionRes.sessions_processed || selectedSessions.length;
             const logsCount = sessionRes.logs_processed || 0;
-            toast.success(
-              `✅ Processed ${processedCount} sessions (${logsCount} network logs)!`
-            );
+            toast.success(`Processed ${processedCount} sessions (${logsCount} network logs)`);
             completedSteps.push("sessions_uploaded");
-          } else {
-            toast.warn(
-              `⚠ Session upload issue: ${sessionRes.Message || sessionRes.error || "Unknown error"}`
-            );
           }
         } catch (sessionError) {
-          console.error("❌ Session upload error:", sessionError);
-          
-          // Provide more specific error message
-          let errorMsg = "Session upload failed";
-          if (sessionError.response?.data?.error) {
-            errorMsg = sessionError.response.data.error;
-          } else if (sessionError.message) {
-            errorMsg = sessionError.message;
+          if (sessionError.message && sessionError.message.includes("already exists")) {
+            toast.info("Session data already exists for this project");
+          } else {
+            toast.error(`Session upload failed: ${sessionError.message || "Unknown error"}`);
           }
-          
-          toast.error(`❌ ${errorMsg}`);
-          // Don't fail the whole process
         }
-      } else {
-        console.log("ℹ️ No sessions selected to upload.");
       }
 
-      // ========================================
-      // STEP 6: FINALIZE AND CLEANUP
-      // ========================================
       setCurrentStep("Finalizing...");
-
-      const successSummary = [
-        `✅ Project "${projectNameDisplay}" (ID: ${projectId}) created successfully!`,
-        completedSteps.includes("buildings_saved") && `✅ ${buildingsToSave?.features?.length || 0} buildings saved`,
-        completedSteps.includes("site_file_uploaded") && `✅ Site file processed`,
-        completedSteps.includes("sessions_uploaded") && `✅ ${selectedSessions.length} sessions processed`,
-      ].filter(Boolean).join("\n");
-
-      console.log("\n" + "=".repeat(60));
-      console.log("🎉 PROJECT CREATION SUCCESSFUL!");
-      console.log("=".repeat(60));
-      console.log(successSummary);
-      console.log("=".repeat(60) + "\n");
-
-      toast.success(`🎉 Project created successfully!`, {
-        autoClose: 5000,
-      });
+      toast.success("Project created successfully!", { autoClose: 5000 });
 
       // Reset form
       setProjectName("");
@@ -595,7 +443,6 @@ const buildingPayload = {
         fileInputRef.current.value = null;
       }
 
-      // Notify parent component
       if (onProjectCreated) {
         onProjectCreated({
           projectId: projectId,
@@ -605,36 +452,22 @@ const buildingPayload = {
       }
 
     } catch (err) {
-      console.error("\n" + "=".repeat(60));
-      console.error("❌ PROJECT CREATION ERROR");
-      console.error("=".repeat(60));
-      console.error("Error object:", err);
-      console.error("Error stack:", err.stack);
-      console.error("=".repeat(60) + "\n");
-
       let errorMessage = "Failed to create project";
-      let technicalDetails = "";
 
       if (err.response?.data) {
         const data = err.response.data;
-        
-        console.log("📋 Error response data:", JSON.stringify(data, null, 2));
-
         if (data?.InnerException) {
-          technicalDetails = data.InnerException;
-          errorMessage = `Database Error: ${data.InnerException}`;
-          
-          // Check for specific patterns
-          if (technicalDetails.toLowerCase().includes("foreign key")) {
+          if (data.InnerException.toLowerCase().includes("foreign key")) {
             errorMessage = "Invalid polygon or session reference. Please refresh and try again.";
-          } else if (technicalDetails.toLowerCase().includes("unique")) {
+          } else if (data.InnerException.toLowerCase().includes("unique")) {
             errorMessage = "A project with this name already exists.";
-          } else if (technicalDetails.toLowerCase().includes("null")) {
+          } else if (data.InnerException.toLowerCase().includes("null")) {
             errorMessage = "Required field is missing. Please ensure all fields are filled.";
+          } else {
+            errorMessage = `Database Error: ${data.InnerException}`;
           }
         } else if (data?.Message || data?.message) {
           errorMessage = data.Message || data.message;
-          technicalDetails = errorMessage;
         } else if (data?.errors) {
           const validationErrors = Object.entries(data.errors)
             .map(([field, messages]) => {
@@ -643,53 +476,22 @@ const buildingPayload = {
             })
             .join("; ");
           errorMessage = `Validation Error: ${validationErrors}`;
-          technicalDetails = validationErrors;
-        } else if (typeof data === "string") {
-          errorMessage = data;
-          technicalDetails = data;
         }
       } else if (err.request) {
         errorMessage = "No response from server. Please check your connection.";
-        technicalDetails = "Network timeout or server unavailable";
       } else {
         errorMessage = err.message || "Unknown error occurred";
-        technicalDetails = err.message;
       }
 
-      // Display user-friendly error
-      toast.error(`❌ ${errorMessage}`, {
-        autoClose: 8000,
-      });
+      toast.error(errorMessage, { autoClose: 8000 });
 
-      // Log technical details
-      if (technicalDetails) {
-        console.error("🔍 Technical details:", technicalDetails);
-      }
-
-      // If project was created but other operations failed
-      if (projectId) {
-        const partialSuccessMsg = [
-          `ℹ️ Project ID ${projectId} was created, but some operations failed:`,
-          !completedSteps.includes("buildings_saved") && "❌ Buildings not saved",
-          !completedSteps.includes("site_file_uploaded") && siteFile && "❌ Site file not uploaded",
-          !completedSteps.includes("sessions_uploaded") && selectedSessions.length > 0 && "❌ Sessions not uploaded",
-        ].filter(Boolean).join("\n");
-
-        console.warn(partialSuccessMsg);
-        toast.info(
-          `ℹ️ Project ${projectId} was created but some operations failed. Check console for details.`,
-          { autoClose: 10000 }
-        );
-
-        // Still call the callback with partial success
-        if (onProjectCreated) {
-          onProjectCreated({
-            projectId: projectId,
-            projectData: projectData,
-            completedSteps: completedSteps,
-            partialSuccess: true,
-          });
-        }
+      if (projectId && onProjectCreated) {
+        onProjectCreated({
+          projectId: projectId,
+          projectData: projectData,
+          completedSteps: completedSteps,
+          partialSuccess: true,
+        });
       }
     } finally {
       setLoading(false);
@@ -699,8 +501,7 @@ const buildingPayload = {
   };
 
   const canSubmit = projectName.trim() && selectedPolygon;
-  const isLoadingPolygons =
-    parentLoading && (!polygons || polygons.length === 0);
+  const isLoadingPolygons = parentLoading && (!polygons || polygons.length === 0);
 
   return (
     <Card>
@@ -712,7 +513,6 @@ const buildingPayload = {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Project Name */}
           <div>
             <Label className="pb-1">
               Project Name <span className="text-red-500">*</span>
@@ -730,7 +530,6 @@ const buildingPayload = {
             </p>
           </div>
 
-          {/* Polygon Selection */}
           <div className="space-y-2">
             <Label>
               Select Polygon <span className="text-red-500">*</span>
@@ -739,9 +538,7 @@ const buildingPayload = {
             {isLoadingPolygons ? (
               <div className="flex items-center gap-2 p-3 bg-gray-50 rounded border">
                 <Spinner className="h-4 w-4" />
-                <span className="text-sm text-gray-600">
-                  Loading polygons...
-                </span>
+                <span className="text-sm text-gray-600">Loading polygons...</span>
               </div>
             ) : (
               <PolygonDropdown
@@ -754,7 +551,7 @@ const buildingPayload = {
             {selectedPolygonData && !generatedBuildings && (
               <div className="flex items-center gap-2 text-sm text-blue-600 mt-1 p-2 bg-blue-50 rounded">
                 <Info className="h-4 w-4" />
-                <span>Buildings will be generated automatically</span>
+                <span>Buildings will be generated when project is created</span>
               </div>
             )}
 
@@ -767,17 +564,14 @@ const buildingPayload = {
             />
           </div>
 
-          {/* Session Selector */}
-          {selectedPolygonData?.sessionIds &&
-            selectedPolygonData.sessionIds.length > 0 && (
-              <PolygonSessionSelector
-                sessions={selectedPolygonData.sessionIds}
-                selectedSessions={selectedSessions}
-                setSelectedSessions={setSelectedSessions}
-              />
-            )}
+          {selectedPolygonData?.sessionIds && selectedPolygonData.sessionIds.length > 0 && (
+            <PolygonSessionSelector
+              sessions={selectedPolygonData.sessionIds}
+              selectedSessions={selectedSessions}
+              setSelectedSessions={setSelectedSessions}
+            />
+          )}
 
-          {/* Site File Upload Section */}
           <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
             <div className="flex items-center justify-between">
               <Label>Upload Site Data (Optional)</Label>
@@ -830,7 +624,6 @@ const buildingPayload = {
             )}
           </div>
 
-          {/* Submit Button */}
           <div className="flex justify-end gap-2 pt-4">
             <Button
               type="submit"
@@ -848,7 +641,6 @@ const buildingPayload = {
             </Button>
           </div>
 
-          {/* Progress Status */}
           {loading && currentStep && (
             <Alert className="bg-blue-50 border-blue-200">
               <AlertCircle className="h-4 w-4 text-blue-600" />

@@ -1,8 +1,6 @@
-// src/api/apiService.js
 
-// Use environment variable or fallback to localhost
-const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL || "http://localhost:5224";
-// const API_BASE_URL =  "https://signaltrackers-1.onrender.com";
+// const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL || "http://localhost:5224";
+const API_BASE_URL =  "https://signaltrackers-1.onrender.com";
 
 const apiService = async (endpoint, { body, params, ...customOptions } = {}) => {
   const isFormData = body instanceof FormData;

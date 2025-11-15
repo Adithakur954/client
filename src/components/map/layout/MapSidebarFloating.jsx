@@ -22,13 +22,13 @@ const getYesterday = () => {
 const normalizeTechName = (tech) => {
   if (!tech) return "Unknown";
   const t = String(tech).trim().toUpperCase();
-  
+
   if (t.includes("5G") || t.includes("NR")) return "5G";
   if (t.includes("LTE") || t.includes("4G")) return "4G";
   if (t.includes("3G")) return "3G";
   if (t.includes("2G") || t.includes("EDGE")) return "2G";
   return "Unknown";
-}
+};
 
 // Normalize provider names
 const normalizeProviderName = (raw) => {
@@ -36,9 +36,9 @@ const normalizeProviderName = (raw) => {
   const s = String(raw).trim();
   if (/^\/+$/.test(s)) return "Unknown";
   if (s.replace(/\s+/g, "") === "404011") return "Unknown";
-  
+
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
-  
+
   // Handle Jio variations (including "Jio True5G")
   if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) {
     return "Jio";
@@ -46,14 +46,18 @@ const normalizeProviderName = (raw) => {
   if (cleaned.includes("AIRTEL")) {
     return "Airtel";
   }
-  if (cleaned === "VI" || cleaned.includes("VIINDIA") || 
-      cleaned.includes("VODAFONE") || cleaned.includes("IDEA")) {
+  if (
+    cleaned === "VI" ||
+    cleaned.includes("VIINDIA") ||
+    cleaned.includes("VODAFONE") ||
+    cleaned.includes("IDEA")
+  ) {
     return "VI India";
   }
   if (cleaned.includes("BSNL")) {
     return "BSNL";
   }
-  
+
   return "Unknown";
 };
 
@@ -65,7 +69,7 @@ const defaultFilters = {
   band: "ALL",
   measureIn: "rsrp",
   coverageHoleOnly: false,
-  colorBy: null
+  colorBy: null,
 };
 
 const COLOR_SCHEMES = {
@@ -81,20 +85,20 @@ const COLOR_SCHEMES = {
     "4G": "#8B5CF6",
     "3G": "#10B981",
     "2G": "#6B7280",
-    "Unknown": "#F59E0B",
+    Unknown: "#F59E0B",
   },
   band: {
-    "3": "#EF4444",
-    "5": "#F59E0B",
-    "8": "#10B981",
-    "40": "#3B82F6",
-    "41": "#8B5CF6",
-    "n28": "#EC4899",
-    "n78": "#F472B6",
-    "1": "#EF4444",
-    "2": "#F59E0B",
-    "7": "#10B781",
-    "Unknown": "#6B7280",
+    3: "#EF4444",
+    5: "#F59E0B",
+    8: "#10B981",
+    40: "#3B82F6",
+    41: "#8B5CF6",
+    n28: "#EC4899",
+    n78: "#F472B6",
+    1: "#EF4444",
+    2: "#F59E0B",
+    7: "#10B781",
+    Unknown: "#6B7280",
   },
 };
 
@@ -109,33 +113,33 @@ export const getLogColor = (colorBy, value, defaultColor = "#6B7280") => {
   }
 
   let normalizedValue = String(value).trim();
-  
+
   // Apply normalization based on colorBy type
-  if (colorBy === 'provider') {
+  if (colorBy === "provider") {
     normalizedValue = normalizeProviderName(value);
-  } else if (colorBy === 'technology') {
+  } else if (colorBy === "technology") {
     normalizedValue = normalizeTechName(value);
-  } else if (colorBy === 'band') {
+  } else if (colorBy === "band") {
     // Bands might be negative (-1), handle special cases
     if (normalizedValue === "-1" || normalizedValue === "") {
       normalizedValue = "Unknown";
     }
   }
-  
+
   // Try exact match first
   if (scheme[normalizedValue]) {
     return scheme[normalizedValue];
   }
-  
+
   // Try case-insensitive match (fallback)
   const matchKey = Object.keys(scheme).find(
-    key => key.toLowerCase() === normalizedValue.toLowerCase()
+    (key) => key.toLowerCase() === normalizedValue.toLowerCase()
   );
-  
+
   if (matchKey) {
     return scheme[matchKey];
   }
-  
+
   return defaultColor;
 };
 
@@ -144,12 +148,8 @@ const isObjectNonEmpty = (obj) =>
 
 const PanelSection = ({ title, children }) => (
   <div className="space-y-2">
-    <div className="text-sm font-medium text-slate-100">
-      {title}
-    </div>
-    <div className="rounded-lg border p-3 bg-slate-900">
-      {children}
-    </div>
+    <div className="text-sm font-medium text-slate-100">{title}</div>
+    <div className="rounded-lg border p-3 bg-slate-900">{children}</div>
   </div>
 );
 
@@ -177,7 +177,7 @@ const ColorLegend = ({ colorBy }) => {
       </div>
     </div>
   );
-}
+};
 
 export default function MapSidebarFloating({
   onApplyFilters,
@@ -207,7 +207,7 @@ export default function MapSidebarFloating({
   const [projects, setProjects] = useState([]);
 
   const hasActiveFilters = isObjectNonEmpty(initialFilters);
-  
+
   useEffect(() => {
     if (!initialFilters) return;
     setFilters((prev) => ({ ...prev, ...initialFilters }));
@@ -224,11 +224,11 @@ export default function MapSidebarFloating({
         ]);
 
         const provList = Array.isArray(provRes) ? provRes : [];
-        console.log("🏢 Raw providers from API:", provList);
+        console.log("Raw providers from API:", provList);
         const normalizedSet = new Set(
           provList.map((p) => normalizeProviderName(p.name))
         );
-         console.log("✨ Normalized providers:", Array.from(normalizedSet));
+        console.log(" Normalized providers:", Array.from(normalizedSet));
         const normalizedProviders = Array.from(normalizedSet).map((name) => ({
           id: name,
           name,
@@ -260,9 +260,9 @@ export default function MapSidebarFloating({
 
   const handleNeighChange = (event) => {
     const checked = event.target.checked;
-    // Pass the showNeighbours state up to parent via onUIChange
+
     onUIChange?.({ showNeighbours: checked });
-  }
+  };
 
   const handleColorByChange = (type) => {
     setFilters((prev) => ({
@@ -291,7 +291,7 @@ export default function MapSidebarFloating({
       : `${base} top-4 left-4`;
   }, [position]);
 
-  const applyAndClose = () => {
+  const applyAndClose = () => {   // yaha pe pita ji ko bhej raha hai 
     onApplyFilters?.(filters, "logs");
     if (autoCloseOnApply) setOpen(false);
   };
@@ -445,6 +445,7 @@ export default function MapSidebarFloating({
                     <SelectItem value="dl-tpt">DL-Throughput</SelectItem>
                     <SelectItem value="lte-bler">LTE-BLER</SelectItem>
                     <SelectItem value="mos">MOS</SelectItem>
+                    <SelectItem value="pci">PCI</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -516,10 +517,10 @@ export default function MapSidebarFloating({
               </label>
 
               <label className="flex items-center gap-2">
-                <input 
+                <input
                   type="checkbox"
                   checked={ui?.showNeighbours || false}
-                  onChange={handleNeighChange} 
+                  onChange={handleNeighChange}
                 />
                 Show Neighbours
               </label>
@@ -550,7 +551,7 @@ export default function MapSidebarFloating({
             Clear
           </Button>
           <Button className="flex-1" onClick={applyAndClose}>
-            <Filter title="Apply & Fetch Logs" className="h-4 w-4 mr-2" /> 
+            <Filter title="Apply & Fetch Logs" className="h-4 w-4 mr-2" />
             Apply & Fetch Logs
           </Button>
         </div>
