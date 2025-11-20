@@ -1,6 +1,6 @@
 // src/components/UnifiedMapSidebar.jsx
 import React, { useMemo, useCallback, memo, useState } from "react";
-import { X, RefreshCw, AlertTriangle, Radio, Filter, Minus, Plus } from "lucide-react";
+import { X, RefreshCw, AlertTriangle, Layers, Filter, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -168,8 +168,6 @@ const UnifiedMapSidebar = ({
   reloadData,
   showNeighbors,
   setShowNeighbors,
-  showCollisionsOnly,
-  setShowCollisionsOnly,
   neighborStats,
 }) => {
   const sideClasses = useMemo(() => {
@@ -446,7 +444,8 @@ const UnifiedMapSidebar = ({
             </div>
           </PanelSection>
 
-          <PanelSection title="Neighbor Analysis" icon={Radio}>
+          {/* ✅ SIMPLIFIED: Heatmap Layer (no collision features) */}
+          <PanelSection title="Heatmap Layer" icon={Layers}>
             <div className="space-y-3">
               <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
                 <input
@@ -456,89 +455,33 @@ const UnifiedMapSidebar = ({
                   className="w-4 h-4"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-medium">Show Neighbor Cells</div>
+                  <div className="text-sm font-medium">Show Neighbor Heatmap</div>
                   <div className="text-xs text-slate-400">
-                    Display neighbor cell data on map
+                    Display neighbor cell data as heatmap
                   </div>
                 </div>
               </label>
 
-              {showNeighbors && (
-                <>
-                  <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800 ml-6">
-                    <input
-                      type="checkbox"
-                      checked={showCollisionsOnly}
-                      onChange={(e) => setShowCollisionsOnly?.(e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <div className="flex-1">
-                      <div className="text-sm">Show Collisions Only</div>
-                      <div className="text-xs text-slate-400">
-                        Hide non-collision neighbors
-                      </div>
+              {showNeighbors && neighborStats && neighborStats.total > 0 && (
+                <div className="space-y-2">
+                  <div className="p-2 bg-slate-800 rounded text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Total Neighbors:</span>
+                      <span className="font-semibold text-blue-400">
+                        {neighborStats.total}
+                      </span>
                     </div>
-                  </label>
-
-                  {neighborStats && neighborStats.total > 0 && (
-                    <div className="ml-6 space-y-2">
-                      <div className="p-2 bg-slate-800 rounded text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400">Total Neighbors:</span>
-                          <span className="font-semibold text-blue-400">
-                            {neighborStats.total}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400">Unique PCIs:</span>
-                          <span className="font-semibold text-green-400">
-                            {neighborStats.uniquePCIs}
-                          </span>
-                        </div>
-
-                        {neighborStats.collisions > 0 && (
-                          <>
-                            <div className="border-t border-slate-700 my-1"></div>
-                            
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400">PCI Collisions:</span>
-                              <span className="font-semibold text-red-400">
-                                {neighborStats.collisions}
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400">Collision Cells:</span>
-                              <span className="font-semibold text-orange-400">
-                                {neighborStats.collisionCells}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {neighborStats.collisions > 0 && (
-                        <div className="bg-red-900/20 border border-red-700 p-2 rounded text-xs">
-                          <p className="text-red-400 font-semibold">
-                            ⚠️ {neighborStats.collisions} PCI collision(s) detected
-                          </p>
-                          <p className="text-red-300 text-xs mt-1">
-                            Same PCI at different locations (shown in black)
-                          </p>
-                        </div>
-                      )}
-
-                      {neighborStats.collisions === 0 && neighborStats.total > 0 && (
-                        <div className="bg-green-900/20 border border-green-700 p-2 rounded text-xs">
-                          <p className="text-green-400">
-                            ✓ No PCI collisions detected
-                          </p>
-                        </div>
-                      )}
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Unique PCIs:</span>
+                      <span className="font-semibold text-green-400">
+                        {neighborStats.uniquePCIs}
+                      </span>
                     </div>
-                  )}
-                </>
+                  </div>
+
+                 
+                </div>
               )}
             </div>
           </PanelSection>
@@ -559,6 +502,7 @@ const UnifiedMapSidebar = ({
                     <SelectItem value="ul_thpt">UL Throughput</SelectItem>
                     <SelectItem value="mos">MOS</SelectItem>
                     <SelectItem value="lte_bler">LTE BLER</SelectItem>
+                    <SelectItem value="pci">PCI</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -655,7 +599,7 @@ const UnifiedMapSidebar = ({
                 </div>
 
                 {/* ✅ COMPACT: Active Filters Summary */}
-                {/* {activeFiltersCount > 0 && (
+                {activeFiltersCount > 0 && (
                   <div className="p-2 bg-yellow-900/20 border border-yellow-700 rounded">
                     <div className="flex items-center gap-1.5 mb-1">
                       <AlertTriangle className="h-3 w-3 text-yellow-400 flex-shrink-0" />
@@ -678,7 +622,7 @@ const UnifiedMapSidebar = ({
                       All criteria must be met (AND logic)
                     </div>
                   </div>
-                )} */}
+                )}
 
                 {activeFiltersCount === 0 && (
                   <div className="p-2 bg-slate-800 rounded text-[10px] text-slate-400 text-center">

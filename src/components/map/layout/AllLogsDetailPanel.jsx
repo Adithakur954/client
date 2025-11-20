@@ -480,6 +480,7 @@ const AllLogsDetailPanel = ({
   selectedMetric = "rsrp",
   isLoading,
   startDate,
+  appSummary, 
   endDate,
   onClose,
 }) => {
@@ -526,6 +527,7 @@ const AllLogsDetailPanel = ({
       try {
         const res = await adminApi.getNetworkDurations(startDate, endDate);
 
+
         console.log("Network durations API response:", res);
 
         let rawData = [];
@@ -534,6 +536,7 @@ const AllLogsDetailPanel = ({
         } else if (Array.isArray(res)) {
           rawData = res;
         }
+        console.log("fbfbkjxfbgjbd",appSummary)
 
         const processedData = normalizeAndAggregateDurations(rawData);
 
@@ -852,6 +855,84 @@ const AllLogsDetailPanel = ({
                     </table>
                   </div>
                 )}
+
+                {/*=====================================================================================================================*/}
+                 {/* App Usage Summary */}
+<div className="bg-slate-800/60 rounded-lg p-3">
+  <div className="font-semibold mb-2 flex items-center gap-2">
+    <Clock className="h-4 w-4" />
+    App Usage Summary
+  </div>
+  
+  {!appSummary || Object.keys(appSummary).length === 0 ? (
+    <div className="text-xs text-slate-400">No app usage data available</div>
+  ) : (
+    <div className="space-y-3">
+      {Object.values(appSummary).map((app) => (
+        <div 
+          key={app.appName} 
+          className="border-b border-slate-700 pb-3 last:border-b-0 last:pb-0"
+        >
+          {/* App Header */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-medium text-slate-100">{app.appName}</span>
+            <span className="text-xs text-emerald-400 font-mono">
+              {app.durationHHMMSS}
+            </span>
+          </div>
+          
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            <div className="flex justify-between">
+              <span className="text-slate-400">RSRP:</span>
+              <span className="text-slate-200 font-medium">
+                {app.avgRsrp?.toFixed(2)} dBm
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">RSRQ:</span>
+              <span className="text-slate-200 font-medium">
+                {app.avgRsrq?.toFixed(2)} dB
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">SINR:</span>
+              <span className="text-slate-200 font-medium">
+                {app.avgSinr?.toFixed(2)} dB
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">MOS:</span>
+              <span className="text-slate-200 font-medium">
+                {app.avgMos?.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">DL:</span>
+              <span className="text-slate-200 font-medium">
+                {app.avgDlTptMbps?.toFixed(2)} Mbps
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">UL:</span>
+              <span className="text-slate-200 font-medium">
+                {app.avgUlTptMbps?.toFixed(2)} Mbps
+              </span>
+            </div>
+          </div>
+          
+          {/* Sample Count */}
+          <div className="mt-2 pt-2 border-t border-slate-700/50 flex justify-between items-center text-xs">
+            <span className="text-slate-500">Samples: {app.sampleCount}</span>
+            <span className="text-slate-500">
+              {new Date(app.firstUsedAt).toLocaleDateString()} - {new Date(app.lastUsedAt).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
 
                 {/*================================================================================================================*/}
                 <div className="bg-slate-800/60 rounded-lg p-3">

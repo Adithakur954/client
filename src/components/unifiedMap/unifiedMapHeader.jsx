@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, Filter, ChartBar } from "lucide-react";
+import { LogOut, Filter, ChartBar, ChevronDown } from "lucide-react";
 import { useLocation, Link, useSearchParams } from "react-router-dom";
 import { mapViewApi } from "@/api/apiEndpoints";
+import ProjectsDropdown from "../project/ProjectsDropdown";
 
 export default function UnifiedHeader({
   onToggleControls,
@@ -71,7 +72,7 @@ export default function UnifiedHeader({
   const isMapPage = location.pathname.includes("unified-map");
 
   return (
-    <header className="h-14 bg-gray-800 text-white shadow-sm flex items-center justify-between px-6 flex-shrink-0">
+    <header className="h-14 bg-gray-800 text-white shadow-sm flex items-center justify-between px-6 flex-shrink-0 relative z-10">
       <div className="flex items-center gap-4">
         {isMapPage && (
           <>
@@ -106,6 +107,13 @@ export default function UnifiedHeader({
       </div>
 
       <div className="flex items-center space-x-4">
+        <Button>
+          <Link to="/dashboard">Dashboard</Link>
+        </Button>
+        <Button>
+          <Link to="/mapview">Map View</Link>
+        </Button>
+          <ProjectsDropdown currentProjectId={effectiveProjectId} />
         <p className="text-gray-300 text-sm">
           Welcome,{" "}
           <span className="font-semibold text-white">

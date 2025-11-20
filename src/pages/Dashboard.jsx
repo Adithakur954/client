@@ -47,6 +47,7 @@ const DashboardPage = () => {
     return bandDistData.length;
   }, [bandDistData]);
 
+  const totalLocationSamples = (Number(indoorData) || 0) + (Number(outdoorData) || 0);
   
 
   // Extract indoor/outdoor counts
@@ -87,7 +88,7 @@ const DashboardPage = () => {
       },
       {
         title: "Total Samples",
-        value: totalsData?.totalSamples ?? 0,
+        value: totalLocationSamples,
         icon: FileText,
         color: "bg-gradient-to-br from-amber-500 to-amber-600",
         description: "Network log samples"

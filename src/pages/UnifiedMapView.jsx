@@ -22,7 +22,7 @@ import UnifiedHeader from "@/components/unifiedMap/unifiedMapHeader";
 import UnifiedDetailLogs from "@/components/unifiedMap/UnifiedDetailLogs";
 import MapLegend from "@/components/MapLegend";
 import { useNeighborCollisions } from '@/hooks/useNeighborCollisions';
-import NeighborCollisionLayer from '@/components/unifiedMap/NeighborCollisionLayer';
+import NeighborHeatmapLayer from '@/components/unifiedMap/NeighborCollisionLayer'; // ✅ Renamed import
 
 const defaultThresholds = {
   rsrp: [],
@@ -202,12 +202,14 @@ const UnifiedMapView = () => {
 
   const [showSiteMarkers, setShowSiteMarkers] = useState(true);
   const [showSiteSectors, setShowSiteSectors] = useState(true);
+  const [appSummary, setAppSummary] = useState({});
+  const [logArea, setLogArea] = useState(null);
 
-  // ✅ NEW: Multi-metric coverage hole filters
+  // ✅ Multi-metric coverage hole filters
   const [coverageHoleFilters, setCoverageHoleFilters] = useState(DEFAULT_COVERAGE_FILTERS);
 
+  // ✅ Simplified: Only showNeighbors state (removed collision-related states)
   const [showNeighbors, setShowNeighbors] = useState(false);
-  const [showCollisionsOnly, setShowCollisionsOnly] = useState(false);
 
   const projectId = useMemo(() => {
     const param =
@@ -243,8 +245,8 @@ const UnifiedMapView = () => {
     autoFetch: true,
   });
 
+  // ✅ Simplified hook usage - only extract what we need
   const {
-    collisions,
     allNeighbors,
     stats: neighborStats,
     loading: neighborLoading,
@@ -281,7 +283,7 @@ const UnifiedMapView = () => {
     loadThresholds();
   }, []);
 
-  // ✅ Load coverage hole thresholds (RSRP from DB, others use defaults)
+  // ✅ Load coverage hole thresholds
   useEffect(() => {
     const loadCoverageThresholds = async () => {
       try {
@@ -392,6 +394,7 @@ const UnifiedMapView = () => {
     if (sessionIds.length === 0) {
       toast.warn("No session ID provided for sample data");
       setLocations([]);
+      setAppSummary({});
       return;
     }
 
@@ -399,25 +402,79 @@ const UnifiedMapView = () => {
     setError(null);
 
     try {
-      const promises = sessionIds.map((sessionId) =>
+      const promises = sessionIds.map((sessionId) => 
         mapViewApi.getNetworkLog({ session_id: sessionId })
-      );
-      const results = await Promise.all(promises);
-      const allLogs = results.flatMap(
-        (resp) => resp?.Data ?? resp?.data ?? resp ?? []
+          .then(resp => ({ sessionId, success: true, data: resp }))
+          .catch(error => ({ sessionId, success: false, error: error.message }))
       );
 
+      const results = await Promise.allSettled(promises);
+
+      const successfulSessions = results
+        .filter(result => result.status === 'fulfilled' && result.value.success)
+        .map(result => result.value);
+
+      const failedSessions = results
+        .filter(result => result.status === 'fulfilled' && !result.value.success)
+        .map(result => result.value);
+
+      console.log(`✅ Successful sessions: ${successfulSessions.length}/${sessionIds.length}`);
+      
+      if (failedSessions.length > 0) {
+        console.warn('❌ Failed sessions:', failedSessions);
+        failedSessions.forEach(({ sessionId, error }) => {
+          console.error(`  Session ${sessionId}: ${error}`);
+        });
+      }
+
+      // ✅ Extract app_summary
+      const allAppSummaries = {};
+      
+      successfulSessions.forEach(({ sessionId, data }) => {
+        if (data?.app_summary) {
+          console.log(data);
+          allAppSummaries[sessionId] = data.app_summary;
+        }
+      });
+
+      setAppSummary(allAppSummaries);
+
+      const indoorMode = {};
+
+      successfulSessions.forEach(({ sessionId, data }) => {
+        if(data?.io_summary){
+          console.log(data?.io_summary)
+          indoorMode[sessionId] = data.io_summary;
+        }
+        })
+
+        setLogArea(indoorMode);
+
+      // ✅ Extract location data
+      const allLogs = successfulSessions.flatMap(({ data }) => {
+        if (Array.isArray(data)) return data;
+        if (data?.data && Array.isArray(data.data)) return data.data;
+        if (data?.Data && Array.isArray(data.Data)) return data.Data;
+        console.warn(' Unexpected response format:', data);
+        return [];
+      });
+
       if (allLogs.length === 0) {
-        toast.warn("No sample data found");
+        if (failedSessions.length === sessionIds.length) {
+          toast.error("All sessions failed to load");
+        } else {
+          toast.warn("No sample data found in successful sessions");
+        }
         setLocations([]);
       } else {
         const formatted = allLogs
           .map((log) => {
             const lat = parseFloat(log.lat ?? log.Lat ?? log.latitude);
-            const lng = parseFloat(
-              log.lon ?? log.lng ?? log.Lng ?? log.longitude
-            );
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            const lng = parseFloat(log.lon ?? log.lng ?? log.Lng ?? log.longitude);
+            
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+              return null;
+            }
 
             return {
               lat,
@@ -432,17 +489,27 @@ const UnifiedMapView = () => {
               mos: log.mos ?? log.MOS,
               lte_bler: log.lte_bler ?? log.LTE_BLER,
               operator: canonicalOperatorName(log.operator_name),
-              technology: log.technology,
+              technology: log.network,
+              provider: log.provider,
               band: log.band,
+              jitter: log.jitter,
+              pci: log.pci,
+              speed: log.speed,
+              nodebid: log.nodeb_id,
             };
           })
           .filter(Boolean);
 
         setLocations(formatted);
-        toast.success(`${formatted.length} sample points loaded`);
+        
+        const message = failedSessions.length > 0
+          ? `${formatted.length} points loaded (${failedSessions.length} session(s) failed)`
+          : `${formatted.length} points loaded from ${successfulSessions.length} session(s)`;
+        
+        toast.success(message, { autoClose: 4000 });
       }
     } catch (err) {
-      console.error("Error fetching sample data:", err);
+      console.error("Critical error fetching sample data:", err);
       toast.error(`Failed to fetch sample data: ${err.message}`);
       setError("Failed to load sample data");
     } finally {
@@ -592,6 +659,7 @@ const UnifiedMapView = () => {
     if (projectId && showPolygons) {
       fetchPolygons();
     }
+    
     if (showNeighbors) {
       refetchNeighbors();
     }
@@ -626,15 +694,15 @@ const UnifiedMapView = () => {
     });
   }, []);
 
+  // ✅ Simplified neighbor click handler (no collision info)
   const handleNeighborClick = useCallback((neighbor) => {
-    const message = neighbor.isCollision
-      ? `⚠️ COLLISION - PCI ${neighbor.pci}\nCell: ${neighbor.id}\n${selectedMetric.toUpperCase()}: ${neighbor[selectedMetric]}`
-      : `PCI ${neighbor.pci} - Cell: ${neighbor.id}\n${selectedMetric.toUpperCase()}: ${neighbor[selectedMetric]}`;
-
-    toast.info(message, { autoClose: 3000 });
+    toast.info(
+      `PCI ${neighbor.pci} - Cell: ${neighbor.id}\n${selectedMetric.toUpperCase()}: ${neighbor[selectedMetric]}`,
+      { autoClose: 3000 }
+    );
   }, [selectedMetric]);
 
-  // Effective thresholds with prediction color settings
+  
   const effectiveThresholds = useMemo(() => {
     const usePredictionColors =
       (enableSiteToggle && siteToggle === "sites-prediction") ||
@@ -735,11 +803,9 @@ const UnifiedMapView = () => {
     effectiveThresholds,
   ]);
 
-  // ✅ NEW: Multi-metric coverage hole filtering with polygon filtering
   const filteredLocations = useMemo(() => {
     let result = locations;
 
-    // ✅ Apply multi-metric coverage hole filters
     const activeFilters = Object.entries(coverageHoleFilters).filter(
       ([_, config]) => config.enabled
     );
@@ -748,28 +814,24 @@ const UnifiedMapView = () => {
       const beforeCount = result.length;
       
       result = result.filter((location) => {
-        // ALL active filters must pass (AND logic)
         return activeFilters.every(([metric, config]) => {
           const value = parseFloat(location[metric]);
           
-          // If value is missing or invalid, exclude this point
           if (isNaN(value) || value === null || value === undefined) {
             return false;
           }
           
-          // Check if value is below threshold
           return value < config.threshold;
         });
       });
 
-      // Show toast notification
       if (result.length > 0) {
         const filterDescriptions = activeFilters.map(
           ([metric, config]) => `${metric.toUpperCase()} < ${config.threshold}`
         );
         
         toast.info(
-          `🔴 ${result.length} coverage hole(s) found:\n${filterDescriptions.join(' AND ')}`,
+          ` ${result.length} coverage hole(s) found:\n${filterDescriptions.join(' AND ')}`,
           { autoClose: 4000 }
         );
       } else if (beforeCount > 0) {
@@ -780,7 +842,6 @@ const UnifiedMapView = () => {
       }
     }
 
-    // Hide points when polygon heatmap is active
     if (onlyInsidePolygons && showPolygons && polygons.length > 0) {
       return [];
     }
@@ -794,12 +855,10 @@ const UnifiedMapView = () => {
     polygons.length,
   ]);
 
-  // ✅ Count active coverage filters for display
   const activeCoverageFiltersCount = useMemo(() => {
     return Object.values(coverageHoleFilters).filter(f => f.enabled).length;
   }, [coverageHoleFilters]);
 
-  // ✅ Get active filter descriptions
   const activeCoverageFilterDesc = useMemo(() => {
     const active = Object.entries(coverageHoleFilters)
       .filter(([_, config]) => config.enabled)
@@ -911,10 +970,13 @@ const UnifiedMapView = () => {
           sessionIds={sessionIds}
           isLoading={isLoading}
           thresholds={effectiveThresholds}
+          appSummary={appSummary}
+          logArea={logArea}
           onClose={() => setShowAnalytics(false)}
         />
       )}
 
+      
       <UnifiedMapSidebar
         open={isSideOpen}
         onOpenChange={setIsSideOpen}
@@ -949,13 +1011,11 @@ const UnifiedMapView = () => {
         reloadData={reloadData}
         showNeighbors={showNeighbors}
         setShowNeighbors={setShowNeighbors}
-        showCollisionsOnly={showCollisionsOnly}
-        setShowCollisionsOnly={setShowCollisionsOnly}
         neighborStats={neighborStats}
       />
 
       <div className="flex-grow rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden relative">
-        {/* ✅ Updated Info Panel */}
+        {/* ✅ Updated Info Panel - removed collision info */}
         <div className="absolute bottom-2 left-2 z-10 bg-white/90 dark:bg-gray-800/90 p-2 px-3 rounded text-xs text-gray-700 dark:text-gray-300 shadow-lg space-y-1 max-w-xs">
           {enableDataToggle && (
             <div className="font-semibold">
@@ -977,7 +1037,6 @@ const UnifiedMapView = () => {
             </div>
           )}
 
-          {/* ✅ NEW: Multi-metric coverage hole display */}
           {activeCoverageFiltersCount > 0 && (
             <div className="text-red-600 dark:text-red-400 font-semibold">
               🔴 Coverage Holes ({activeCoverageFiltersCount} filter{activeCoverageFiltersCount > 1 ? 's' : ''})
@@ -1000,14 +1059,13 @@ const UnifiedMapView = () => {
             </div>
           )}
 
-          {showNeighbors && neighborStats.total > 0 && (
+          {/* ✅ Simplified neighbor stats - no collision info */}
+          {showNeighbors && neighborStats && neighborStats.total > 0 && (
             <div className="text-blue-600 dark:text-blue-400 font-semibold">
               📡 {neighborStats.total} Neighbor Cells
-              {neighborStats.collisions > 0 && (
-                <span className="text-red-600 dark:text-red-400 ml-1">
-                  ({neighborStats.collisions} collisions)
-                </span>
-              )}
+              <div className="text-xs text-blue-500 dark:text-blue-300">
+                {neighborStats.uniquePCIs} unique PCIs
+              </div>
             </div>
           )}
         </div>
@@ -1088,7 +1146,7 @@ const UnifiedMapView = () => {
                 <SiteMarkers
                   sites={siteData}
                   showMarkers={showSiteMarkers}
-                  circleRadius={50}
+                  circleRadius={0}
                   onSiteClick={handleSiteClick}
                   viewport={viewport}
                 />
@@ -1098,12 +1156,11 @@ const UnifiedMapView = () => {
                 <MapLegend showOperators={true} showSignalQuality={false} />
               )}
 
-              {showNeighbors && (
-                <NeighborCollisionLayer
+              {/* ✅ Simplified Neighbor Heatmap Layer */}
+              {showNeighbors && allNeighbors && allNeighbors.length > 0 && (
+                <NeighborHeatmapLayer
                   allNeighbors={allNeighbors}
-                  collisions={collisions}
                   showNeighbors={showNeighbors}
-                  showCollisionsOnly={showCollisionsOnly}
                   selectedMetric={selectedMetric}
                   thresholds={effectiveThresholds[selectedMetric] || []}
                   onNeighborClick={handleNeighborClick}

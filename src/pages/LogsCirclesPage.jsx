@@ -6,6 +6,7 @@ import DrawingToolsLayer from "@/components/map/tools/DrawingToolsLayer";
 import { settingApi } from "@/api/apiEndpoints";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 import PCILegend from "@/components/map/PCILegend";
+import AllLogsDetailPanel from "@/components/map/layout/AllLogsDetailPanel";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
@@ -18,6 +19,7 @@ export default function LogsCirclesPage() {
   const [thresholds, setThresholds] = useState({});
   const [selectedMetric, setSelectedMetric] = useState("rsrp");
   const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false); 
+   const [appSummary, setAppSummary] = useState(null);
    const [colorBy, setColorBy] = useState(null);
   
   const [filters, setFilters] = useState({
@@ -36,6 +38,7 @@ export default function LogsCirclesPage() {
     pixelateRect: false,
     cellSizeMeters: 100,
     clearSignal: 0,
+    showNeighbours: false,
   });
 
   const idleTimerRef = useRef(null);
@@ -59,9 +62,15 @@ export default function LogsCirclesPage() {
           });
         }
       } catch {}
+     
     };
+    
     fetchThresholds();
   }, []);
+
+setTimeout(() => {
+    console.log("Current thresholds:", appSummary);
+  }, 2000);
 
   const onMapLoad = useCallback((m) => {
     setMap(m);
@@ -263,11 +272,14 @@ export default function LogsCirclesPage() {
           map={map}
           filters={filters}
           selectedMetric={selectedMetric}
+          setAppSummary={setAppSummary}
+          appSummary={appSummary}
           thresholds={thresholds}
           showCircles={true}
           showHeatmap={false}
           visibleBounds={visibleBounds}
-            showNeighbours={ui.showNeighbours} 
+            showNeighbours={drawUi.showNeighbours}
+ 
           renderVisibleOnly={true}
           canvasRadiusPx={(zoom) => Math.max(3, Math.min(7, Math.floor(zoom / 2)))}
           maxDraw={70000}
@@ -294,6 +306,7 @@ export default function LogsCirclesPage() {
 
       <MapLegend thresholds={thresholds} selectedMetric={selectedMetric} colorBy={colorBy} />
       <PCILegend show={selectedMetric === 'pci'} />
+      <AllLogsDetailPanel appSummary={appSummary} />
 
       {analysis && (
         <div

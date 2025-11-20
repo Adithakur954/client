@@ -1,4 +1,3 @@
-// src/components/map/layers/LogCirclesLayer.jsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toast } from "react-toastify";
 import { mapViewApi } from "@/api/apiEndpoints";
@@ -13,6 +12,8 @@ export default function LogCirclesLayer({
   selectedMetric,
   thresholds,
   onLogsLoaded,
+  setAppSummary = () => {},
+  appSummary,
   setIsLoading,
   showCircles = true,
   showHeatmap = false,
@@ -22,22 +23,21 @@ export default function LogCirclesLayer({
   maxDraw = 60000,
   coverageHoleOnly = false,
   colorBy = null,
-  showNeighbours = false, // NEW PROP
+  showNeighbours = false,
 }) {
   const [logs, setLogs] = useState([]);
   const [keys, setKeys] = useState([]);
   const [session, setSession] = useState([]);
   const [neighbours, setNeighbours] = useState([]);
+ 
   const heatmapRef = useRef(null);
   const { field } = resolveMetricConfig(selectedMetric);
 
-  // Keep a stable ref for onLogsLoaded to avoid effect dependency loops
   const onLogsLoadedRef = useRef(onLogsLoaded);
   useEffect(() => {
     onLogsLoadedRef.current = onLogsLoaded;
   }, [onLogsLoaded]);
 
-  // Build a stable signature for filters so effect only runs when actual values change
   const filterSignature = useMemo(() => {
     if (!filters) return null;
     return JSON.stringify({
@@ -55,7 +55,6 @@ export default function LogCirclesLayer({
     filters?.band,
   ]);
 
-  // Fetch logs when map or filterSignature changes
   useEffect(() => {
     if (!filters || !map || !filterSignature) return;
 
@@ -66,16 +65,23 @@ export default function LogCirclesLayer({
       try {
         const apiParams = JSON.parse(filterSignature);
         console.log("🚀 API Request Params:", apiParams);
-    console.log("📊 Provider value being sent:", apiParams.Provider)
+        console.log("📊 Provider value being sent:", apiParams.Provider);
 
-        const fetched = await mapViewApi.getLogsByDateRange(apiParams);
-         console.log("✅ Fetched logs count:", fetched);
+        const response = await mapViewApi.getLogsByDateRange(apiParams);
+        
+        const fetched = response?.data || response || [];
+        const appSummaryData = response?.app_summary || null;
+        
+        console.log("✅ API Response:", response);
+        console.log("✅ Fetched logs count:", fetched.length);
+        console.log("📱 App Summary:", appSummaryData);
 
-           if (fetched?.length > 0) {
-      console.log("📋 Sample log providers:", 
-        [...new Set(fetched.slice(0, 10).map(l => l.provider || l.Provider))]
-      );
-    }
+        if (fetched?.length > 0) {
+          console.log("📋 Sample log providers:", 
+            [...new Set(fetched.slice(0, 10).map(l => l.provider || l.Provider))]
+          );
+          console.log("📋 Sample log structure:", fetched[0]);
+        }
 
         if (cancelled) return;
 
@@ -84,16 +90,25 @@ export default function LogCirclesLayer({
           setLogs([]);
           setKeys([]);
           setSession([]);
-          onLogsLoadedRef.current?.([]);
+          setNeighbours([]);
+          setAppSummary(null);
+          onLogsLoadedRef.current?.([], null);
           if (heatmapRef.current) heatmapRef.current.setMap(null);
           return;
         }
 
-        setKeys(fetched.map((item) => item.id));
-        setSession([...new Set(fetched.map(item => item.session_id))]);
+        const sessionIds = [...new Set(
+          fetched
+            .map(item => item.session_id)
+            .filter(id => id != null && id !== '')
+        )];
 
+        console.log("📊 Extracted session IDs:", sessionIds);
+
+        setKeys(fetched.map((item) => item.id));
+        setSession(sessionIds);
         setLogs(fetched);
-        onLogsLoadedRef.current?.(fetched);
+        setAppSummary(appSummaryData);
 
         const pts = [];
         for (const log of fetched) {
@@ -101,16 +116,22 @@ export default function LogCirclesLayer({
           const lng = parseFloat(log.lon ?? log.lng);
           if (Number.isFinite(lat) && Number.isFinite(lng)) pts.push({ lat, lng });
         }
-        fitMapToMostlyLogs(map, pts);
+        
+        if (pts.length > 0) {
+          fitMapToMostlyLogs(map, pts);
+        }
 
-        toast.info(`Loaded ${fetched.length} logs.`);
+        toast.info(`Loaded ${fetched.length} logs from ${sessionIds.length} sessions.`);
       } catch (e) {
         if (cancelled) return;
+        console.error("❌ Error fetching logs:", e);
         toast.error(`Failed to fetch logs: ${e?.message || "Unknown error"}`);
         setLogs([]);
         setKeys([]);
         setSession([]);
-        onLogsLoadedRef.current?.([]);
+        setNeighbours([]);
+        setAppSummary(null);
+        onLogsLoadedRef.current?.([], null);
         if (heatmapRef.current) heatmapRef.current.setMap(null);
       } finally {
         if (!cancelled) setIsLoading?.(false);
@@ -123,13 +144,11 @@ export default function LogCirclesLayer({
     };
   }, [map, filterSignature, setIsLoading]);
 
-  // Debug log for keys and sessions
   useEffect(() => {
     console.log("Keys:", keys);
     console.log("Sessions:", session);
   }, [keys, session]);
 
-  // Fetch neighbours when sessions change and showNeighbours is true
   useEffect(() => {
     if (!showNeighbours || session.length === 0) {
       setNeighbours([]);
@@ -140,7 +159,7 @@ export default function LogCirclesLayer({
 
     const fetchNeighbours = async () => {
       try {
-        console.log("Fetching neighbours for sessions:", session);
+        console.log("🔍 Fetching neighbours for sessions:", session);
         
         const responses = await Promise.all(
           session.map(id => mapViewApi.getNeighbours(id))
@@ -148,18 +167,34 @@ export default function LogCirclesLayer({
         
         if (cancelled) return;
 
-        // Flatten all responses
-        const allData = responses.flatMap(r => r?.data || r || []);
+        const allData = responses.flatMap(response => {
+          if (response?.data?.data && Array.isArray(response.data.data)) {
+            return response.data.data;
+          }
+          if (response?.data && Array.isArray(response.data)) {
+            return response.data;
+          }
+          if (Array.isArray(response)) {
+            return response;
+          }
+          return [];
+        });
         
-        console.log("Neighbours fetched:", allData);
+        console.log("✅ Neighbours fetched:", allData.length);
+        if (allData.length > 0) {
+          console.log("📋 Sample neighbour structure:", allData[0]);
+        }
+        
         setNeighbours(allData);
         
         if (allData.length > 0) {
-          toast.success(`Loaded neighbour data for ${session.length} sessions`);
+          toast.success(`Loaded ${allData.length} neighbour records for ${session.length} sessions`);
+        } else {
+          toast.info("No neighbour data found for selected sessions");
         }
       } catch (error) {
         if (cancelled) return;
-        console.error("Error fetching neighbours:", error);
+        console.error("❌ Error fetching neighbours:", error);
         toast.error(`Failed to fetch neighbours: ${error?.message || "Unknown error"}`);
         setNeighbours([]);
       }
@@ -172,43 +207,70 @@ export default function LogCirclesLayer({
     };
   }, [session, showNeighbours]);
 
-  // Debug log for neighbours
   useEffect(() => {
     if (neighbours.length > 0) {
       console.log("Neighbours data:", neighbours);
     }
   }, [neighbours]);
 
-  // Filter logs for coverage holes if checkbox is enabled
-  const filteredLogs = useMemo(() => {
-    if (!coverageHoleOnly) {
+  const logsWithNeighbours = useMemo(() => {
+    if (!showNeighbours || neighbours.length === 0) {
       return logs;
     }
 
+    const neighbourCountMap = new Map();
+    
+    neighbours.forEach((neighbour) => {
+      const logId = neighbour.log_id || neighbour.id || neighbour.session_id;
+      if (logId) {
+        neighbourCountMap.set(logId, (neighbourCountMap.get(logId) || 0) + 1);
+      }
+    });
+
+    console.log("📊 Neighbour count map:", Object.fromEntries(neighbourCountMap));
+
+    const merged = logs.map((log) => ({
+      ...log,
+      neighbour_count: neighbourCountMap.get(log.id) || 
+                       neighbourCountMap.get(log.session_id) || 0,
+    }));
+
+    const logsWithNeighbors = merged.filter(l => l.neighbour_count > 0);
+    console.log(`✅ Merged: ${logsWithNeighbors.length} logs have neighbours`);
+
+    return merged;
+  }, [logs, neighbours, showNeighbours]);
+
+  useEffect(() => {
+    onLogsLoadedRef.current?.(logsWithNeighbours, appSummary);
+  }, [logsWithNeighbours, appSummary]);
+
+  const filteredLogs = useMemo(() => {
+    if (!coverageHoleOnly) {
+      return logsWithNeighbours;
+    }
+
     const threshold = thresholds.coveragehole || -110;
-    const filtered = logs.filter((log) => {
+    const filtered = logsWithNeighbours.filter((log) => {
       const rsrp = parseFloat(log.rsrp);
       return !isNaN(rsrp) && rsrp < threshold;
     });
 
     return filtered;
-  }, [logs, coverageHoleOnly, thresholds]);
+  }, [logsWithNeighbours, coverageHoleOnly, thresholds]);
 
-  // Show info toast when coverage hole filter is active
   useEffect(() => {
-    if (coverageHoleOnly && filteredLogs.length > 0 && logs.length > 0) {
+    if (coverageHoleOnly && filteredLogs.length > 0 && logsWithNeighbours.length > 0) {
       const threshold = thresholds.coveragehole || -110;
       toast.info(
-        `Showing ${filteredLogs.length} coverage holes (RSRP < ${threshold} dBm) out of ${logs.length} total logs`,
+        `Showing ${filteredLogs.length} coverage holes (RSRP < ${threshold} dBm) out of ${logsWithNeighbours.length} total logs`,
         { autoClose: 3000 }
       );
     }
-  }, [coverageHoleOnly, filteredLogs.length, logs.length, thresholds.coveragehole]);
+  }, [coverageHoleOnly, filteredLogs.length, logsWithNeighbours.length, thresholds.coveragehole]);
 
-  // Helper function to determine color for a log
   const getColorForLog = useCallback(
     (log, metricValue) => {
-      // If colorBy mode is active, use category colors
       if (colorBy === "provider") {
         const providerValue = log.provider || log.Provider;
         return getLogColor("provider", providerValue);
@@ -224,13 +286,11 @@ export default function LogCirclesLayer({
         return getLogColor("band", bandValue);
       }
 
-      // Otherwise, use metric-based colors (default behavior)
       return getColorForMetric(selectedMetric, metricValue, thresholds);
     },
     [colorBy, selectedMetric, thresholds]
   );
 
-  // Parse & prep (use filteredLogs)
   const processed = useMemo(() => {
     return (filteredLogs || [])
       .map((l, i) => {
@@ -248,7 +308,6 @@ export default function LogCirclesLayer({
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   }, [filteredLogs, field]);
 
-  // Viewport filter
   const visibleProcessed = useMemo(() => {
     if (!renderVisibleOnly || !visibleBounds) return processed;
     const { north, south, east, west } = visibleBounds;
@@ -262,17 +321,17 @@ export default function LogCirclesLayer({
     });
   }, [processed, renderVisibleOnly, visibleBounds]);
 
-  // Color points based on colorBy mode or selected metric
   const pointsForCanvas = useMemo(() => {
     return visibleProcessed.map((p) => ({
       lat: p.lat,
       lng: p.lng,
       color: getColorForLog(p.raw, p.value),
-      label: showNeighbours ? (p.raw.neighbour_count?.toString() || "") : "",
+      label: showNeighbours && p.raw.neighbour_count > 0 
+        ? p.raw.neighbour_count.toString() 
+        : "",
     }));
   }, [visibleProcessed, getColorForLog, showNeighbours]);
 
-  // Heatmap layer
   useEffect(() => {
     if (!map || !showHeatmap) {
       if (heatmapRef.current) heatmapRef.current.setMap(null);
@@ -301,12 +360,12 @@ export default function LogCirclesLayer({
     <CanvasPointsOverlay
       map={map}
       points={pointsForCanvas}
-      neigh={showNeighbours} // PASS THE NEIGH PROP
+      neigh={showNeighbours}
       getRadiusPx={canvasRadiusPx}
       maxDraw={maxDraw}
       padding={80}
       opacity={0.9}
-      showLabels={true} 
+      showLabels={showNeighbours}
       labelStyle={{
         font: "bold 11px Arial",
         color: "#000",

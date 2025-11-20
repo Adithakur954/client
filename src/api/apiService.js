@@ -1,7 +1,7 @@
 
-// const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL || "http://localhost:5224";
-// const API_BASE_URL =  "http://signaltrackers-1.onrender.com";
-const API_BASE_URL =  "http://13.204.241.153";
+const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL || "http://localhost:5224";
+// // // const API_BASE_URL =  "http://signaltrackers-1.onrender.com";
+// const API_BASE_URL =  "http://13.204.241.153";
 
 const apiService = async (endpoint, { body, params, ...customOptions } = {}) => {
   const isFormData = body instanceof FormData;

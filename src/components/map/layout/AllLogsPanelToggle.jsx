@@ -10,6 +10,7 @@ export default function AllLogsPanelToggle({
   isLoading = false,
   startDate,  
   endDate,
+  appSummary
 }) {
   const [open, setOpen] = useState(false);
 
@@ -36,6 +37,7 @@ export default function AllLogsPanelToggle({
           onClose={() => setOpen(false)}
           startDate={startDate}    
           endDate={endDate} 
+          appSummary={appSummary}
         />
       )}
 

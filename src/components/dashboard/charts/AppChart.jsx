@@ -39,6 +39,7 @@ function AppChart() {
           avgRsrp: parseFloat(item.avgRsrp) || 0,
           avgRsrq: parseFloat(item.avgRsrq) || 0,
           avgSinr: parseFloat(item.avgSinr) || 0,
+          avgDuration: parseFloat(item.durationMinutes/60) || 0,
         }));
 
         console.log("Formatted data:", formattedData);
@@ -71,6 +72,7 @@ function AppChart() {
               { key: "avgRsrp", label: "RSRP" },
               { key: "avgRsrq", label: "RSRQ" },
               { key: "avgSinr", label: "SINR" },
+              { key: "avgDuration", label: "Duration (Minutes)" },
             ].map(({ key, label }) => (
               <label key={key} className="flex items-center gap-2">
                 <input

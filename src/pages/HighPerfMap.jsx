@@ -8,8 +8,7 @@ import React, {
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { toast } from "react-toastify";
 import MapSearchBox from "@/components/map/MapSearchBox";
-import { Save } from "lucide-react";
-
+import { Save, Clock } from "lucide-react";
 
 import { adminApi, mapViewApi, settingApi } from "@/api/apiEndpoints";
 
@@ -17,6 +16,7 @@ import { adminApi, mapViewApi, settingApi } from "@/api/apiEndpoints";
 import MapHeader from "@/components/map/layout/MapHeader";
 import SessionDetailPanel from "@/components/map/layout/SessionDetail";
 import AllLogsPanelToggle from "@/components/map/layout/AllLogsPanelToggle";
+import TimeControlsPanel from "@/components/map/TimeControlsPanel"; // ✅ NEW
 
 // Layers
 import SessionsLayer from "@/components/map/overlays/SessionsLayer";
@@ -45,15 +45,13 @@ import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
 const MAP_CONTAINER_STYLE = { height: "calc(100vh - 64px)", width: "100%" };
+
 const coordinatesToWktPolygon = (coords) => {
   if (!Array.isArray(coords) || coords.length < 3) {
-    return null; // Need at least 3 points for a polygon
+    return null;
   }
-  // Format each point as "lng lat" and join with commas
   const pointsString = coords.map((p) => `${p.lng} ${p.lat}`).join(", ");
-  // Ensure the polygon is closed by repeating the first point at the end
   const firstPointString = `${coords[0].lng} ${coords[0].lat}`;
-  // WKT format requires longitude first, then latitude
   return `POLYGON((${pointsString}, ${firstPointString}))`;
 };
 
@@ -151,12 +149,18 @@ const MAP_STYLES = {
     },
   ],
 };
+
 const formatArea = (areaInMeters) => {
   if (!areaInMeters || areaInMeters < 1) return "N/A";
   if (areaInMeters > 1000000) {
     return `${(areaInMeters / 1000000).toFixed(2)} km²`;
   }
   return `${areaInMeters.toFixed(0)} m²`;
+};
+
+const getDayName = (index) => {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[index] || '';
 };
 
 export default function HighPerfMap() {
@@ -191,11 +195,22 @@ export default function HighPerfMap() {
     drawPixelateRect: false,
     drawCellSizeMeters: 10,
     drawClearSignal: 0,
-     showNeighbours: false,
+    showNeighbours: false,
+    colorizeCells: true,
+    // ✅ Time-based controls
+    timeFilterEnabled: false,
+    timeMode: 'all', // 'single' | 'range' | 'all'
+    currentHour: 12,
+    timeRange: [0, 23],
+    selectedDays: [0, 1, 2, 3, 4, 5, 6],
+    isTimePlaying: false,
+    timeSpeed: 1,
   });
 
   const [analysis, setAnalysis] = useState(null);
+  const [temporalAnalysis, setTemporalAnalysis] = useState(null); // ✅ NEW
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [isTimeControlsOpen, setIsTimeControlsOpen] = useState(false); // ✅ NEW
   const [polygonName, setPolygonName] = useState("");
   const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false);
 
@@ -203,6 +218,7 @@ export default function HighPerfMap() {
   const idleListenerRef = useRef(null);
   const idleTimerRef = useRef(null);
   const [idCollect, setIdCollect] = useState([]);
+  const [appSummary, setAppSummary] = useState(null);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -210,7 +226,7 @@ export default function HighPerfMap() {
     const fetchThresholds = async () => {
       try {
         const res = await settingApi.getThresholdSettings();
-       
+
         if (res?.Data) {
           const d = res.Data;
           setThresholds({
@@ -321,6 +337,7 @@ export default function HighPerfMap() {
     setSelectedSessionData(null);
     setDrawnLogs([]);
     setAnalysis(null);
+    setTemporalAnalysis(null); // ✅ Reset temporal analysis
     setUi((u) => ({ ...u, showLogsCircles: true }));
     setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
     setColorBy(filters.colorBy || null);
@@ -331,8 +348,14 @@ export default function HighPerfMap() {
     setSelectedSessionData(null);
     setDrawnLogs([]);
     setAnalysis(null);
+    setTemporalAnalysis(null); // ✅ Reset temporal analysis
     setColorBy(null);
-    setUi((u) => ({ ...u, showHeatmap: false, drawEnabled: false }));
+    setUi((u) => ({ 
+      ...u, 
+      showHeatmap: false, 
+      drawEnabled: false,
+      timeFilterEnabled: false, // ✅ Reset time filter
+    }));
     fetchAllSessions();
   }, [fetchAllSessions]);
 
@@ -342,17 +365,9 @@ export default function HighPerfMap() {
   const handleSessionMarkerClick = async (session) => {
     setIsLoading(true);
     try {
-      console.log(session.id,"mayank bhaiya")
       const logs = await mapViewApi.getNetworkLog(session.id);
-      console.log(logs)
       setSelectedSessionData({ session, logs: logs || [] });
-      console.log(selectedSessionData)
-
-    setIdCollect(logs.map((item)=>item.id))
-      
-
-    
-     
+      setIdCollect(logs.map((item) => item.id));
     } catch (e) {
       toast.error(
         `Failed to fetch logs for session ${session.id}: ${
@@ -365,8 +380,8 @@ export default function HighPerfMap() {
   };
 
   useEffect(() => {
-  console.log("🔥 idCollect state changed:", idCollect);
-}, [idCollect]);
+    console.log("🔥 idCollect state changed:", idCollect);
+  }, [idCollect]);
 
   const handleSavePolygon = async () => {
     if (!analysis || !analysis.geometry) {
@@ -381,30 +396,24 @@ export default function HighPerfMap() {
     let wktString = null;
     const geometry = analysis.geometry;
 
-    // Convert geometry coordinates to WKT based on type
     if (geometry.type === "polygon" && geometry.polygon) {
       wktString = coordinatesToWktPolygon(geometry.polygon);
     } else if (geometry.type === "rectangle" && geometry.rectangle) {
-      // Convert rectangle bounds to a polygon coordinate array first
       const { ne, sw } = geometry.rectangle;
       const rectCoords = [
-        { lng: sw.lng, lat: ne.lat }, // Top-left
-        { lng: ne.lng, lat: ne.lat }, // Top-right
-        { lng: ne.lng, lat: sw.lat }, // Bottom-right
-        { lng: sw.lng, lat: sw.lat }, // Bottom-left
-        // Closing point is added by coordinatesToWktPolygon
+        { lng: sw.lng, lat: ne.lat },
+        { lng: ne.lng, lat: ne.lat },
+        { lng: ne.lng, lat: sw.lat },
+        { lng: sw.lng, lat: sw.lat },
       ];
       wktString = coordinatesToWktPolygon(rectCoords);
     } else if (geometry.type === "circle" && geometry.circle) {
-      // Approximate circle as a polygon for WKT
       const { center, radius } = geometry.circle;
       const circleCoords = [];
-      const numPoints = 32; // More points make a smoother circle approximation
+      const numPoints = 32;
       for (let i = 0; i < numPoints; i++) {
         const angle = (i / numPoints) * 360;
-        // Approximate degrees based on meters (latitude doesn't change much locally)
         const latOffset = (radius / 111111) * Math.cos((angle * Math.PI) / 180);
-        // Longitude offset depends on latitude
         const lngOffset =
           (radius / (111111 * Math.cos((center.lat * Math.PI) / 180))) *
           Math.sin((angle * Math.PI) / 180);
@@ -421,29 +430,20 @@ export default function HighPerfMap() {
       return;
     }
 
-    // Prepare payload matching the C# controller
     const payload = {
       Name: polygonName,
-      WKT: wktString, //try to send in array os session
-      SessionIds: Array.isArray(analysis.session) ? analysis.session : [], 
-      
+      WKT: wktString,
+      SessionIds: Array.isArray(analysis.session) ? analysis.session : [],
     };
 
-  
-  
-
-    setIsLoading(true); // Indicate loading state
+    setIsLoading(true);
     try {
-      // Use the correct API endpoint function name
       const response = await mapViewApi.savePolygon(payload);
       if (response && response.Status === 1) {
-        // Check response structure
         toast.success(`Polygon "${polygonName}" saved successfully!`);
-        setIsSaveDialogOpen(false); // Close dialog on success
-        setPolygonName(""); // Reset name field
-        // Optionally: Trigger a refresh of polygons if needed
+        setIsSaveDialogOpen(false);
+        setPolygonName("");
       } else {
-        // Use message from response if available
         toast.error(
           response?.Message || "Failed to save polygon. Check server logs."
         );
@@ -455,7 +455,7 @@ export default function HighPerfMap() {
       );
       console.error("SavePolygon Network/Catch Error:", error);
     } finally {
-      setIsLoading(false); // End loading state
+      setIsLoading(false);
     }
   };
 
@@ -480,6 +480,33 @@ export default function HighPerfMap() {
       csvRows.push(
         ["Grid Cells", analysis.grid.cells],
         ["Cell Size (meters)", analysis.grid.cellSizeMeters]
+      );
+    }
+
+    // ✅ Add time-based data to CSV
+    if (analysis.timeFilter) {
+      csvRows.push(
+        ["", ""],
+        ["Time Filter", ""],
+        ["Mode", analysis.timeFilter.mode],
+      );
+      if (analysis.timeFilter.mode === 'single') {
+        csvRows.push(["Hour", `${analysis.timeFilter.currentHour}:00`]);
+      } else if (analysis.timeFilter.mode === 'range') {
+        csvRows.push([
+          "Time Range", 
+          `${analysis.timeFilter.timeRange[0]}:00 - ${analysis.timeFilter.timeRange[1]}:00`
+        ]);
+      }
+      csvRows.push(["Days Selected", analysis.timeFilter.selectedDays.join(', ')]);
+    }
+
+    if (analysis.temporalPatterns) {
+      csvRows.push(
+        ["", ""],
+        ["Temporal Analysis", ""],
+        ["Peak Hour", `${analysis.temporalPatterns.peakHour}:00`],
+        ["Peak Day", getDayName(analysis.temporalPatterns.peakDay)],
       );
     }
 
@@ -519,8 +546,6 @@ export default function HighPerfMap() {
       "carrier",
       "technology",
     ];
-
-   
 
     const csvRows = [
       headers.join(","),
@@ -565,6 +590,12 @@ export default function HighPerfMap() {
     );
   }, [analysis, selectedMetric]);
 
+  // ✅ Handle temporal analysis data
+  const handleTimeAnalysis = useCallback((patterns) => {
+    setTemporalAnalysis(patterns);
+    console.log('⏰ Temporal Patterns:', patterns);
+  }, []);
+
   const mapOptions = useMemo(() => {
     const standardMapTypes = ["roadmap", "satellite", "hybrid", "terrain"];
     const styleKey = ui.basemapStyle || "roadmap";
@@ -587,8 +618,6 @@ export default function HighPerfMap() {
 
     return options;
   }, [ui.basemapStyle]);
-
- 
 
   if (loadError) return <div>Error loading Google Maps.</div>;
   if (!isLoaded) return <div className="p-4">Loading map…</div>;
@@ -620,6 +649,7 @@ export default function HighPerfMap() {
           options={mapOptions}
         >
           {isSearchOpen && <MapSearchBox />}
+          
           {!activeFilters && ui.showSessions && (
             <SessionsLayer
               map={map}
@@ -644,6 +674,8 @@ export default function HighPerfMap() {
               }
               showHeatmap={ui.showHeatmap}
               visibleBounds={ui.renderVisibleLogsOnly ? visibleBounds : null}
+              setAppSummary={setAppSummary}
+              appSummary={appSummary}
               renderVisibleOnly={ui.renderVisibleLogsOnly}
               canvasRadiusPx={(zoom) =>
                 Math.max(3, Math.min(7, Math.floor(zoom / 2)))
@@ -674,9 +706,44 @@ export default function HighPerfMap() {
               onSummary={setAnalysis}
               clearSignal={ui.drawClearSignal || 0}
               maxCells={1500}
+              onDrawingsChange={() => {}}
+              colorizeCells={ui.colorizeCells}
+              timeSettings={{
+                timeFilterEnabled: ui.timeFilterEnabled,
+                timeMode: ui.timeMode,
+                currentHour: ui.currentHour,
+                timeRange: ui.timeRange,
+                selectedDays: ui.selectedDays,
+              }}
+              onTimeAnalysis={handleTimeAnalysis}
             />
           )}
         </GoogleMap>
+
+        {/* ✅ Time Controls Toggle Button */}
+        {ui.drawEnabled && (
+          <button
+            onClick={() => setIsTimeControlsOpen(!isTimeControlsOpen)}
+            className={`absolute top-4 right-4 z-40 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg transition-all ${
+              isTimeControlsOpen
+                ? "bg-purple-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Time Filter</span>
+          </button>
+        )}
+
+        {/* ✅ Time Controls Panel */}
+        {isTimeControlsOpen && ui.drawEnabled && (
+          <TimeControlsPanel
+            ui={ui}
+            onUIChange={handleUIChange}
+            hasLogs={drawnLogs.length > 0}
+            onClose={() => setIsTimeControlsOpen(false)}
+          />
+        )}
 
         {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
           <MapLegend
@@ -686,8 +753,9 @@ export default function HighPerfMap() {
           />
         )}
 
+        {/* ✅ Enhanced Analysis Panel with Time Data */}
         {analysis && (
-          <div className="absolute bottom-4 left-4 z-30 bg-white/95 dark:bg-gray-900/95 rounded-lg shadow-xl p-4 min-w-[260px] border border-gray-200">
+          <div className="absolute bottom-4 left-4 z-30 bg-white/95 dark:bg-gray-900/95 rounded-lg shadow-xl p-4 min-w-[280px] max-w-[320px] border border-gray-200 max-h-[80vh] overflow-y-auto">
             <div className="font-semibold mb-2 text-gray-800 dark:text-white flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-lg">📊</span>
@@ -702,6 +770,7 @@ export default function HighPerfMap() {
                 Save
               </Button>
             </div>
+            
             <div className="text-sm text-gray-700 dark:text-gray-200 space-y-1.5">
               <div className="flex justify-between border-b border-gray-100 pb-1">
                 <span className="text-gray-600">Shape:</span>
@@ -715,6 +784,72 @@ export default function HighPerfMap() {
                 <span className="text-gray-600">Total Logs:</span>
                 <span className="font-medium">{analysis.count}</span>
               </div>
+
+              {/* ✅ Time Filter Info */}
+              {analysis.timeFilter && (
+                <div className="mt-3 pt-2 border-t-2 border-purple-200">
+                  <div className="font-medium text-purple-700 mb-2 flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    Time Filter Active
+                  </div>
+                  <div className="text-xs space-y-1 bg-purple-50 p-2 rounded">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Mode:</span>
+                      <span className="font-medium capitalize">{analysis.timeFilter.mode}</span>
+                    </div>
+                    {analysis.timeFilter.mode === 'single' && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Hour:</span>
+                        <span className="font-medium">{analysis.timeFilter.currentHour}:00</span>
+                      </div>
+                    )}
+                    {analysis.timeFilter.mode === 'range' && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Range:</span>
+                        <span className="font-medium">
+                          {analysis.timeFilter.timeRange[0]}:00 - {analysis.timeFilter.timeRange[1]}:00
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Days:</span>
+                      <span className="font-medium">
+                        {analysis.timeFilter.selectedDays.length}/7 selected
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Before filter:</span>
+                      <span>{analysis.totalLogsBeforeTimeFilter || 0}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>After filter:</span>
+                      <span>{analysis.logsAfterTimeFilter || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ Temporal Patterns */}
+              {analysis.temporalPatterns && (
+                <div className="mt-3 pt-2 border-t-2 border-blue-200">
+                  <div className="font-medium text-blue-700 mb-2">📈 Temporal Patterns</div>
+                  <div className="text-xs space-y-1 bg-blue-50 p-2 rounded">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Peak Hour:</span>
+                      <span className="font-medium text-blue-600">
+                        {analysis.temporalPatterns.peakHour}:00
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Peak Day:</span>
+                      <span className="font-medium text-blue-600">
+                        {getDayName(analysis.temporalPatterns.peakDay)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {analysis.grid && (
                 <div className="mt-2 pt-2 border-t border-gray-200">
                   <div className="flex justify-between text-xs text-gray-500">
@@ -737,6 +872,7 @@ export default function HighPerfMap() {
                   </div>
                 </div>
               )}
+
               {analysis.stats?.count > 0 ? (
                 <>
                   <div className="flex justify-between">
@@ -758,22 +894,6 @@ export default function HighPerfMap() {
                       {analysis.stats.max?.toFixed(2)}
                     </span>
                   </div>
-                  {analysis.grid && (
-                    <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
-                      <div className="flex justify-between">
-                        <span>Grid Cells:</span>
-                        <span className="font-medium">
-                          {analysis.grid.cells}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Cell Size:</span>
-                        <span className="font-medium">
-                          {analysis.grid.cellSizeMeters}m
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </>
               ) : (
                 <div className="text-gray-500 italic text-center py-2">
@@ -796,8 +916,9 @@ export default function HighPerfMap() {
           logs={drawnLogs}
           thresholds={thresholds}
           selectedMetric={selectedMetric}
+          appSummary={appSummary}
           isLoading={logsLoading}
-          startDate={activeFilters?.startDate} // ✅ Add this
+          startDate={activeFilters?.startDate}
           endDate={activeFilters?.endDate}
         />
 
