@@ -1,6 +1,6 @@
 // src/api/pythonApiService.js
 
-// const PYTHON_BASE_URL = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:8080";
+// const PYTHON_BASE_URL = import.meta.env.VITE_PYTHON_API_URL;
 const PYTHON_BASE_URL = "https://python-ml-backend-iqz0.onrender.com";
 
 /**

@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { PCI_COLOR_PALETTE } from "@/components/map/layers/MultiColorCirclesLayer";
+
 
 const PanelSection = memo(({ title, icon: Icon, children, className = "" }) => (
   <div className={`space-y-2 ${className}`}>
@@ -26,6 +28,34 @@ const PanelSection = memo(({ title, icon: Icon, children, className = "" }) => (
   </div>
 ));
 PanelSection.displayName = 'PanelSection';
+
+const PciColorSelector = memo(({ selectedColor, onColorChange, disabled }) => {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-slate-300">PCI Color Scheme</Label>
+      <div className="grid grid-cols-5 gap-2 p-3 bg-slate-800 rounded-lg">
+        {PCI_COLOR_PALETTE.map((color, idx) => (
+          <button
+            key={idx}
+            onClick={() => !disabled && onColorChange?.(idx)}
+            disabled={disabled}
+            className={`w-8 h-8 rounded-full border-2 transition-all ${
+              selectedColor === idx 
+                ? 'border-white scale-110 shadow-lg' 
+                : 'border-slate-600 hover:border-slate-400'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            style={{ backgroundColor: color }}
+            title={`Color ${idx}`}
+          />
+        ))}
+      </div>
+      <div className="text-[10px] text-slate-400 text-center">
+        {PCI_COLOR_PALETTE.length} colors available for PCI values
+      </div>
+    </div>
+  );
+});
+PciColorSelector.displayName = 'PciColorSelector';
 
 const ToggleButton = memo(({ value, onChange, options, disabled, className = "" }) => (
   <div className={`flex rounded-lg overflow-hidden border border-slate-600 ${className} ${disabled ? 'opacity-50' : ''}`}>
@@ -179,6 +209,8 @@ const UnifiedMapSidebar = ({
   const handleApply = useCallback(() => {
     reloadData?.();
   }, [reloadData]);
+
+  const [selectedPciColor, setSelectedPciColor] = useState(0);
 
   const shouldShowMetricSelector = useMemo(
     () => enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction") || showPolygons,
@@ -508,6 +540,23 @@ const UnifiedMapSidebar = ({
               </div>
             </PanelSection>
           )}
+
+          {/* {shouldShowMetricSelector && metric === 'pci' && (
+  <PanelSection title="PCI Color Configuration" icon={Layers}>
+    <PciColorSelector
+      selectedColor={selectedPciColor}
+      onColorChange={setSelectedPciColor}
+      disabled={false}
+    />
+    <div className="mt-3 p-2 bg-blue-900/20 border border-blue-700 rounded text-xs">
+      <div className="text-blue-300 font-semibold mb-1">ℹ️ PCI Color Logic</div>
+      <div className="text-blue-200 text-[10px]">
+        Each unique PCI value is assigned a color from the palette. 
+        The same PCI will always use the same color across the map.
+      </div>
+    </div>
+  </PanelSection>
+)} */}
 
           {/* ✅ MINIMAL & COMPACT: Horizontal layout for coverage filters */}
           {shouldShowMetricSelector && coverageHoleFilters && (

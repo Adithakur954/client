@@ -1,6 +1,7 @@
 // src/components/map/layers/MultiColorCirclesLayer.jsx
 import React from "react";
 import { Circle, InfoWindow } from "@react-google-maps/api";
+// import { getColorForMetric } from '../utils/metrics';
 
 // helper to parse numbers like "-88 dBm"
 const parseNumber = (x) => {

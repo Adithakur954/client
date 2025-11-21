@@ -6,6 +6,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
+import { PCI_COLOR_PALETTE } from '@/components/map/layers/MultiColorCirclesLayer';
 import { 
   BarChart3, 
   MapPin, 
@@ -23,11 +24,11 @@ import {
   Wifi,
   Zap,
   Gauge,
-  Share2,      // Replaces Network
-  Antenna,     // Replaces Antenna
+  Share2,
+  Antenna,
   Globe2,
   Network,
-  Globe       // Replaces Globe
+  Globe
 } from 'lucide-react';
 import {
   BarChart,
@@ -97,7 +98,115 @@ const TabButton = ({ active, onClick, children, icon: Icon }) => (
   </button>
 );
 
-// NEW: Band Distribution Chart
+// NEW: PCI Color Legend Component
+const PciColorLegend = React.forwardRef(({ locations }, ref) => {
+  const pciColorMap = useMemo(() => {
+    if (!locations || locations.length === 0) return [];
+
+    // Get unique PCIs and their counts
+    const pciStats = locations.reduce((acc, loc) => {
+      const pci = loc.pci || 'Unknown';
+      if (!acc[pci]) {
+        acc[pci] = { count: 0, samples: [] };
+      }
+      acc[pci].count++;
+      acc[pci].samples.push(loc);
+      return acc;
+    }, {});
+
+    // Map PCIs to colors
+    return Object.entries(pciStats)
+      .map(([pci, data]) => {
+        const pciNum = parseInt(pci);
+        const colorIndex = isNaN(pciNum) ? 0 : pciNum % PCI_COLOR_PALETTE.length;
+        return {
+          pci,
+          color: PCI_COLOR_PALETTE[colorIndex],
+          colorIndex,
+          count: data.count,
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+  }, [locations]);
+
+  if (pciColorMap.length === 0) {
+    return <div className="text-center text-slate-400 py-8 text-sm">No PCI data</div>;
+  }
+
+  return (
+    <div className="space-y-3" ref={ref}>
+      <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+        <Antenna className="h-4 w-4" />
+        PCI Color Mapping ({pciColorMap.length} unique PCIs)
+      </h4>
+
+      <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2">
+        {pciColorMap.map((item, idx) => (
+          <div 
+            key={idx} 
+            className="flex items-center gap-2 p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors"
+          >
+            <div 
+              className="w-6 h-6 rounded-full border-2 border-slate-600 flex-shrink-0"
+              style={{ backgroundColor: item.color }}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-white text-sm">
+                  PCI {item.pci}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {item.count} pts
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-500">
+                Color #{item.colorIndex}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Color Palette Reference */}
+      <div className="mt-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
+        <div className="text-xs font-semibold text-slate-300 mb-2">
+          Available Color Palette
+        </div>
+        <div className="grid grid-cols-10 gap-1.5">
+          {PCI_COLOR_PALETTE.map((color, idx) => (
+            <div key={idx} className="flex flex-col items-center">
+              <div
+                className="w-6 h-6 rounded-full border border-slate-600"
+                style={{ backgroundColor: color }}
+                title={`Color ${idx}`}
+              />
+              <span className="text-[9px] text-slate-500 mt-0.5">{idx}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-[10px] text-slate-400 mt-2 text-center">
+          PCI values cycle through these {PCI_COLOR_PALETTE.length} colors
+        </div>
+      </div>
+
+      {/* Logic Explanation */}
+      <div className="p-3 bg-blue-900/20 border border-blue-700 rounded-lg">
+        <div className="text-xs text-blue-300 font-semibold mb-1 flex items-center gap-1">
+          <Activity className="h-3 w-3" />
+          Color Assignment Logic
+        </div>
+        <div className="text-[10px] text-blue-200 space-y-1">
+          <div>• Each PCI value gets a unique color from the palette</div>
+          <div>• Formula: Color Index = PCI % {PCI_COLOR_PALETTE.length}</div>
+          <div>• Same PCI always shows the same color</div>
+          <div>• Colors repeat after every {PCI_COLOR_PALETTE.length} PCI values</div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// Band Distribution Chart
 const BandDistributionChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -193,7 +302,7 @@ const BandDistributionChart = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// NEW: Operator Comparison Chart
+// Operator Comparison Chart
 const OperatorComparisonChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -286,7 +395,7 @@ const OperatorComparisonChart = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// NEW: PCI Distribution Chart
+// PCI Distribution Chart
 const PCIDistributionChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -310,7 +419,7 @@ const PCIDistributionChart = React.forwardRef(({ locations }, ref) => {
           : 'N/A',
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10
+      .slice(0, 10);
   }, [locations]);
 
   if (data.length === 0) {
@@ -350,7 +459,7 @@ const PCIDistributionChart = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// NEW: Speed vs Signal Quality Scatter
+// Speed vs Signal Quality Scatter
 const SpeedVsSignalChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -358,7 +467,7 @@ const SpeedVsSignalChart = React.forwardRef(({ locations }, ref) => {
     return locations
       .filter(loc => loc.speed != null && loc.rsrp != null)
       .map(loc => ({
-        speed: parseFloat(loc.speed) * 3.6, // m/s to km/h
+        speed: parseFloat(loc.speed) * 3.6,
         rsrp: loc.rsrp,
         sinr: loc.sinr || 0,
       }));
@@ -417,7 +526,7 @@ const SpeedVsSignalChart = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// NEW: Throughput Over Time
+// Throughput Over Time
 const ThroughputTimelineChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -474,7 +583,7 @@ const ThroughputTimelineChart = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// NEW: Jitter and Latency Analysis
+// Jitter and Latency Analysis
 const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -542,7 +651,7 @@ const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// NEW: Provider Performance
+// Provider Performance
 const ProviderPerformanceChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -623,7 +732,7 @@ const ProviderPerformanceChart = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// Keep existing charts...
+// Signal Distribution Chart
 const SignalDistributionChart = React.forwardRef(({ locations, metric, thresholds }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -675,7 +784,7 @@ const SignalDistributionChart = React.forwardRef(({ locations, metric, threshold
               borderRadius: '8px',
               color: '#fff'
             }}
-            formatter={(value, name) => [value, name === 'count' ? 'Points' : name]}
+            formatter={(value, name) => [value, name === 'count' ? 'Samples' : name]}
           />
           <Bar dataKey="count" radius={[8, 8, 0, 0]}>
             {data.map((entry, index) => (
@@ -698,6 +807,7 @@ const SignalDistributionChart = React.forwardRef(({ locations, metric, threshold
   );
 });
 
+// Technology Breakdown
 const TechnologyBreakdown = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -782,7 +892,7 @@ const TechnologyBreakdown = React.forwardRef(({ locations }, ref) => {
                 />
                 <span className="text-white font-semibold">{item.name}</span>
               </div>
-              <span className="text-slate-300">{item.count} points</span>
+              <span className="text-slate-300">{item.count} Samples</span>
             </div>
             <div className="grid grid-cols-2 gap-2 ml-5">
               <div className="text-slate-400">
@@ -799,6 +909,7 @@ const TechnologyBreakdown = React.forwardRef(({ locations }, ref) => {
   );
 });
 
+// Metric Comparison Radar
 const MetricComparisonRadar = React.forwardRef(({ locations }, ref) => {
   const chartData = useMemo(() => {
     if (!locations || locations.length === 0) return [];
@@ -1112,6 +1223,7 @@ function UnifiedDetailLogs({
   const bandChartRef = useRef(null);
   const operatorChartRef = useRef(null);
   const pciChartRef = useRef(null);
+  const pciColorLegendRef = useRef(null); // NEW: PCI Color Legend ref
   const speedChartRef = useRef(null);
   const throughputTimelineRef = useRef(null);
   const jitterLatencyRef = useRef(null);
@@ -1120,8 +1232,6 @@ function UnifiedDetailLogs({
   const throughputChartRef = useRef(null);
   const signalChartRef = useRef(null);
   const qoeChartRef = useRef(null);
-  const indoorCount = useRef(null);
-  const outdoorCount = useRef(null);
 
   // Fetch duration using SWR
   const fetchDuration = async () => {
@@ -1141,24 +1251,43 @@ function UnifiedDetailLogs({
   );
 
   const stats = useMemo(() => {
-    if (!locations || locations.length === 0) return null;
+  if (!locations || locations.length === 0) return null;
 
-    const values = locations
-      .map(loc => loc[selectedMetric])
-      .filter(val => val != null && !isNaN(val));
+  const values = locations
+    .map(loc => loc[selectedMetric])
+    .filter(val => val != null && !isNaN(val) && typeof val === 'number');
 
-    if (values.length === 0) return null;
+  if (values.length === 0) return null;
 
-    const sum = values.reduce((acc, val) => acc + val, 0);
-    const avg = sum / values.length;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const sorted = [...values].sort((a, b) => a - b);
-    const median = sorted[Math.floor(sorted.length / 2)];
+  const sum = values.reduce((acc, val) => acc + val, 0);
+  const avg = sum / values.length;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const sorted = [...values].sort((a, b) => a - b);
+  
+  // Calculate median with proper handling
+  let median;
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    median = (sorted[mid - 1] + sorted[mid]) / 2;
+  } else {
+    median = sorted[mid];
+  }
 
-    return { avg, min, max, median, count: values.length };
-  }, [locations, selectedMetric]);
+  // Ensure all values are valid numbers
+  const safeAvg = isNaN(avg) || !isFinite(avg) ? 0 : avg;
+  const safeMin = isNaN(min) || !isFinite(min) ? 0 : min;
+  const safeMax = isNaN(max) || !isFinite(max) ? 0 : max;
+  const safeMedian = isNaN(median) || !isFinite(median) ? 0 : median;
 
+  return { 
+    avg: safeAvg, 
+    min: safeMin, 
+    max: safeMax, 
+    median: safeMedian, 
+    count: values.length 
+  };
+}, [locations, selectedMetric]);
   const polygonStats = useMemo(() => {
     if (!polygons || polygons.length === 0) return null;
 
@@ -1174,28 +1303,27 @@ function UnifiedDetailLogs({
     };
   }, [polygons]);
 
-
   const ioSummary = useMemo(() => {
-  if (!logArea || typeof logArea !== 'object') return null;
+    if (!logArea || typeof logArea !== 'object') return null;
 
-  let totalIndoor = 0;
-  let totalOutdoor = 0;
+    let totalIndoor = 0;
+    let totalOutdoor = 0;
 
-  Object.values(logArea).forEach(session => {
-    if (session.Indoor?.inputCount) {
-      totalIndoor += session.Indoor.inputCount;
-    }
-    if (session.Outdoor?.inputCount) {
-      totalOutdoor += session.Outdoor.inputCount;
-    }
-  });
+    Object.values(logArea).forEach(session => {
+      if (session.Indoor?.inputCount) {
+        totalIndoor += session.Indoor.inputCount;
+      }
+      if (session.Outdoor?.inputCount) {
+        totalOutdoor += session.Outdoor.inputCount;
+      }
+    });
 
-  return {
-    indoor: totalIndoor,
-    outdoor: totalOutdoor,
-    total: totalIndoor + totalOutdoor
-  };
-}, [logArea]);
+    return {
+      indoor: totalIndoor,
+      outdoor: totalOutdoor,
+      total: totalIndoor + totalOutdoor
+    };
+  }, [logArea]);
 
   const handleExport = async () => {
     try {
@@ -1206,7 +1334,6 @@ function UnifiedDetailLogs({
 
       const wb = XLSX.utils.book_new();
 
-     
       const summaryData = [
         ['Analytics Export Report'],
         ['Generated:', new Date().toLocaleString()],
@@ -1214,11 +1341,11 @@ function UnifiedDetailLogs({
         ['Session IDs:', sessionIds.join(', ')],
         [''],
         ['Summary Statistics'],
-        ['Total Points:', totalLocations],
-        ['Filtered Points:', filteredCount],
+        ['Total Sample:', totalLocations],
+        ['Filtered Samples:', filteredCount],
         ['Selected Metric:', selectedMetric?.toUpperCase()],
-        ['Indoor Points:', logArea ? logArea.Indoor?.inputCount : 'N/A'],
-        ['Outdoor Points:', logArea ? logArea.Outdoor?.inputCount : 'N/A'],
+        ['Indoor Samples:', ioSummary ? ioSummary.indoor : 'N/A'],
+        ['Outdoor Samples:', ioSummary ? ioSummary.outdoor : 'N/A'],
         [''],
       ];
 
@@ -1327,6 +1454,7 @@ function UnifiedDetailLogs({
         captureChart(radarChartRef, `metric-comparison-${timestamp}.png`),
         captureChart(bandChartRef, `band-distribution-${timestamp}.png`),
         captureChart(operatorChartRef, `operator-comparison-${timestamp}.png`),
+        captureChart(pciColorLegendRef, `pci-color-legend-${timestamp}.png`), // NEW: PCI Color Legend
         captureChart(pciChartRef, `pci-distribution-${timestamp}.png`),
         captureChart(speedChartRef, `speed-vs-signal-${timestamp}.png`),
         captureChart(throughputTimelineRef, `throughput-timeline-${timestamp}.png`),
@@ -1358,6 +1486,7 @@ Contents:
    - Metric Comparison Timeline
    - Band Distribution
    - Operator Comparison
+   - PCI Color Legend
    - PCI Distribution
    - Speed vs Signal Quality
    - Throughput Timeline
@@ -1386,7 +1515,7 @@ Notes:
 
   if (collapsed) {
     return (
-      <div className="fixed bottom-4 right-4 z-40 flex gap-2">
+      <div className=" fixed  flex gap-2">
         <button
           onClick={() => setCollapsed(false)}
           className="bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2"
@@ -1408,9 +1537,10 @@ Notes:
   const containerWidth = expanded ? 'w-[95vw] max-w-[1400px]' : 'w-[480px]';
 
   return (
-    <div className={`fixed ${expanded ? 'top-20 left-1/2 -translate-x-1/2' : 'bottom-4 right-4'} z-40 ${containerWidth} bg-slate-950 text-white rounded-lg shadow-2xl border border-slate-700 transition-all duration-300`}>
+    <div className={`fixed ${expanded ? 'top-20 left-1/2 -translate-x-1/2' : 'bottom-4 right-4'} z-40 ${containerWidth} h-[calc(100%-72px)]
+  bg-slate-950 text-white rounded-lg shadow-2xl border border-slate-700 transition-all duration-300`}>
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-slate-700 bg-slate-900 rounded-t-lg">
+      <div className="flex items-center justify-between  p-2 border-b border-slate-700 bg-slate-900 rounded-t-lg">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-blue-400" />
           <h3 className="font-semibold">Analytics</h3>
@@ -1451,7 +1581,7 @@ Notes:
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 p-3 bg-slate-900 border-b border-slate-700 overflow-x-auto">
+      <div className="flex gap-2 p-3 bg-slate-900 border-b border-slate-700 overflow-x-auto scrollbar-hide">
         <TabButton 
           active={activeTab === 'overview'} 
           onClick={() => setActiveTab('overview')}
@@ -1497,7 +1627,7 @@ Notes:
       </div>
 
       {/* Content */}
-      <div className={`${expanded ? 'max-h-[calc(100vh-200px)]' : 'max-h-[70vh]'} overflow-y-auto p-4 space-y-4`}>
+      <div className={`${expanded ? 'max-h-[calc(100vh-200px)]' : 'max-h-[70vh]'} overflow-y-auto scrollbar-hide p-4 space-y-4`}>
         {isLoading && (
           <div className="text-center py-8 text-slate-400">
             <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
@@ -1505,172 +1635,239 @@ Notes:
           </div>
         )}
 
-       
-
-{activeTab === 'overview' && (
-  <div className="space-y-4">
-    <div className={`grid ${expanded ? 'grid-cols-4' : 'grid-cols-2'} gap-3`}>
-      <StatCard
-        icon={MapPin}
-        label="Total Points"
-        value={totalLocations.toLocaleString()}
-        color="blue"
-      />
-      <StatCard
-        icon={Activity}
-        label="Displayed"
-        value={filteredCount.toLocaleString()}
-        color="green"
-      />
-      
-      {enableSiteToggle && (
-        <StatCard
-          icon={Layers}
-          label="Sites"
-          value={siteData.length}
-          subValue={siteToggle}
-          color="purple"
-        />
-      )}
-      {showPolygons && polygonStats && (
-        <StatCard
-          icon={Layers}
-          label="Polygons"
-          value={polygonStats.total}
-          subValue={`${polygonStats.withData} with data`}
-          color="orange"
-        />
-      )}
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="space-y-4">
+            <div className={`grid ${expanded ? 'grid-cols-4' : 'grid-cols-2'} gap-3`}>
+              <StatCard
+                icon={MapPin}
+                label="Total Samples"
+                value={totalLocations.toLocaleString()}
+                color="blue"
+              />
+              <StatCard
+                icon={Activity}
+                label="Displayed"
+                value={filteredCount.toLocaleString()}
+                color="green"
+              />
+              
+              {enableSiteToggle && (
+                <StatCard
+                  icon={Layers}
+                  label="Sites"
+                  value={siteData.length}
+                  subValue={siteToggle}
+                  color="purple"
+                />
+              )}
+              {showPolygons && polygonStats && (
+                <StatCard
+                  icon={Layers}
+                  label="Polygons"
+                  value={polygonStats.total}
+                  subValue={`${polygonStats.withData} with data`}
+                  color="orange"
+                />
+              )}
+            </div>
+{stats && (
+  <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+    <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+      <Activity className="h-4 w-4" />
+      {selectedMetric?.toUpperCase() || 'METRIC'} Statistics
+    </h4>
+    
+    <div className={`grid ${expanded ? 'grid-cols-5' : 'grid-cols-3'} gap-3`}>
+      <div className="bg-slate-800 rounded p-3 text-center">
+        <div className="text-xs text-slate-400 mb-1">Average</div>
+        <div className="text-xl font-bold text-white">
+          {typeof stats.avg === 'number' ? stats.avg.toFixed(2) : 'N/A'}
+        </div>
+      </div>
+      <div className="bg-slate-800 rounded p-3 text-center">
+        <div className="text-xs text-slate-400 mb-1">Minimum</div>
+        <div className="text-xl font-bold text-blue-400">
+          {typeof stats.min === 'number' ? stats.min.toFixed(2) : 'N/A'}
+        </div>
+      </div>
+      <div className="bg-slate-800 rounded p-3 text-center">
+        <div className="text-xs text-slate-400 mb-1">Maximum</div>
+        <div className="text-xl font-bold text-green-400">
+          {typeof stats.max === 'number' ? stats.max.toFixed(2) : 'N/A'}
+        </div>
+      </div>
+      <div className="bg-slate-800 rounded p-3 text-center">
+        <div className="text-xs text-slate-400 mb-1">Median</div>
+        <div className="text-xl font-bold text-purple-400">
+          {typeof stats.median === 'number' ? stats.median.toFixed(2) : 'N/A'}
+        </div>
+      </div>
+      <div className="bg-slate-800 rounded p-3 text-center">
+        <div className="text-xs text-slate-400 mb-1">Count</div>
+        <div className="text-xl font-bold text-yellow-400">
+          {stats.count || 0}
+        </div>
+      </div>
     </div>
-
-    {/* Indoor/Outdoor Count Boxes */}
-   
-
-    {stats && (
-      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-        <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-          <Activity className="h-4 w-4" />
-          {selectedMetric.toUpperCase()} Statistics
-        </h4>
-        
-        <div className={`grid ${expanded ? 'grid-cols-5' : 'grid-cols-3'} gap-3`}>
-          <div className="bg-slate-800 rounded p-3 text-center">
-            <div className="text-xs text-slate-400 mb-1">Average</div>
-            <div className="text-xl font-bold text-white">{stats.avg.toFixed(2)}</div>
-          </div>
-          <div className="bg-slate-800 rounded p-3 text-center">
-            <div className="text-xs text-slate-400 mb-1">Minimum</div>
-            <div className="text-xl font-bold text-blue-400">{stats.min.toFixed(2)}</div>
-          </div>
-          <div className="bg-slate-800 rounded p-3 text-center">
-            <div className="text-xs text-slate-400 mb-1">Maximum</div>
-            <div className="text-xl font-bold text-green-400">{stats.max.toFixed(2)}</div>
-          </div>
-          <div className="bg-slate-800 rounded p-3 text-center">
-            <div className="text-xs text-slate-400 mb-1">Median</div>
-            <div className="text-xl font-bold text-purple-400">{stats.median.toFixed(2)}</div>
-          </div>
-          <div className="bg-slate-800 rounded p-3 text-center">
-            <div className="text-xs text-slate-400 mb-1">Count</div>
-            <div className="text-xl font-bold text-yellow-400">{stats.count}</div>
-          </div>
-        </div>
-      </div>
-    )}
-
-     {ioSummary && (ioSummary.indoor > 0 || ioSummary.outdoor > 0) && (
-      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-        <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
-          Indoor/Outdoor Distribution
-        </h4>
-        
-        <div className="grid grid-cols-2 gap-3">
-          {/* Indoor Box */}
-          {ioSummary.indoor > 0 && (
-            <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/30 rounded-lg p-4 hover:shadow-lg hover:shadow-cyan-500/10 transition-all">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-cyan-500/20 p-2.5 rounded-lg">
-                  <svg 
-                    className="h-6 w-6 text-cyan-400" 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-xs text-cyan-300/70 font-medium">Indoor Points</div>
-                  <div className="text-2xl font-bold text-cyan-400">
-                    {ioSummary.indoor.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-3 border-t border-cyan-500/20">
-                <span className="text-xs text-slate-400">Percentage of Total</span>
-                <span className="text-sm font-semibold text-cyan-400">
-                  {ioSummary.total > 0 ? `${((ioSummary.indoor / ioSummary.total) * 100).toFixed(1)}%` : '0%'}
-                </span>
-              </div>
-            </div>
-          )}
-          
-          {/* Outdoor Box */}
-          {ioSummary.outdoor > 0 && (
-            <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/30 rounded-lg p-4 hover:shadow-lg hover:shadow-green-500/10 transition-all">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-green-500/20 p-2.5 rounded-lg">
-                  <svg 
-                    className="h-6 w-6 text-green-400" 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-xs text-green-300/70 font-medium">Outdoor Points</div>
-                  <div className="text-2xl font-bold text-green-400">
-                    {ioSummary.outdoor.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-3 border-t border-green-500/20">
-                <span className="text-xs text-slate-400">Percentage of Total</span>
-                <span className="text-sm font-semibold text-green-400">
-                  {ioSummary.total > 0 ? `${((ioSummary.outdoor / ioSummary.total) * 100).toFixed(1)}%` : '0%'}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
-
-    {duration && (
-      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-        <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-          <Clock className="h-4 w-4" />
-          Session Information
-        </h4>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="bg-slate-800 p-3 rounded">
-            <div className="text-slate-400 text-xs mb-1">Duration</div>
-            <div className="text-white font-semibold">{duration.total_duration || 'N/A'}</div>
-          </div>
-          <div className="bg-slate-800 p-3 rounded">
-            <div className="text-slate-400 text-xs mb-1">Start Time</div>
-            <div className="text-white font-semibold">
-              {duration.start_time ? new Date(duration.start_time).toLocaleTimeString() : 'N/A'}
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
   </div>
 )}
+
+            {ioSummary && (ioSummary.indoor > 0 || ioSummary.outdoor > 0) && (
+              <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Indoor/Outdoor Distribution
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {ioSummary.indoor > 0 && (
+                    <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/30 rounded-lg p-4 hover:shadow-lg hover:shadow-cyan-500/10 transition-all">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="bg-cyan-500/20 p-2.5 rounded-lg">
+                          <svg 
+                            className="h-6 w-6 text-cyan-400" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-xs text-cyan-300/70 font-medium">Indoor Samples</div>
+                          <div className="text-2xl font-bold text-cyan-400">
+                            {ioSummary.indoor.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-3 border-t border-cyan-500/20">
+                        <span className="text-xs text-slate-400">Percentage of Total</span>
+                        <span className="text-sm font-semibold text-cyan-400">
+                          {ioSummary.total > 0 ? `${((ioSummary.indoor / ioSummary.total) * 100).toFixed(1)}%` : '0%'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {ioSummary.outdoor > 0 && (
+                    <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/30 rounded-lg p-4 hover:shadow-lg hover:shadow-green-500/10 transition-all">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="bg-green-500/20 p-2.5 rounded-lg">
+                          <svg 
+                            className="h-6 w-6 text-green-400" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-xs text-green-300/70 font-medium">Outdoor Samples</div>
+                          <div className="text-2xl font-bold text-green-400">
+                            {ioSummary.outdoor.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-3 border-t border-green-500/20">
+                        <span className="text-xs text-slate-400">Percentage of Total</span>
+                        <span className="text-sm font-semibold text-green-400">
+                          {ioSummary.total > 0 ? `${((ioSummary.outdoor / ioSummary.total) * 100).toFixed(1)}%` : '0%'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* PCI Color Reference in Overview Tab */}
+{selectedMetric === 'pci' && locations && locations.length > 0 && (
+  <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+    <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+      <Antenna className="h-4 w-4" />
+      PCI Color Reference
+    </h4>
+    
+    <div className="mb-3">
+      
+     
+    </div>
+
+   
+
+    {/* Show active PCIs with their colors */}
+    {(() => {
+      const pciCounts = locations.reduce((acc, loc) => {
+        const pci = loc.pci;
+        if (pci != null) {
+          if (!acc[pci]) acc[pci] = 0;
+          acc[pci]++;
+        }
+        return acc;
+      }, {});
+
+      const sortedPCIs = Object.entries(pciCounts)
+        .map(([pci, count]) => ({
+          pci: parseInt(pci),
+          count,
+          color: PCI_COLOR_PALETTE[parseInt(pci) % PCI_COLOR_PALETTE.length]
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+
+      if (sortedPCIs.length === 0) return null;
+
+      return (
+        <div className="mt-3">
+          <div className="text-xs text-slate-400 mb-2">Top 10 PCIs in Current View</div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {sortedPCIs.map((item, idx) => (
+              <div 
+                key={idx}
+                className="flex items-center gap-1 bg-slate-800 p-1.5 rounded text-[10px]"
+              >
+                <div
+                  className="w-4 h-4 rounded-full border border-slate-600 flex-shrink-0"
+                  style={{ backgroundColor: item.color }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-white font-semibold truncate">PCI {item.pci}</div>
+                  <div className="text-slate-400">{item.count} pts</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    })()}
+  </div>
+)}
+
+            {duration && (
+              <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Session Information
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-slate-800 p-3 rounded">
+                    <div className="text-slate-400 text-xs mb-1">Duration</div>
+                    <div className="text-white font-semibold">{duration.total_duration || 'N/A'}</div>
+                  </div>
+                  <div className="bg-slate-800 p-3 rounded">
+                    <div className="text-slate-400 text-xs mb-1">Start Time</div>
+                    <div className="text-white font-semibold">
+                      {duration.start_time ? new Date(duration.start_time).toLocaleTimeString() : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Signal Tab */}
         {activeTab === 'signal' && (
           <div className={`grid ${expanded ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
@@ -1689,6 +1886,10 @@ Notes:
           <div className={`grid ${expanded ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
             <BandDistributionChart ref={bandChartRef} locations={locations} />
             <OperatorComparisonChart ref={operatorChartRef} locations={locations} />
+            
+            {/* NEW: PCI Color Legend */}
+            <PciColorLegend ref={pciColorLegendRef} locations={locations} />
+            
             <PCIDistributionChart ref={pciChartRef} locations={locations} />
             <ProviderPerformanceChart ref={providerPerfRef} locations={locations} />
           </div>
@@ -1703,7 +1904,7 @@ Notes:
           </div>
         )}
 
-        {/* Application Tab - Keep existing code */}
+        {/* Application Tab */}
         {activeTab === 'Application' && (
           <div className="space-y-4">
             <div className="flex gap-2 bg-slate-800 p-2 rounded-lg">
