@@ -488,7 +488,7 @@ const UnifiedMapView = () => {
               ul_thpt: log.ul_thpt ?? log.ul_tpt ?? log.UL,
               mos: log.mos ?? log.MOS,
               lte_bler: log.lte_bler ?? log.LTE_BLER,
-              operator: canonicalOperatorName(log.operator_name),
+              operator:log.provider,
               technology: log.network,
               provider: log.provider,
               band: log.band,
