@@ -1,9 +1,8 @@
-// Enhanced DrawingControlsPanel.jsx
+// DrawingControlsPanel.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PenTool, XCircle, Download, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { PenTool, XCircle, Download, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import TimeControls from "./TimeControls";
 
 export default function DrawingControlsPanel({
   ui,
@@ -15,7 +14,6 @@ export default function DrawingControlsPanel({
   position = "top-right",
 }) {
   const [dropOpen, setDropOpen] = useState(false);
-  const [timeDropOpen, setTimeDropOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   const safeUi = {
@@ -25,14 +23,6 @@ export default function DrawingControlsPanel({
     drawCellSizeMeters: 100,
     drawClearSignal: 0,
     colorizeCells: true,
-    // Time-based controls
-    timeFilterEnabled: false,
-    timeMode: 'all', // 'single' | 'range' | 'all'
-    currentHour: 12,
-    timeRange: [0, 23],
-    selectedDays: [0, 1, 2, 3, 4, 5, 6],
-    isTimePlaying: false,
-    timeSpeed: 1,
     ...ui,
   };
 
@@ -40,7 +30,6 @@ export default function DrawingControlsPanel({
     const onOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropOpen(false);
-        setTimeDropOpen(false);
       }
     };
     document.addEventListener("mousedown", onOutside);
@@ -53,7 +42,7 @@ export default function DrawingControlsPanel({
   };
 
   const clearDrawings = () => {
-    onUIChange?.({ drawClearSignal: (safeUi.drawClearSignal || 0) + 1, drawEnabled: false });
+    onUIChange?.({ drawClearSignal: (safeUi.drawClearSignal || 0) + 1 });
   };
 
   const positionClasses = {
@@ -66,40 +55,18 @@ export default function DrawingControlsPanel({
   return (
     <div className={`absolute ${positionClasses[position]} z-40`} ref={dropdownRef}>
       {/* Main Toggle Button */}
-      <div className="flex gap-2">
-        <button
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg transition-all ${
-            dropOpen
-              ? "bg-blue-600 text-white"
-              : "bg-white text-gray-700 hover:bg-gray-50"
-          }`}
-          onClick={() => {
-            setDropOpen((p) => !p);
-            setTimeDropOpen(false);
-          }}
-        >
-          <PenTool className="w-4 h-4" />
-          <span>Draw / Analyze</span>
-          {dropOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-
-        {/* Time Controls Toggle */}
-        <button
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg transition-all ${
-            timeDropOpen
-              ? "bg-purple-600 text-white"
-              : "bg-white text-gray-700 hover:bg-gray-50"
-          }`}
-          onClick={() => {
-            setTimeDropOpen((p) => !p);
-            setDropOpen(false);
-          }}
-        >
-          <Clock className="w-4 h-4" />
-          <span>Time Filter</span>
-          {timeDropOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-      </div>
+      <button
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg transition-all ${
+          dropOpen
+            ? "bg-blue-600 text-white"
+            : "bg-white text-gray-700 hover:bg-gray-50"
+        }`}
+        onClick={() => setDropOpen((p) => !p)}
+      >
+        <PenTool className="w-4 h-4" />
+        <span>Draw / Analyze</span>
+        {dropOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      </button>
 
       {/* Drawing Tools Dropdown */}
       {dropOpen && (
@@ -109,6 +76,22 @@ export default function DrawingControlsPanel({
               ⚠️ Load/fetch logs first to enable drawing.
             </div>
           )}
+
+          {/* Edit Instructions */}
+          <div className="mb-3 p-3 rounded bg-blue-50 text-blue-800 text-xs border border-blue-200">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold mb-1">Editing Shapes:</div>
+                <ul className="space-y-1 text-xs">
+                  <li>• <strong>Drag</strong> shapes to move them</li>
+                  <li>• <strong>Drag vertices</strong> to resize/reshape</li>
+                  <li>• <strong>Drag midpoints</strong> to add vertices (polygons)</li>
+                  <li>• Stats update automatically when edited</li>
+                </ul>
+              </div>
+            </div>
+          </div>
 
           <label className="flex items-center gap-2 font-medium text-sm mb-3">
             <input
@@ -216,45 +199,6 @@ export default function DrawingControlsPanel({
                 Download Raw Logs CSV
               </Button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Time Controls Dropdown */}
-      {timeDropOpen && (
-        <div className="absolute top-full right-0 mt-2 w-80 bg-white text-gray-900 rounded-lg shadow-2xl ring-1 ring-gray-200 p-4 z-50">
-          <div className="mb-3">
-            <label className="flex items-center gap-2 font-medium text-sm">
-              <input
-                type="checkbox"
-                checked={!!safeUi.timeFilterEnabled}
-                onChange={(e) => onUIChange?.({ timeFilterEnabled: e.target.checked })}
-                disabled={!hasLogs}
-                className="w-4 h-4"
-              />
-              Enable Time-Based Filtering
-            </label>
-            {!hasLogs && (
-              <div className="mt-2 p-2 rounded bg-amber-50 text-amber-800 text-xs">
-                ⚠️ Load logs first to enable time filtering.
-              </div>
-            )}
-          </div>
-
-          <div className={safeUi.timeFilterEnabled ? "" : "opacity-50 pointer-events-none"}>
-            <TimeControls
-              currentHour={safeUi.currentHour}
-              onHourChange={(h) => onUIChange?.({ currentHour: h })}
-              timeRange={safeUi.timeRange}
-              onTimeRangeChange={(r) => onUIChange?.({ timeRange: r })}
-              selectedDays={safeUi.selectedDays}
-              onDaysChange={(d) => onUIChange?.({ selectedDays: d })}
-              isPlaying={safeUi.isTimePlaying}
-              onPlayPause={() => onUIChange?.({ isTimePlaying: !safeUi.isTimePlaying })}
-              speed={safeUi.timeSpeed}
-              onSpeedChange={(s) => onUIChange?.({ timeSpeed: s })}
-              enabled={safeUi.timeFilterEnabled}
-            />
           </div>
         </div>
       )}

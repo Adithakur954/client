@@ -1,160 +1,6 @@
 // DrawingToolsLayer.jsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { toast } from "react-toastify";
-
-/**
- * ============================================================================
- * TIME UTILITIES
- * ============================================================================
- */
-
-/**
- * Extract timestamp from log object
- */
-function getLogTimestamp(log) {
-  const ts = log.timestamp || log.time || log.datetime || log.created_at || log.date;
-  if (!ts) return null;
-  const date = new Date(ts);
-  return isNaN(date.getTime()) ? null : date;
-}
-
-/**
- * Get hour of day from timestamp (0-23)
- */
-function getHourOfDay(date) {
-  return date.getHours();
-}
-
-/**
- * Get day of week from timestamp (0-6, 0=Sunday)
- */
-function getDayOfWeek(date) {
-  return date.getDay();
-}
-
-/**
- * Filter logs by specific hour
- */
-function filterLogsByHour(logs, hour) {
-  if (!Array.isArray(logs)) return [];
-  
-  return logs.filter(log => {
-    const ts = getLogTimestamp(log);
-    if (!ts) return false;
-    return getHourOfDay(ts) === hour;
-  });
-}
-
-/**
- * Filter logs by time range
- */
-function filterLogsByTimeRange(logs, startHour, endHour) {
-  if (!Array.isArray(logs)) return [];
-  if (startHour === 0 && endHour === 23) return logs; // All day
-  
-  return logs.filter(log => {
-    const ts = getLogTimestamp(log);
-    if (!ts) return false;
-    
-    const hour = getHourOfDay(ts);
-    
-    if (startHour <= endHour) {
-      return hour >= startHour && hour <= endHour;
-    } else {
-      // Handle overnight range (e.g., 22:00 - 02:00)
-      return hour >= startHour || hour <= endHour;
-    }
-  });
-}
-
-/**
- * Filter logs by day of week
- */
-function filterLogsByDayOfWeek(logs, days = []) {
-  if (!Array.isArray(logs) || days.length === 0) return logs;
-  
-  return logs.filter(log => {
-    const ts = getLogTimestamp(log);
-    if (!ts) return false;
-    return days.includes(getDayOfWeek(ts));
-  });
-}
-
-/**
- * Get time distribution of logs (hourly buckets)
- */
-function getTimeDistribution(logs) {
-  const hourCounts = Array(24).fill(0);
-  
-  logs.forEach(log => {
-    const ts = getLogTimestamp(log);
-    if (ts) {
-      const hour = getHourOfDay(ts);
-      hourCounts[hour]++;
-    }
-  });
-  
-  return hourCounts;
-}
-
-/**
- * Apply time filter based on time settings
- */
-function applyTimeFilter(logs, timeSettings) {
-  if (!timeSettings?.timeFilterEnabled) return logs;
-
-  let filtered = logs;
-
-  // Filter by day of week first
-  if (timeSettings.selectedDays && timeSettings.selectedDays.length > 0 && timeSettings.selectedDays.length < 7) {
-    filtered = filterLogsByDayOfWeek(filtered, timeSettings.selectedDays);
-  }
-
-  // Then filter by time mode
-  if (timeSettings.timeMode === 'single') {
-    filtered = filterLogsByHour(filtered, timeSettings.currentHour);
-  } else if (timeSettings.timeMode === 'range') {
-    const [start, end] = timeSettings.timeRange || [0, 23];
-    filtered = filterLogsByTimeRange(filtered, start, end);
-  }
-  // 'all' mode doesn't filter by hour
-
-  return filtered;
-}
-
-/**
- * Analyze temporal patterns
- */
-function analyzeTemporalPatterns(logs) {
-  const hourly = Array(24).fill(0).map(() => []);
-  const daily = Array(7).fill(0).map(() => []);
-  
-  logs.forEach(log => {
-    const ts = getLogTimestamp(log);
-    if (!ts) return;
-    
-    const hour = getHourOfDay(ts);
-    const day = getDayOfWeek(ts);
-    
-    hourly[hour].push(log);
-    daily[day].push(log);
-  });
-  
-  const hourCounts = hourly.map(h => h.length);
-  const dayCounts = daily.map(d => d.length);
-  
-  const peakHour = hourCounts.indexOf(Math.max(...hourCounts));
-  const peakDay = dayCounts.indexOf(Math.max(...dayCounts));
-  
-  return {
-    hourly,
-    daily,
-    hourCounts,
-    dayCounts,
-    peakHour,
-    peakDay,
-  };
-}
 
 /**
  * ============================================================================
@@ -162,9 +8,6 @@ function analyzeTemporalPatterns(logs) {
  * ============================================================================
  */
 
-/**
- * Safely extract lat/lng from a log object and return google.maps.LatLng.
- */
 function toLatLng(log) {
   const lat = Number(
     log.lat ?? log.latitude ?? log.start_lat ?? log.Latitude ?? log.LAT
@@ -176,9 +19,6 @@ function toLatLng(log) {
   return new window.google.maps.LatLng(lat, lng);
 }
 
-/**
- * Normalize metric key from UI to internal keys used in the data.
- */
 function normalizeMetricKey(m) {
   if (!m) return "rsrp";
   const s = String(m).toLowerCase();
@@ -188,9 +28,6 @@ function normalizeMetricKey(m) {
   return s;
 }
 
-/**
- * Mapping of logical metric key -> possible field names in logs.
- */
 const metricKeyMap = {
   rsrp: ["rsrp", "lte_rsrp", "rsrp_dbm"],
   rsrq: ["rsrq"],
@@ -201,9 +38,6 @@ const metricKeyMap = {
   lte_bler: ["lte_bler", "bler"],
 };
 
-/**
- * Read numeric metric value from a log using normalized mapping.
- */
 function getMetricValue(log, selectedMetric) {
   const key = normalizeMetricKey(selectedMetric);
   const candidates = metricKeyMap[key] || [key];
@@ -214,9 +48,6 @@ function getMetricValue(log, selectedMetric) {
   return null;
 }
 
-/**
- * Compute basic statistics on an array of numbers.
- */
 function computeStats(values) {
   if (!values.length) {
     return { mean: null, median: null, max: null, min: null, count: 0 };
@@ -232,9 +63,6 @@ function computeStats(values) {
   return { mean, median, max, min, count: values.length };
 }
 
-/**
- * Pick a color based on thresholds for a given metric.
- */
 function pickColorForValue(value, selectedMetric, thresholds) {
   const key = normalizeMetricKey(selectedMetric);
   const arr = thresholds?.[key];
@@ -250,12 +78,9 @@ function pickColorForValue(value, selectedMetric, thresholds) {
       }
     }
   }
-  return "#93c5fd"; // fallback color
+  return "#93c5fd";
 }
 
-/**
- * Build LatLngBounds for a polygon from its path.
- */
 function buildPolygonBounds(polygon) {
   const path = polygon.getPath()?.getArray?.() || [];
   const bounds = new window.google.maps.LatLngBounds();
@@ -263,9 +88,6 @@ function buildPolygonBounds(polygon) {
   return bounds;
 }
 
-/**
- * Analyze which logs are inside a shape (rectangle, polygon, circle)
- */
 function analyzeInside(type, overlay, logs, selectedMetric) {
   const gm = window.google.maps;
   const poly = gm.geometry?.poly;
@@ -299,9 +121,6 @@ function analyzeInside(type, overlay, logs, selectedMetric) {
   return { inside, stats: computeStats(vals) };
 }
 
-/**
- * Convert meters to degrees latitude/longitude.
- */
 function metersToDegLat(m) {
   return m / 111320;
 }
@@ -311,18 +130,12 @@ function metersToDegLng(m, lat) {
   return m / (metersPerDeg > 0 ? metersPerDeg : 111320);
 }
 
-/**
- * Get bounds of any shape.
- */
 function getShapeBounds(type, overlay) {
   if (type === "rectangle" || type === "circle") return overlay.getBounds();
   if (type === "polygon") return buildPolygonBounds(overlay);
   return null;
 }
 
-/**
- * Check whether a point lies within a shape.
- */
 function isPointInShape(type, overlay, point) {
   const gm = window.google.maps;
   if (type === "rectangle") return overlay.getBounds().contains(point);
@@ -336,14 +149,10 @@ function isPointInShape(type, overlay, point) {
 
 /**
  * ============================================================================
- * GRID PIXELATION WITH TIME SUPPORT
+ * GRID PIXELATION
  * ============================================================================
  */
 
-/**
- * Create a grid over the drawn shape and color cells by metric stats.
- * Now supports time-based filtering for each cell.
- */
 function pixelateShape(
   type,
   overlay,
@@ -352,9 +161,8 @@ function pixelateShape(
   thresholds,
   cellSizeMeters,
   map,
-  overlaysRef,
-  colorizeCells,
-  timeSettings = null
+  gridOverlaysRef,
+  colorizeCells
 ) {
   const gm = window.google.maps;
   const bounds = getShapeBounds(type, overlay);
@@ -372,12 +180,7 @@ function pixelateShape(
   const ne = bounds.getNorthEast();
   const south = sw.lat(), west = sw.lng(), north = ne.lat(), east = ne.lng();
 
-  // Apply time filter to logs first
-  const timeFilteredLogs = timeSettings?.timeFilterEnabled 
-    ? applyTimeFilter(logs, timeSettings)
-    : logs;
-
-  const preFilteredLogs = timeFilteredLogs
+  const preFilteredLogs = logs
     .map((l) => ({ log: l, pt: toLatLng(l) }))
     .filter((x) => x.pt && bounds.contains(x.pt));
 
@@ -420,11 +223,11 @@ function pixelateShape(
             : "#9ca3af";
           fillOpacity = 0.6;
         } else {
-          fillColor = "#808080"; // Gray for logs with no valid metric
+          fillColor = "#808080";
           fillOpacity = 0.3;
         }
       } else {
-        fillColor = "#808080"; // Gray for empty cells
+        fillColor = "#808080";
       }
 
       const rect = new gm.Rectangle({
@@ -438,7 +241,6 @@ function pixelateShape(
         zIndex: 50,
       });
 
-      // Add click listener to show cell info
       gm.event.addListener(rect, 'click', () => {
         console.log('Cell clicked:', {
           row: i,
@@ -450,10 +252,9 @@ function pixelateShape(
         });
       });
 
-      overlaysRef.current.push(rect);
+      gridOverlaysRef.push(rect);
       cellsDrawn++;
 
-      // Store cell data for analysis
       cellData.push({
         row: i,
         col: j,
@@ -483,9 +284,6 @@ function pixelateShape(
   };
 }
 
-/**
- * Serialize overlay to JSON
- */
 function serializeOverlay(type, overlay) {
   if (!overlay) return null;
 
@@ -544,19 +342,158 @@ export default function DrawingToolsLayer({
   onDrawingsChange,
   clearSignal = 0,
   colorizeCells = true,
-  // Time-based props
-  timeSettings = null,
-  onTimeAnalysis = null,
 }) {
   const managerRef = useRef(null);
-  const overlaysRef = useRef([]);
+  const shapesRef = useRef([]);
   const collectedDrawingRef = useRef([]);
+  const lastClearSignalRef = useRef(clearSignal);
+  const callbacksRef = useRef({ onSummary, onDrawingsChange });
 
+  // Update callbacks ref
   useEffect(() => {
-    if (!map || !enabled || managerRef.current) return;
+    callbacksRef.current = { onSummary, onDrawingsChange };
+  }, [onSummary, onDrawingsChange]);
+
+  /**
+   * Re-analyze a shape and update its grid
+   */
+  const reAnalyzeShape = useCallback((shapeObj) => {
+    const { type, overlay, id } = shapeObj;
+    const gm = window.google.maps;
+    
+    console.log('🔍 Analyzing shape:', id);
+    
+    // Clear existing grid overlays for this shape
+    if (shapeObj.gridOverlays && shapeObj.gridOverlays.length > 0) {
+      shapeObj.gridOverlays.forEach((rect) => rect?.setMap?.(null));
+      shapeObj.gridOverlays = [];
+    }
+
+    const allLogs = logs || [];
+    const geometry = serializeOverlay(type, overlay);
+    const { inside, stats } = analyzeInside(type, overlay, allLogs, selectedMetric);
+    
+    // Extract unique sessions
+    const uniqueSessionsMap = new Map();
+    inside.forEach((log) => {
+      const sessionKey = log.session_id;
+      if (sessionKey && !uniqueSessionsMap.has(sessionKey)) {
+        uniqueSessionsMap.set(sessionKey, log.session_id);
+      }
+    });
+    const uniqueSessions = Array.from(uniqueSessionsMap.values());
+    const uniqueSessionCount = uniqueSessions.length;
+
+    console.log("🔄 Shape analysis complete:", {
+      id,
+      total: inside.length,
+      sessions: uniqueSessionCount,
+    });
+    
+    // Calculate area
+    let areaInMeters = 0;
+    const spherical = gm.geometry?.spherical;
+    if (spherical) {
+      if (type === "polygon") {
+        areaInMeters = spherical.computeArea(overlay.getPath());
+      } else if (type === "rectangle") {
+        const b = overlay.getBounds();
+        const p = [
+          b.getNorthEast(),
+          new gm.LatLng(b.getNorthEast().lat(), b.getSouthWest().lng()),
+          b.getSouthWest(),
+          new gm.LatLng(b.getSouthWest().lat(), b.getNorthEast().lng())
+        ];
+        areaInMeters = spherical.computeArea(p);
+      } else if (type === "circle") {
+        areaInMeters = Math.PI * Math.pow(overlay.getRadius(), 2);
+      }
+    }
+
+    // Grid pixelation
+    let gridInfo = null;
+    if (pixelateRect) {
+      const gridResult = pixelateShape(
+        type,
+        overlay,
+        allLogs,
+        selectedMetric,
+        thresholds,
+        cellSizeMeters,
+        map,
+        shapeObj.gridOverlays,
+        colorizeCells
+      );
+      
+      const singleCellArea = cellSizeMeters * cellSizeMeters;
+      const totalGridAreaWithLogs = singleCellArea * gridResult.cellsWithLogs;
+      
+      gridInfo = {
+        cells: gridResult.cellsDrawn,
+        cellsWithLogs: gridResult.cellsWithLogs,
+        cellSizeMeters,
+        totalGridArea: totalGridAreaWithLogs,
+        gridRows: gridResult.gridRows,
+        gridCols: gridResult.gridCols,
+        cellData: gridResult.cellData,
+      };
+    }
+
+    // Update entry
+    const entry = {
+      id,
+      type,
+      geometry,
+      selectedMetric,
+      stats,
+      count: inside.length,
+      session: uniqueSessions,
+      sessionCount: uniqueSessionCount,
+      logs: inside,
+      grid: gridInfo,
+      createdAt: shapeObj.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      area: areaInMeters,
+      areaInSqKm: (areaInMeters / 1000000).toFixed(4),
+    };
+
+    // Update stored data
+    const existingIndex = collectedDrawingRef.current.findIndex(d => d.id === id);
+    if (existingIndex >= 0) {
+      collectedDrawingRef.current[existingIndex] = entry;
+    } else {
+      collectedDrawingRef.current.push(entry);
+    }
+
+    callbacksRef.current.onDrawingsChange?.([...collectedDrawingRef.current]);
+    callbacksRef.current.onSummary?.(entry);
+
+    return entry;
+  }, [logs, selectedMetric, thresholds, pixelateRect, cellSizeMeters, map, colorizeCells]);
+
+  // Main DrawingManager setup - ONLY recreate when map or enabled changes
+  useEffect(() => {
+    if (!map) return;
+
     const gm = window.google?.maps;
     if (!gm?.drawing?.DrawingManager) {
+      console.error('Drawing library not loaded.');
       toast.error('Drawing library not loaded.');
+      return;
+    }
+
+    console.log('🎨 Setting up DrawingManager, enabled:', enabled);
+
+    // Clean up existing manager if it exists
+    if (managerRef.current) {
+      console.log('🗑️ Cleaning up old DrawingManager');
+      managerRef.current.setMap(null);
+      managerRef.current = null;
+    }
+
+    // Only create new manager if enabled
+    if (!enabled) {
+      console.log('⏸️ Drawing disabled, not creating manager');
       return;
     }
 
@@ -568,21 +505,27 @@ export default function DrawingToolsLayer({
         drawingModes: ["rectangle", "polygon", "circle"],
       },
       polygonOptions: {
-        clickable: false,
+        clickable: true,
+        editable: true,
+        draggable: true,
         strokeWeight: 2,
         strokeColor: "#1d4ed8",
         fillColor: "#1d4ed8",
         fillOpacity: 0.08
       },
       rectangleOptions: {
-        clickable: false,
+        clickable: true,
+        editable: true,
+        draggable: true,
         strokeWeight: 2,
         strokeColor: "#1d4ed8",
         fillColor: "#1d4ed8",
         fillOpacity: 0.06
       },
       circleOptions: {
-        clickable: false,
+        clickable: true,
+        editable: true,
+        draggable: true,
         strokeWeight: 2,
         strokeColor: "#1d4ed8",
         fillColor: "#1d4ed8",
@@ -590,137 +533,78 @@ export default function DrawingToolsLayer({
       },
     });
     dm.setMap(map);
+    console.log('✅ DrawingManager created and attached to map');
 
     const handleComplete = (e) => {
+      console.log('✏️ Drawing completed:', e.type);
       const type = e.type;
       const overlay = e.overlay;
-      overlaysRef.current.push(overlay);
+      const shapeId = Date.now();
 
-      const allLogs = logs || [];
-      
-      // Apply time filter to logs before analysis
-      const timeFilteredLogs = timeSettings?.timeFilterEnabled 
-        ? applyTimeFilter(allLogs, timeSettings)
-        : allLogs;
-
-      const geometry = serializeOverlay(type, overlay);
-      const { inside, stats } = analyzeInside(type, overlay, timeFilteredLogs, selectedMetric);
-      
-      // Extract unique sessions
-      const uniqueSessionsMap = new Map();
-      inside.forEach((log) => {
-        const sessionKey = log.session_id;
-        if (sessionKey && !uniqueSessionsMap.has(sessionKey)) {
-          uniqueSessionsMap.set(sessionKey, log.session_id);
-        }
-      });
-      const uniqueSessions = Array.from(uniqueSessionsMap.values());
-      const uniqueSessionCount = uniqueSessions.length;
-
-      // Temporal analysis
-      const timeDistribution = getTimeDistribution(inside);
-      const temporalPatterns = analyzeTemporalPatterns(inside);
-
-      console.log("📍 Points inside shape:", {
-        total: inside.length,
-        sessions: uniqueSessionCount,
-        timeFiltered: timeSettings?.timeFilterEnabled,
-        distribution: timeDistribution
-      });
-      
-      // Calculate area
-      let areaInMeters = 0;
-      const spherical = gm.geometry?.spherical;
-      if (spherical) {
-        if (type === "polygon") {
-          areaInMeters = spherical.computeArea(overlay.getPath());
-        } else if (type === "rectangle") {
-          const b = overlay.getBounds();
-          const p = [
-            b.getNorthEast(),
-            new gm.LatLng(b.getNorthEast().lat(), b.getSouthWest().lng()),
-            b.getSouthWest(),
-            new gm.LatLng(b.getSouthWest().lat(), b.getNorthEast().lng())
-          ];
-          areaInMeters = spherical.computeArea(p);
-        } else if (type === "circle") {
-          areaInMeters = Math.PI * Math.pow(overlay.getRadius(), 2);
-        }
-      }
-
-      // Grid pixelation
-      let gridInfo = null;
-      if (pixelateRect) {
-        const gridResult = pixelateShape(
-          type,
-          overlay,
-          allLogs, // Pass all logs, filtering happens inside
-          selectedMetric,
-          thresholds,
-          cellSizeMeters,
-          map,
-          overlaysRef,
-          colorizeCells,
-          timeSettings
-        );
-        
-        const singleCellArea = cellSizeMeters * cellSizeMeters;
-        const totalGridAreaWithLogs = singleCellArea * gridResult.cellsWithLogs;
-        
-        gridInfo = {
-          cells: gridResult.cellsDrawn,
-          cellsWithLogs: gridResult.cellsWithLogs,
-          cellSizeMeters,
-          totalGridArea: totalGridAreaWithLogs,
-          gridRows: gridResult.gridRows,
-          gridCols: gridResult.gridCols,
-          cellData: gridResult.cellData,
-        };
-      }
-
-      // Create analysis entry
-      const entry = {
-        id: Date.now(),
+      // Create shape object to track
+      const shapeObj = {
+        id: shapeId,
         type,
-        geometry,
-        selectedMetric,
-        stats,
-        count: inside.length,
-        session: uniqueSessions,
-        sessionCount: uniqueSessionCount,
-        logs: inside,
-        grid: gridInfo,
+        overlay,
+        gridOverlays: [],
         createdAt: new Date().toISOString(),
-        area: areaInMeters,
-        areaInSqKm: (areaInMeters / 1000000).toFixed(4),
-        // Time-based data
-        timeFilter: timeSettings?.timeFilterEnabled ? {
-          mode: timeSettings.timeMode,
-          currentHour: timeSettings.currentHour,
-          timeRange: timeSettings.timeRange,
-          selectedDays: timeSettings.selectedDays,
-        } : null,
-        timeDistribution,
-        temporalPatterns: {
-          peakHour: temporalPatterns.peakHour,
-          peakDay: temporalPatterns.peakDay,
-          hourCounts: temporalPatterns.hourCounts,
-          dayCounts: temporalPatterns.dayCounts,
-        },
-        totalLogsBeforeTimeFilter: allLogs.length,
-        logsAfterTimeFilter: timeFilteredLogs.length,
-        logsInsideShape: inside.length,
       };
 
-      collectedDrawingRef.current.push(entry);
-      onDrawingsChange?.([...collectedDrawingRef.current]);
-      onSummary?.(entry);
-      onTimeAnalysis?.(entry.temporalPatterns);
-      
+      shapesRef.current.push(shapeObj);
+      console.log('📦 Shape added to shapesRef, total shapes:', shapesRef.current.length);
+
+      // Initial analysis
+      const entry = reAnalyzeShape(shapeObj);
+
+      // Add event listeners for shape changes
+      const listeners = [];
+
+      if (type === "polygon") {
+        const path = overlay.getPath();
+        listeners.push(
+          gm.event.addListener(path, 'set_at', () => {
+            console.log('🔧 Polygon vertex moved');
+            reAnalyzeShape(shapeObj);
+          })
+        );
+        listeners.push(
+          gm.event.addListener(path, 'insert_at', () => {
+            console.log('🔧 Polygon vertex added');
+            reAnalyzeShape(shapeObj);
+          })
+        );
+        listeners.push(
+          gm.event.addListener(path, 'remove_at', () => {
+            console.log('🔧 Polygon vertex removed');
+            reAnalyzeShape(shapeObj);
+          })
+        );
+      } else if (type === "rectangle") {
+        listeners.push(
+          gm.event.addListener(overlay, 'bounds_changed', () => {
+            console.log('🔧 Rectangle resized/moved');
+            reAnalyzeShape(shapeObj);
+          })
+        );
+      } else if (type === "circle") {
+        listeners.push(
+          gm.event.addListener(overlay, 'radius_changed', () => {
+            console.log('🔧 Circle radius changed');
+            reAnalyzeShape(shapeObj);
+          })
+        );
+        listeners.push(
+          gm.event.addListener(overlay, 'center_changed', () => {
+            console.log('🔧 Circle moved');
+            reAnalyzeShape(shapeObj);
+          })
+        );
+      }
+
+      shapeObj.listeners = listeners;
       dm.setDrawingMode(null);
 
-      // Show success toast
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} drawn: ${inside.length} logs found`, {
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} drawn: ${entry.count} logs found`, {
         position: "bottom-right",
         autoClose: 3000,
       });
@@ -730,61 +614,61 @@ export default function DrawingToolsLayer({
     managerRef.current = dm;
 
     return () => {
+      console.log('🧹 Cleanup DrawingManager effect');
       gm.event.removeListener(listener);
-      dm.setMap(null);
-      managerRef.current = null;
+      if (managerRef.current) {
+        managerRef.current.setMap(null);
+        managerRef.current = null;
+      }
     };
-  }, [
-    map,
-    enabled,
-    logs,
-    selectedMetric,
-    thresholds,
-    pixelateRect,
-    cellSizeMeters,
-    onSummary,
-    onDrawingsChange,
-    colorizeCells,
-    timeSettings,
-    onTimeAnalysis
-  ]);
+  }, [map, enabled, reAnalyzeShape]);
 
-  // Clear drawings effect
+  // Clear drawings effect - ONLY when clearSignal actually changes
   useEffect(() => {
-    if (!clearSignal) return;
+    // Skip if clearSignal hasn't changed or is 0
+    if (clearSignal === 0 || clearSignal === lastClearSignalRef.current) {
+      return;
+    }
+
+    console.log('🗑️ Clear signal detected:', clearSignal, 'previous:', lastClearSignalRef.current);
+    lastClearSignalRef.current = clearSignal;
     
-    overlaysRef.current.forEach((o) => o?.setMap?.(null));
-    overlaysRef.current = [];
+    // Clear all shapes and their event listeners
+    shapesRef.current.forEach((shapeObj) => {
+      // Remove event listeners
+      if (shapeObj.listeners) {
+        shapeObj.listeners.forEach(listener => {
+          window.google.maps.event.removeListener(listener);
+        });
+      }
+      // Remove shape from map
+      shapeObj.overlay?.setMap?.(null);
+      // Remove grid overlays
+      if (shapeObj.gridOverlays) {
+        shapeObj.gridOverlays.forEach((rect) => rect?.setMap?.(null));
+      }
+    });
+
+    shapesRef.current = [];
     collectedDrawingRef.current = [];
-    onDrawingsChange?.([]);
-    onSummary?.(null);
+    callbacksRef.current.onDrawingsChange?.([]);
+    callbacksRef.current.onSummary?.(null);
     
     toast.info('All drawings cleared', {
       position: "bottom-right",
       autoClose: 2000,
     });
-  }, [clearSignal, onDrawingsChange, onSummary]);
+  }, [clearSignal]);
 
-  // Re-render grid when time settings change
+  // Re-analyze all shapes when settings change
   useEffect(() => {
-    if (!timeSettings?.timeFilterEnabled || !pixelateRect) return;
-    if (collectedDrawingRef.current.length === 0) return;
+    if (shapesRef.current.length === 0) return;
 
-    // Get the last drawn shape
-    const lastDrawing = collectedDrawingRef.current[collectedDrawingRef.current.length - 1];
-    
-    // Clear only grid rectangles (keep the main shape)
-    const mainShapesCount = collectedDrawingRef.current.length;
-    const gridRectangles = overlaysRef.current.slice(mainShapesCount);
-    gridRectangles.forEach((rect) => rect?.setMap?.(null));
-    overlaysRef.current = overlaysRef.current.slice(0, mainShapesCount);
-
-    // Redraw grid with new time filter
-    // This would require storing the overlay reference, which we don't have here
-    // So this is a placeholder for future enhancement
-    console.log('Time settings changed, grid should be redrawn');
-    
-  }, [timeSettings, pixelateRect]);
+    console.log('⚙️ Settings changed, re-analyzing', shapesRef.current.length, 'shapes...');
+    shapesRef.current.forEach((shapeObj) => {
+      reAnalyzeShape(shapeObj);
+    });
+  }, [selectedMetric, thresholds, pixelateRect, cellSizeMeters, colorizeCells, reAnalyzeShape]);
 
   return null;
 }

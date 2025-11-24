@@ -3,6 +3,7 @@ import React, { useMemo, useCallback, memo, useState } from "react";
 import { X, RefreshCw, AlertTriangle, Layers, Filter, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Palette } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,8 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { PCI_COLOR_PALETTE } from "@/components/map/layers/MultiColorCirclesLayer";
-
 
 const PanelSection = memo(({ title, icon: Icon, children, className = "" }) => (
   <div className={`space-y-2 ${className}`}>
@@ -28,34 +27,6 @@ const PanelSection = memo(({ title, icon: Icon, children, className = "" }) => (
   </div>
 ));
 PanelSection.displayName = 'PanelSection';
-
-const PciColorSelector = memo(({ selectedColor, onColorChange, disabled }) => {
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs text-slate-300">PCI Color Scheme</Label>
-      <div className="grid grid-cols-5 gap-2 p-3 bg-slate-800 rounded-lg">
-        {PCI_COLOR_PALETTE.map((color, idx) => (
-          <button
-            key={idx}
-            onClick={() => !disabled && onColorChange?.(idx)}
-            disabled={disabled}
-            className={`w-8 h-8 rounded-full border-2 transition-all ${
-              selectedColor === idx 
-                ? 'border-white scale-110 shadow-lg' 
-                : 'border-slate-600 hover:border-slate-400'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            style={{ backgroundColor: color }}
-            title={`Color ${idx}`}
-          />
-        ))}
-      </div>
-      <div className="text-[10px] text-slate-400 text-center">
-        {PCI_COLOR_PALETTE.length} colors available for PCI values
-      </div>
-    </div>
-  );
-});
-PciColorSelector.displayName = 'PciColorSelector';
 
 const ToggleButton = memo(({ value, onChange, options, disabled, className = "" }) => (
   <div className={`flex rounded-lg overflow-hidden border border-slate-600 ${className} ${disabled ? 'opacity-50' : ''}`}>
@@ -77,7 +48,6 @@ const ToggleButton = memo(({ value, onChange, options, disabled, className = "" 
 ));
 ToggleButton.displayName = 'ToggleButton';
 
-// ✅ COMPACT: Minimal threshold input with +/- buttons
 const CompactThresholdInput = memo(({ value, onChange, min, max, step, disabled }) => {
   const [inputValue, setInputValue] = useState(String(value));
 
@@ -181,6 +151,11 @@ const UnifiedMapSidebar = ({
   setMetric,
   coverageHoleFilters,
   setCoverageHoleFilters,
+  dataFilters,
+  setDataFilters,
+  availableFilterOptions,
+   colorBy,           
+  setColorBy,
   ui,
   onUIChange,
   showPolygons,
@@ -210,8 +185,6 @@ const UnifiedMapSidebar = ({
     reloadData?.();
   }, [reloadData]);
 
-  const [selectedPciColor, setSelectedPciColor] = useState(0);
-
   const shouldShowMetricSelector = useMemo(
     () => enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction") || showPolygons,
     [enableDataToggle, enableSiteToggle, siteToggle, showPolygons]
@@ -227,7 +200,7 @@ const UnifiedMapSidebar = ({
     }));
   }, [setCoverageHoleFilters]);
 
-  const activeFiltersCount = useMemo(() => {
+  const activeCoverageFiltersCount = useMemo(() => {
     if (!coverageHoleFilters) return 0;
     return Object.values(coverageHoleFilters).filter(f => f.enabled).length;
   }, [coverageHoleFilters]);
@@ -240,6 +213,32 @@ const UnifiedMapSidebar = ({
     }));
   }, [setCoverageHoleFilters]);
 
+  // ✅ Data filter handlers
+ // ✅ UPDATED: Data filter handler
+const updateDataFilter = useCallback((filterType, value) => {
+  setDataFilters?.(prev => ({
+    ...prev,
+    [filterType]: value === "all" ? [] : [value] // Use "all" instead of empty string
+  }));
+}, [setDataFilters]);
+
+  const clearAllDataFilters = useCallback(() => {
+    setDataFilters?.({
+      providers: [],
+      bands: [],
+      technologies: []
+    });
+  }, [setDataFilters]);
+
+  const activeDataFiltersCount = useMemo(() => {
+    if (!dataFilters) return 0;
+    return (
+      (dataFilters.providers?.length > 0 ? 1 : 0) +
+      (dataFilters.bands?.length > 0 ? 1 : 0) +
+      (dataFilters.technologies?.length > 0 ? 1 : 0)
+    );
+  }, [dataFilters]);
+
   const siteToggleOptions = useMemo(
     () => [
       { value: "Cell", label: "Cell" },
@@ -248,6 +247,17 @@ const UnifiedMapSidebar = ({
     ],
     []
   );
+  const handleColorByChange = useCallback((value) => {
+  console.log('🎨 Layer Color changed to:', value, 'Type:', typeof value);
+  
+  if (value === "metric") {
+    console.log('  → Setting colorBy to NULL (use metric colors)');
+    setColorBy?.(null);
+  } else {
+    console.log('  → Setting colorBy to:', value);
+    setColorBy?.(value);
+  }
+}, [setColorBy]);
 
   const dataToggleOptions = useMemo(
     () => [
@@ -476,7 +486,6 @@ const UnifiedMapSidebar = ({
             </div>
           </PanelSection>
 
-          {/* ✅ SIMPLIFIED: Heatmap Layer (no collision features) */}
           <PanelSection title="Heatmap Layer" icon={Layers}>
             <div className="space-y-3">
               <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
@@ -511,58 +520,165 @@ const UnifiedMapSidebar = ({
                       </span>
                     </div>
                   </div>
-
-                 
                 </div>
               )}
             </div>
           </PanelSection>
 
+          {/* ✅ UPDATED: Metric Display with Simple Dropdowns */}
           {shouldShowMetricSelector && (
-            <PanelSection title="Metric Display">
-              <div>
-                <Label className="text-xs text-slate-300 mb-2 block">Select Metric</Label>
-                <Select value={metric} onValueChange={handleMetricChange}>
-                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white h-9">
-                    <SelectValue placeholder="Select metric..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rsrp">RSRP</SelectItem>
-                    <SelectItem value="rsrq">RSRQ</SelectItem>
-                    <SelectItem value="sinr">SINR</SelectItem>
-                    <SelectItem value="dl_thpt">DL Throughput</SelectItem>
-                    <SelectItem value="ul_thpt">UL Throughput</SelectItem>
-                    <SelectItem value="mos">MOS</SelectItem>
-                    <SelectItem value="lte_bler">LTE BLER</SelectItem>
-                    <SelectItem value="pci">PCI</SelectItem>
-                  </SelectContent>
-                </Select>
+            <PanelSection title="Metric & Filters">
+              <div className="space-y-3">
+                {/* Metric Selector */}
+                <div>
+                  <Label className="text-xs text-slate-300 mb-2 block">Select Metric</Label>
+                  <Select value={metric} onValueChange={handleMetricChange}>
+                    <SelectTrigger className="bg-slate-800 border-slate-700 text-white h-9">
+                      <SelectValue placeholder="Select metric..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rsrp">RSRP</SelectItem>
+                      <SelectItem value="rsrq">RSRQ</SelectItem>
+                      <SelectItem value="sinr">SINR</SelectItem>
+                      <SelectItem value="dl_thpt">DL Throughput</SelectItem>
+                      <SelectItem value="ul_thpt">UL Throughput</SelectItem>
+                      <SelectItem value="mos">MOS</SelectItem>
+                      <SelectItem value="lte_bler">LTE BLER</SelectItem>
+                      <SelectItem value="pci">PCI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-slate-700 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-xs text-slate-300">Data Filters</Label>
+                    {activeDataFiltersCount > 0 && (
+                      <button
+                        onClick={clearAllDataFilters}
+                        className="text-[10px] text-blue-400 hover:text-blue-300 underline"
+                      >
+                        Clear ({activeDataFiltersCount})
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Provider Dropdown */}
+               {/* Provider Dropdown */}
+<div>
+  <Label className="text-xs text-slate-300 mb-1.5 block">Provider</Label>
+  <Select 
+    value={dataFilters?.providers?.[0] || "all"} 
+    onValueChange={(value) => updateDataFilter('providers', value)}
+    disabled={!enableDataToggle}
+  >
+    <SelectTrigger className="bg-slate-800 border-slate-700 text-white h-9 text-xs">
+      <SelectValue placeholder="All Providers" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">All Providers</SelectItem>
+      {availableFilterOptions?.providers?.map((provider) => (
+        <SelectItem key={provider} value={provider}>
+          {provider}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+
+               {/* Band Dropdown */}
+<div>
+  <Label className="text-xs text-slate-300 mb-1.5 block">Band</Label>
+  <Select 
+    value={dataFilters?.bands?.[0] || "all"} 
+    onValueChange={(value) => updateDataFilter('bands', value)}
+    disabled={!enableDataToggle}
+  >
+    <SelectTrigger className="bg-slate-800 border-slate-700 text-white h-9 text-xs">
+      <SelectValue placeholder="All Bands" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">All Bands</SelectItem>
+      {availableFilterOptions?.bands?.map((band) => (
+        <SelectItem key={band} value={band}>
+          {band}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+
+                {/* Technology Dropdown */}
+<div>
+  <Label className="text-xs text-slate-300 mb-1.5 block">Technology</Label>
+  <Select 
+    value={dataFilters?.technologies?.[0] || "all"} 
+    onValueChange={(value) => updateDataFilter('technologies', value)}
+    disabled={!enableDataToggle}
+  >
+    <SelectTrigger className="bg-slate-800 border-slate-700 text-white h-9 text-xs">
+      <SelectValue placeholder="All Technologies" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">All Technologies</SelectItem>
+      {availableFilterOptions?.technologies?.map((tech) => (
+        <SelectItem key={tech} value={tech}>
+          {tech}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+
+                {/* Active Filters Indicator */}
+                {activeDataFiltersCount > 0 && (
+                  <div className="p-2 bg-blue-900/20 border border-blue-700 rounded text-xs">
+                    <div className="text-blue-300 font-medium">
+                      🔍 {activeDataFiltersCount} filter{activeDataFiltersCount > 1 ? 's' : ''} active
+                    </div>
+                  </div>
+                )}
               </div>
             </PanelSection>
           )}
 
-          {/* {shouldShowMetricSelector && metric === 'pci' && (
-  <PanelSection title="PCI Color Configuration" icon={Layers}>
-    <PciColorSelector
-      selectedColor={selectedPciColor}
-      onColorChange={setSelectedPciColor}
-      disabled={false}
-    />
-    <div className="mt-3 p-2 bg-blue-900/20 border border-blue-700 rounded text-xs">
-      <div className="text-blue-300 font-semibold mb-1">ℹ️ PCI Color Logic</div>
-      <div className="text-blue-200 text-[10px]">
-        Each unique PCI value is assigned a color from the palette. 
-        The same PCI will always use the same color across the map.
-      </div>
-    </div>
-  </PanelSection>
-)} */}
+            {shouldShowMetricSelector && (
+            <PanelSection title="Layer Color" icon={Palette}>
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 mb-2 block">
+                  Color Points  
+                </Label>
+                <Select 
+                  value={colorBy || "metric"} 
+                  onValueChange={handleColorByChange}
+                  disabled={!enableDataToggle}
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white h-9 text-xs">
+                    <SelectValue placeholder="Select color scheme..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="metric">  Metric Value</SelectItem>
+                    <SelectItem value="provider">  Provider</SelectItem>
+                    <SelectItem value="band">  band</SelectItem>
+                    <SelectItem value="technology">  technology</SelectItem>
+                  </SelectContent>
+                </Select>
 
-          {/* ✅ MINIMAL & COMPACT: Horizontal layout for coverage filters */}
+             
+
+                {!colorBy && (
+                  <div className="p-2 bg-slate-800 rounded text-xs text-slate-400">
+                    Points colored by selected metric value
+                  </div>
+                )}
+              </div>
+            </PanelSection>
+          )}
+          {/* Coverage Hole Filters */}
           {shouldShowMetricSelector && coverageHoleFilters && (
             <PanelSection title="Coverage Hole Filters" icon={Filter}>
               <div className="space-y-3">
-                {/* Quick Actions - More compact */}
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => toggleAllCoverageFilters(true)}
@@ -578,9 +694,7 @@ const UnifiedMapSidebar = ({
                   </button>
                 </div>
 
-                {/* ✅ HORIZONTAL LAYOUT: All three filters in grid */}
                 <div className="grid grid-cols-1 gap-2">
-                  {/* RSRP */}
                   <div className="flex items-center gap-2 p-2 bg-slate-800/50 rounded">
                     <input
                       type="checkbox"
@@ -602,7 +716,6 @@ const UnifiedMapSidebar = ({
                     </div>
                   </div>
 
-                  {/* RSRQ */}
                   <div className="flex items-center gap-2 p-2 bg-slate-800/50 rounded">
                     <input
                       type="checkbox"
@@ -624,7 +737,6 @@ const UnifiedMapSidebar = ({
                     </div>
                   </div>
 
-                  {/* SINR */}
                   <div className="flex items-center gap-2 p-2 bg-slate-800/50 rounded">
                     <input
                       type="checkbox"
@@ -647,13 +759,12 @@ const UnifiedMapSidebar = ({
                   </div>
                 </div>
 
-                {/* ✅ COMPACT: Active Filters Summary */}
-                {activeFiltersCount > 0 && (
+                {activeCoverageFiltersCount > 0 && (
                   <div className="p-2 bg-yellow-900/20 border border-yellow-700 rounded">
                     <div className="flex items-center gap-1.5 mb-1">
                       <AlertTriangle className="h-3 w-3 text-yellow-400 flex-shrink-0" />
                       <div className="font-semibold text-yellow-400 text-xs">
-                        {activeFiltersCount} Active Filter{activeFiltersCount > 1 ? 's' : ''}
+                        {activeCoverageFiltersCount} Active Filter{activeCoverageFiltersCount > 1 ? 's' : ''}
                       </div>
                     </div>
                     <div className="text-[10px] text-yellow-300 space-y-0.5">
@@ -673,7 +784,7 @@ const UnifiedMapSidebar = ({
                   </div>
                 )}
 
-                {activeFiltersCount === 0 && (
+                {activeCoverageFiltersCount === 0 && (
                   <div className="p-2 bg-slate-800 rounded text-[10px] text-slate-400 text-center">
                     Enable filters to identify coverage holes
                   </div>

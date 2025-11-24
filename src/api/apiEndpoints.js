@@ -11,8 +11,7 @@ import { pythonApi } from "./pythonApiService"; // Python Backend
 export const generalApi = {
   healthCheck: async () => {
     try {
-      const response = await pythonApi.get('/health');
-      return response;
+      return await pythonApi.get('/health');
     } catch (error) {
       console.error('Python backend health check failed:', error);
       throw error;
@@ -21,8 +20,7 @@ export const generalApi = {
 
   getInfo: async () => {
     try {
-      const response = await pythonApi.get('/');
-      return response;
+      return await pythonApi.get('/');
     } catch (error) {
       console.error('API Info Error:', error);
       throw error;
@@ -33,8 +31,7 @@ export const generalApi = {
 export const buildingApi = {
   generateBuildings: async (polygonData) => {
     try {
-      const response = await pythonApi.post('/api/buildings/generate', polygonData);
-      return response;
+      return await pythonApi.post('/api/buildings/generate', polygonData);
     } catch (error) {
       console.error('Building API Error:', error);
       throw error;
@@ -43,8 +40,7 @@ export const buildingApi = {
 
   saveBuildingsWithProject: async (data) => {
     try {
-      const response = await pythonApi.post('/api/buildings/save', data);
-      return response;
+      return await pythonApi.post('/api/buildings/save', data);
     } catch (error) {
       console.error('Save buildings error:', error);
       throw error;
@@ -53,8 +49,7 @@ export const buildingApi = {
 
   getProjectBuildings: async (projectId) => {
     try {
-      const response = await pythonApi.get(`/api/buildings/project/${projectId}`);
-      return response;
+      return await pythonApi.get(`/api/buildings/project/${projectId}`);
     } catch (error) {
       console.error('Get project buildings error:', error);
       throw error;
@@ -63,8 +58,7 @@ export const buildingApi = {
 
   healthCheck: async () => {
     try {
-      const response = await pythonApi.get('/api/buildings/health');
-      return response;
+      return await pythonApi.get('/api/buildings/health');
     } catch (error) {
       console.error('Building service health check failed:', error);
       throw error;
@@ -74,9 +68,7 @@ export const buildingApi = {
 
 export const cellSiteApi = {
   /**
-   * ============================================
-   * VERIFY PROJECT EXISTS (NEW)
-   * ============================================
+   * Verify project exists
    */
   verifyProject: async (projectId) => {
     try {
@@ -91,15 +83,13 @@ export const cellSiteApi = {
   },
 
   /**
-   * ============================================
-   * UPLOAD SITE FILE
-   * ============================================
+   * Upload site file with progress tracking
    */
-  uploadSite: async (formData) => {
+  uploadSite: async (formData, onUploadProgress = null) => {
     try {
       console.log('📤 Uploading site file...');
       
-      // Log FormData contents (for debugging)
+      // Log FormData contents
       for (let [key, value] of formData.entries()) {
         if (value instanceof File) {
           console.log(`  ${key}: ${value.name} (${value.size} bytes)`);
@@ -109,10 +99,13 @@ export const cellSiteApi = {
       }
 
       const response = await pythonApi.post('/api/process-and-save', formData, {
-        signal: AbortSignal.timeout(300000), // 5 minutes
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        timeout: 300000, // 5 minutes
+        onUploadProgress: onUploadProgress || ((progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          console.log(`Upload Progress: ${percentCompleted}%`);
+        }),
       });
 
       console.log('✅ Site upload response:', response);
@@ -120,12 +113,8 @@ export const cellSiteApi = {
     } catch (error) {
       console.error('❌ Cell Site upload error:', error);
       
-      // Provide more specific error messages
       if (error.code === 'ECONNABORTED') {
         throw new Error('Upload timed out. File may be too large.');
-      } else if (error.response) {
-        const errorMsg = error.response.data?.error || error.response.data?.message || 'Upload failed';
-        throw new Error(errorMsg);
       }
       
       throw error;
@@ -133,9 +122,7 @@ export const cellSiteApi = {
   },
 
   /**
-   * ============================================
-   * UPLOAD SESSIONS (NEW - was missing)
-   * ============================================
+   * Upload sessions
    */
   uploadSessions: async (payload) => {
     try {
@@ -144,31 +131,20 @@ export const cellSiteApi = {
 
       const response = await pythonApi.post('/api/cell-site/process-session', payload, {
         timeout: 300000, // 5 minutes
-        headers: {
-          'Content-Type': 'application/json',
-        },
       });
 
       console.log('✅ Session upload response:', response);
       return response;
     } catch (error) {
       console.error('❌ Session upload error:', error);
-      
-      if (error.response?.data) {
-        const errorMsg = error.response.data.error || error.response.data.message || 'Session upload failed';
-        throw new Error(errorMsg);
-      }
-      
       throw error;
     }
   },
 
   /**
-   * ============================================
-   * GET SITE DATA BY PROJECT
-   * ============================================
+   * Get site data by project with cancellation support
    */
-  siteNoml: async (projectId, signal = null) => {
+  siteNoml: async (projectId, cancelToken = null) => {
     try {
       console.log(`🔍 Fetching SiteNoMl data for project ${projectId}...`);
       
@@ -176,8 +152,8 @@ export const cellSiteApi = {
         timeout: 30000, // 30 seconds
       };
       
-      if (signal) {
-        config.signal = signal;
+      if (cancelToken) {
+        config.cancelToken = cancelToken;
       }
       
       const response = await pythonApi.get(
@@ -188,9 +164,15 @@ export const cellSiteApi = {
       console.log(`✅ Retrieved ${response.count || 0} sites for project ${projectId}`);
       return response;
     } catch (error) {
+      // Handle cancellation
+      if (axios.isCancel(error)) {
+        console.log('Request canceled:', error.message);
+        return null;
+      }
+      
       console.error('❌ siteNoml error:', error);
       
-      // Return empty data instead of throwing for 404
+      // Return empty data for 404
       if (error.response?.status === 404) {
         console.warn(`⚠️ No site data found for project ${projectId}`);
         return {
@@ -207,9 +189,7 @@ export const cellSiteApi = {
   },
 
   /**
-   * ============================================
-   * UPDATE PROJECT ID FOR EXISTING PREDICTION
-   * ============================================
+   * Update project ID
    */
   updateProjectId: async (filename, projectId) => {
     try {
@@ -229,9 +209,7 @@ export const cellSiteApi = {
   },
 
   /**
-   * ============================================
-   * GET PROJECT CELL SITES
-   * ============================================
+   * Get project cell sites
    */
   getProjectCellSites: async (projectId) => {
     try {
@@ -245,7 +223,9 @@ export const cellSiteApi = {
     }
   },
 
-  
+  /**
+   * Download file (opens in new tab)
+   */
   downloadFile: (outputDir, filename) => {
     const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:8080";
     const url = `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`;
@@ -253,20 +233,22 @@ export const cellSiteApi = {
     window.open(url, '_blank');
   },
 
+  /**
+   * Download file as blob using axios
+   */
   downloadFileBlob: async (outputDir, filename) => {
     try {
-      const baseUrl = import.meta.env.VITE_PYTHON_API_URL || "http://localhost:8080";
-      const url = `${baseUrl}/api/cell-site/download/${outputDir}/${filename}`;
+      console.log('📥 Downloading file as blob...');
       
-      console.log('📥 Downloading file as blob:', url);
-      
-      const response = await fetch(url);
+      const response = await pythonApi.get(
+        `/api/cell-site/download/${outputDir}/${filename}`,
+        {
+          responseType: 'blob', // Important for file downloads
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.statusText}`);
-      }
-
-      const blob = await response.blob();
+      // Create download link
+      const blob = new Blob([response]);
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -285,14 +267,11 @@ export const cellSiteApi = {
   },
 
   /**
-   * ============================================
-   * LIST OUTPUT FILES
-   * ============================================
+   * List output files
    */
   listOutputs: async (outputDir) => {
     try {
-      const response = await pythonApi.get(`/api/cell-site/outputs/${outputDir}`);
-      return response;
+      return await pythonApi.get(`/api/cell-site/outputs/${outputDir}`);
     } catch (error) {
       console.error('❌ List outputs error:', error);
       throw error;
@@ -300,14 +279,11 @@ export const cellSiteApi = {
   },
 
   /**
-   * ============================================
-   * HEALTH CHECK
-   * ============================================
+   * Health check
    */
   healthCheck: async () => {
     try {
-      const response = await pythonApi.get('/api/cell-site/health');
-      return response;
+      return await pythonApi.get('/api/cell-site/health');
     } catch (error) {
       console.error('Cell Site health check failed:', error);
       throw error;
@@ -333,7 +309,9 @@ export const adminApi = {
   getAllUsers: (filters) => api.post("/Admin/GetAllUsers", filters),
   
   getAppValue: (startDate, endDate) => 
-    api.get(`/Admin/AppQualityFlatV2?from=${startDate}&to=${endDate}`),
+    api.get("/Admin/AppQualityFlatV2", { 
+      params: { from: startDate, to: endDate } 
+    }),
 
   getNetworkDurations: async (startDate, endDate) => {
     const formatDateLocal = (d) => {
@@ -348,11 +326,11 @@ export const adminApi = {
 
     if (!from || !to) throw new Error("Invalid date range");
 
-    const url = `/Admin/GetNetworkDurations?fromDate=${encodeURIComponent(from)}&toDate=${encodeURIComponent(to)}`;
-
     try {
-      console.log("✅ Network durations URL:", url);
-      const response = await api.get(url);
+      console.log("✅ Fetching network durations...");
+      const response = await api.get("/Admin/GetNetworkDurations", {
+        params: { fromDate: from, toDate: to }
+      });
       console.log("✅ Network durations response:", response);
       return response;
     } catch (err) {
@@ -414,7 +392,9 @@ export const mapViewApi = {
 
   // ==================== Polygon Management ====================
   getProjectPolygons: (projectId) =>
-    api.get(`/api/MapView/GetProjectPolygons?projectId=${projectId}`),
+    api.get("/api/MapView/GetProjectPolygons", { 
+      params: { projectId } 
+    }),
   
   getProjectPolygonsV2: (projectId, source = 'map') =>
     api.get("/api/MapView/GetProjectPolygonsV2", { 
@@ -453,7 +433,6 @@ export const mapViewApi = {
   
   /**
    * Create project with polygons and sessions
-   * @param {Object} payload - { ProjectName, PolygonIds, SessionIds }
    */
   createProjectWithPolygons: async (payload) => {
     try {
@@ -507,7 +486,9 @@ export const mapViewApi = {
   logNetwork: (data) => api.post("/api/MapView/log_networkAsync", data),
 
   getNeighbours: (session) => 
-    api.get(`/api/MapView/GetNeighboursForPrimary?sessionId=${session}`),
+    api.get("/api/MapView/GetNeighboursForPrimary", { 
+      params: { sessionId: session } 
+    }),
 
   // ==================== Filter Options ====================
   getProviders: () => api.get("/api/MapView/GetProviders"),
@@ -566,7 +547,15 @@ export const settingApi = {
 };
 
 export const excelApi = {
-  uploadFile: (formData) => api.post("/ExcelUpload/UploadExcelFile", formData),
+  uploadFile: (formData, onUploadProgress = null) => 
+    api.post("/ExcelUpload/UploadExcelFile", formData, {
+      onUploadProgress: onUploadProgress || ((progressEvent) => {
+        const percentCompleted = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total
+        );
+        console.log(`Upload Progress: ${percentCompleted}%`);
+      }),
+    }),
   
   downloadTemplate: (fileType) => {
     const url = `https://signaltrackers-1.onrender.com/ExcelUpload/DownloadExcel?fileType=${fileType}`;
@@ -576,7 +565,9 @@ export const excelApi = {
   },
   
   getUploadedFiles: (type) =>
-    api.get(`/ExcelUpload/GetUploadedExcelFiles`, { params: { FileType: type } }),
+    api.get("/ExcelUpload/GetUploadedExcelFiles", { 
+      params: { FileType: type } 
+    }),
     
   getSessions: (fromDate, toDate) =>
     api.get("/ExcelUpload/GetSessions", {
@@ -628,13 +619,7 @@ export const validateProjectExists = async (projectId) => {
   try {
     if (!projectId) return false;
     
-    // Check Python backend
     const pythonCheck = await cellSiteApi.verifyProject(projectId);
-    
-    // Optionally check C# backend too
-    // const csharpCheck = await mapViewApi.getProjects();
-    // const projectExists = csharpCheck.some(p => p.id === projectId);
-    
     return pythonCheck.exists === true;
   } catch (error) {
     console.error('Project validation error:', error);

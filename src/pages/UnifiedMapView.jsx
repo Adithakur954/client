@@ -20,9 +20,9 @@ import NetworkPlannerMap from "@/components/unifiedMap/NetworkPlannerMap";
 import { useSiteData } from "@/hooks/useSiteData";
 import UnifiedHeader from "@/components/unifiedMap/unifiedMapHeader";
 import UnifiedDetailLogs from "@/components/unifiedMap/UnifiedDetailLogs";
-import MapLegend from "@/components/MapLegend";
+import MapLegend from "@/components/map/MapLegend";
 import { useNeighborCollisions } from '@/hooks/useNeighborCollisions';
-import NeighborHeatmapLayer from '@/components/unifiedMap/NeighborCollisionLayer'; // ✅ Renamed import
+import NeighborHeatmapLayer from '@/components/unifiedMap/NeighborCollisionLayer';
 
 const defaultThresholds = {
   rsrp: [],
@@ -36,11 +36,16 @@ const defaultThresholds = {
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
-// ✅ Default coverage hole filter values
 const DEFAULT_COVERAGE_FILTERS = {
   rsrp: { enabled: false, threshold: -110 },
   rsrq: { enabled: false, threshold: -15 },
   sinr: { enabled: false, threshold: 0 }
+};
+
+const DEFAULT_DATA_FILTERS = {
+  providers: [],
+  bands: [],
+  technologies: [],
 };
 
 function debounce(func, wait) {
@@ -146,19 +151,6 @@ const isPointInPolygon = (point, polygon) => {
   return inside;
 };
 
-function canonicalOperatorName(raw) {
-  if (!raw && raw !== 0) return "Unknown";
-  let s = String(raw).trim();
-  s = s.replace(/^IND[-\s]*/i, "");
-  const lower = s.toLowerCase();
-  if (lower === "//////" || lower === "404011") return "Unknown";
-  if (lower.includes("jio")) return "JIO";
-  if (lower.includes("airtel")) return "Airtel";
-  if (lower.includes("vodafone") || lower.startsWith("vi"))
-    return "Vi (Vodafone Idea)";
-  return s;
-}
-
 function getColorFromValue(value, thresholds) {
   if (!thresholds || thresholds.length === 0) return "#999999";
 
@@ -183,7 +175,6 @@ const UnifiedMapView = () => {
   const [polygons, setPolygons] = useState([]);
 
   const [isSideOpen, setIsSideOpen] = useState(false);
-  const [isLeftOpen, setIsLeftOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState("rsrp");
   const [ui, setUi] = useState({ basemapStyle: "roadmap" });
@@ -204,11 +195,10 @@ const UnifiedMapView = () => {
   const [showSiteSectors, setShowSiteSectors] = useState(true);
   const [appSummary, setAppSummary] = useState({});
   const [logArea, setLogArea] = useState(null);
+  const [colorBy, setColorBy] = useState(null);
 
-  // ✅ Multi-metric coverage hole filters
   const [coverageHoleFilters, setCoverageHoleFilters] = useState(DEFAULT_COVERAGE_FILTERS);
-
-  // ✅ Simplified: Only showNeighbors state (removed collision-related states)
+  const [dataFilters, setDataFilters] = useState(DEFAULT_DATA_FILTERS);
   const [showNeighbors, setShowNeighbors] = useState(false);
 
   const projectId = useMemo(() => {
@@ -245,7 +235,6 @@ const UnifiedMapView = () => {
     autoFetch: true,
   });
 
-  // ✅ Simplified hook usage - only extract what we need
   const {
     allNeighbors,
     stats: neighborStats,
@@ -283,7 +272,7 @@ const UnifiedMapView = () => {
     loadThresholds();
   }, []);
 
-  // ✅ Load coverage hole thresholds
+  // Load coverage hole thresholds
   useEffect(() => {
     const loadCoverageThresholds = async () => {
       try {
@@ -306,9 +295,7 @@ const UnifiedMapView = () => {
 
   // Fetch polygons
   const fetchPolygons = useCallback(async () => {
-    if (!projectId) {
-      return;
-    }
+    if (!projectId) return;
 
     try {
       const res = await mapViewApi.getProjectPolygonsV2(
@@ -427,12 +414,11 @@ const UnifiedMapView = () => {
         });
       }
 
-      // ✅ Extract app_summary
+      // Extract app_summary
       const allAppSummaries = {};
       
       successfulSessions.forEach(({ sessionId, data }) => {
         if (data?.app_summary) {
-          console.log(data);
           allAppSummaries[sessionId] = data.app_summary;
         }
       });
@@ -443,19 +429,18 @@ const UnifiedMapView = () => {
 
       successfulSessions.forEach(({ sessionId, data }) => {
         if(data?.io_summary){
-          console.log(data?.io_summary)
           indoorMode[sessionId] = data.io_summary;
         }
-        })
+      })
 
-        setLogArea(indoorMode);
+      setLogArea(indoorMode);
 
-      // ✅ Extract location data
+      // Extract location data
       const allLogs = successfulSessions.flatMap(({ data }) => {
         if (Array.isArray(data)) return data;
         if (data?.data && Array.isArray(data.data)) return data.data;
         if (data?.Data && Array.isArray(data.Data)) return data.Data;
-        console.warn(' Unexpected response format:', data);
+        console.warn('⚠️ Unexpected response format:', data);
         return [];
       });
 
@@ -476,6 +461,11 @@ const UnifiedMapView = () => {
               return null;
             }
 
+            // ✅ Convert to strings and handle undefined/null values
+            const provider = String(log.provider || '').trim();
+            const technology = String(log.network || log.technology || '').trim();
+            const band = String(log.band || '').trim();
+
             return {
               lat,
               lng,
@@ -488,14 +478,19 @@ const UnifiedMapView = () => {
               ul_thpt: log.ul_thpt ?? log.ul_tpt ?? log.UL,
               mos: log.mos ?? log.MOS,
               lte_bler: log.lte_bler ?? log.LTE_BLER,
-              operator:log.provider,
-              technology: log.network,
-              provider: log.provider,
-              band: log.band,
+              operator: provider,
+              technology: technology,
+              provider: provider,
+              band: band,
               jitter: log.jitter,
               pci: log.pci,
               speed: log.speed,
-              nodebid: log.nodeb_id,
+              nodebid: log.nodeb_id ?? log.nodebid,
+              nodeb_id: log.nodeb_id ?? log.nodebid,
+              apps: log.apps ?? log.app_name ?? "",
+              mode: log.mode,
+              radio: log.radio,
+              latency: log.latency,
             };
           })
           .filter(Boolean);
@@ -530,7 +525,7 @@ const UnifiedMapView = () => {
 
     try {
       const res = await mapViewApi.getPredictionLog({
-        projectId,
+        projectId: Number(projectId),
         metric: String(selectedMetric).toUpperCase(),
       });
 
@@ -560,6 +555,7 @@ const UnifiedMapView = () => {
 
         toast.success(`${formatted.length} prediction points loaded`);
       } else {
+        console.log("❌ Prediction data fetch failed:", projectId, res);
         toast.error(res?.Message || "No prediction data available");
         setLocations([]);
       }
@@ -694,7 +690,6 @@ const UnifiedMapView = () => {
     });
   }, []);
 
-  // ✅ Simplified neighbor click handler (no collision info)
   const handleNeighborClick = useCallback((neighbor) => {
     toast.info(
       `PCI ${neighbor.pci} - Cell: ${neighbor.id}\n${selectedMetric.toUpperCase()}: ${neighbor[selectedMetric]}`,
@@ -702,7 +697,6 @@ const UnifiedMapView = () => {
     );
   }, [selectedMetric]);
 
-  
   const effectiveThresholds = useMemo(() => {
     const usePredictionColors =
       (enableSiteToggle && siteToggle === "sites-prediction") ||
@@ -733,6 +727,45 @@ const UnifiedMapView = () => {
     thresholds,
     selectedMetric,
   ]);
+
+  // ✅ Extract unique filter options from locations
+  const availableFilterOptions = useMemo(() => {
+    if (locations.length === 0) {
+      return {
+        providers: [],
+        bands: [],
+        technologies: []
+      };
+    }
+
+    const providersSet = new Set();
+    const bandsSet = new Set();
+    const technologiesSet = new Set();
+
+    locations.forEach(loc => {
+      const provider = String(loc.provider || '').trim();
+      const band = String(loc.band || '').trim();
+      const technology = String(loc.technology || '').trim();
+      
+      if (provider) providersSet.add(provider);
+      if (band) bandsSet.add(band);
+      if (technology) technologiesSet.add(technology);
+    });
+
+    const result = {
+      providers: Array.from(providersSet).sort(),
+      bands: Array.from(bandsSet).sort((a, b) => {
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return String(a).localeCompare(String(b));
+      }),
+      technologies: Array.from(technologiesSet).sort()
+    };
+
+    console.log('📊 Available filter options:', result);
+    return result;
+  }, [locations]);
 
   const polygonsWithColors = useMemo(() => {
     if (
@@ -803,9 +836,11 @@ const UnifiedMapView = () => {
     effectiveThresholds,
   ]);
 
+  // ✅ Filter locations with coverage and data filters
   const filteredLocations = useMemo(() => {
     let result = locations;
 
+    // Apply coverage hole filters
     const activeFilters = Object.entries(coverageHoleFilters).filter(
       ([_, config]) => config.enabled
     );
@@ -825,35 +860,75 @@ const UnifiedMapView = () => {
         });
       });
 
-      if (result.length > 0) {
+      if (result.length > 0 && beforeCount !== result.length) {
         const filterDescriptions = activeFilters.map(
           ([metric, config]) => `${metric.toUpperCase()} < ${config.threshold}`
         );
         
-        toast.info(
-          ` ${result.length} coverage hole(s) found:\n${filterDescriptions.join(' AND ')}`,
-          { autoClose: 4000 }
-        );
-      } else if (beforeCount > 0) {
-        toast.warn(
-          `No coverage holes found matching all filter criteria`,
-          { autoClose: 3000 }
+        console.log(
+          `🔍 ${result.length} coverage hole(s) found: ${filterDescriptions.join(' AND ')}`
         );
       }
     }
 
+    // ✅ Apply provider filter with string comparison
+    if (dataFilters.providers && dataFilters.providers.length > 0) {
+      const beforeCount = result.length;
+      result = result.filter(loc => {
+        const provider = String(loc.provider || '').trim();
+        const match = dataFilters.providers.includes(provider);
+        return match;
+      });
+      console.log(`🔍 Provider filter: ${beforeCount} → ${result.length} (filter: ${dataFilters.providers.join(', ')})`);
+    }
+
+    // ✅ Apply band filter with string comparison
+    if (dataFilters.bands && dataFilters.bands.length > 0) {
+      const beforeCount = result.length;
+      result = result.filter(loc => {
+        const band = String(loc.band || '').trim();
+        const match = dataFilters.bands.includes(band);
+        return match;
+      });
+      console.log(`🔍 Band filter: ${beforeCount} → ${result.length} (filter: ${dataFilters.bands.join(', ')})`);
+    }
+
+    // ✅ Apply technology filter with string comparison
+    if (dataFilters.technologies && dataFilters.technologies.length > 0) {
+      const beforeCount = result.length;
+      result = result.filter(loc => {
+        const technology = String(loc.technology || '').trim();
+        const match = dataFilters.technologies.includes(technology);
+        return match;
+      });
+      console.log(`🔍 Technology filter: ${beforeCount} → ${result.length} (filter: ${dataFilters.technologies.join(', ')})`);
+    }
+
     if (onlyInsidePolygons && showPolygons && polygons.length > 0) {
-      return [];
+      result = result.filter((point) => 
+        polygons.some((poly) => isPointInPolygon(point, poly))
+      );
     }
 
     return result;
   }, [
     locations,
     coverageHoleFilters,
+    dataFilters,
     onlyInsidePolygons,
     showPolygons,
-    polygons.length,
+    polygons,
   ]);
+
+  // ✅ Debug effect to log filter state
+  useEffect(() => {
+    if (dataFilters.bands?.length > 0 || dataFilters.technologies?.length > 0 || dataFilters.providers?.length > 0) {
+      console.log('🔍 Active Data Filters:', dataFilters);
+      console.log('📊 Sample location:', locations[0]);
+      console.log('📊 Available options:', availableFilterOptions);
+      console.log('📊 Filtered count:', filteredLocations.length, '/', locations.length);
+    }
+  }, [dataFilters, filteredLocations.length, locations.length, availableFilterOptions]);
 
   const activeCoverageFiltersCount = useMemo(() => {
     return Object.values(coverageHoleFilters).filter(f => f.enabled).length;
@@ -866,6 +941,14 @@ const UnifiedMapView = () => {
     
     return active.join(', ');
   }, [coverageHoleFilters]);
+
+  const activeDataFiltersCount = useMemo(() => {
+    return (
+      (dataFilters.providers?.length > 0 ? 1 : 0) +
+      (dataFilters.bands?.length > 0 ? 1 : 0) +
+      (dataFilters.technologies?.length > 0 ? 1 : 0)
+    );
+  }, [dataFilters]);
 
   // Visible polygons calculation
   const visiblePolygons = useMemo(() => {
@@ -917,6 +1000,11 @@ const UnifiedMapView = () => {
   const showDataCircles =
     enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction");
 
+  // Determine if legend should show
+  const shouldShowLegend = useMemo(() => {
+    return enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction");
+  }, [enableDataToggle, enableSiteToggle, siteToggle]);
+
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -938,7 +1026,7 @@ const UnifiedMapView = () => {
       <UnifiedHeader
         onToggleControls={() => setIsSideOpen(!isSideOpen)}
         onLeftToggle={() => setShowAnalytics(!showAnalytics)}
-        isLeftOpen={isLeftOpen}
+        isLeftOpen={false}
         isControlsOpen={isSideOpen}
         showAnalytics={showAnalytics}
         projectId={projectId}
@@ -976,7 +1064,6 @@ const UnifiedMapView = () => {
         />
       )}
 
-      
       <UnifiedMapSidebar
         open={isSideOpen}
         onOpenChange={setIsSideOpen}
@@ -994,6 +1081,11 @@ const UnifiedMapView = () => {
         setMetric={setSelectedMetric}
         coverageHoleFilters={coverageHoleFilters}
         setCoverageHoleFilters={setCoverageHoleFilters}
+        dataFilters={dataFilters}
+        setDataFilters={setDataFilters}
+        availableFilterOptions={availableFilterOptions}
+        colorBy={colorBy}
+        setColorBy={setColorBy}
         ui={ui}
         onUIChange={handleUIChange}
         showPolygons={showPolygons}
@@ -1015,7 +1107,7 @@ const UnifiedMapView = () => {
       />
 
       <div className="flex-grow rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden relative">
-        {/* ✅ Updated Info Panel - removed collision info */}
+        {/* Info Panel */}
         <div className="absolute bottom-2 left-2 z-10 bg-white/90 dark:bg-gray-800/90 p-2 px-3 rounded text-xs text-gray-700 dark:text-gray-300 shadow-lg space-y-1 max-w-xs">
           {enableDataToggle && (
             <div className="font-semibold">
@@ -1046,6 +1138,23 @@ const UnifiedMapView = () => {
             </div>
           )}
 
+          {activeDataFiltersCount > 0 && (
+            <div className="text-blue-600 dark:text-blue-400 font-semibold">
+              🔍 Data Filters ({activeDataFiltersCount} active)
+              <div className="text-xs text-blue-500 dark:text-blue-300 mt-0.5">
+                {dataFilters.providers?.length > 0 && (
+                  <div>Providers: {dataFilters.providers.join(', ')}</div>
+                )}
+                {dataFilters.bands?.length > 0 && (
+                  <div>Bands: {dataFilters.bands.join(', ')}</div>
+                )}
+                {dataFilters.technologies?.length > 0 && (
+                  <div>Tech: {dataFilters.technologies.join(', ')}</div>
+                )}
+              </div>
+            </div>
+          )}
+
           {showPolygons && polygons.length > 0 && (
             <div className="text-blue-600 dark:text-blue-400 font-semibold">
               📐 {polygons.length} Polygons ({polygonSource})
@@ -1059,7 +1168,6 @@ const UnifiedMapView = () => {
             </div>
           )}
 
-          {/* ✅ Simplified neighbor stats - no collision info */}
           {showNeighbors && neighborStats && neighborStats.total > 0 && (
             <div className="text-blue-600 dark:text-blue-400 font-semibold">
               📡 {neighborStats.total} Neighbor Cells
@@ -1069,6 +1177,24 @@ const UnifiedMapView = () => {
             </div>
           )}
         </div>
+
+        {/* MAP LEGEND */}
+        {shouldShowLegend && (
+          <div >
+            <div className="pointer-events-auto">
+              <MapLegend
+                thresholds={effectiveThresholds}
+                selectedMetric={selectedMetric}
+                colorBy={colorBy}
+                showOperators={colorBy === 'provider'}
+                showBands={colorBy === 'band'}
+                showTechnologies={colorBy === 'technology'}
+                showSignalQuality={!colorBy || colorBy === 'metric'}
+                availableFilterOptions={availableFilterOptions}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Map Container */}
         <div className="relative h-full w-full">
@@ -1094,6 +1220,7 @@ const UnifiedMapView = () => {
               locations={showDataCircles ? filteredLocations : []}
               thresholds={effectiveThresholds}
               selectedMetric={selectedMetric}
+              colorBy={colorBy}
               activeMarkerIndex={null}
               onMarkerClick={() => {}}
               options={mapOptions}
@@ -1152,11 +1279,6 @@ const UnifiedMapView = () => {
                 />
               )}
 
-              {enableSiteToggle && showSiteSectors && (
-                <MapLegend showOperators={true} showSignalQuality={false} />
-              )}
-
-              {/* ✅ Simplified Neighbor Heatmap Layer */}
               {showNeighbors && allNeighbors && allNeighbors.length > 0 && (
                 <NeighborHeatmapLayer
                   allNeighbors={allNeighbors}

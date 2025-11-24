@@ -1,5 +1,6 @@
-import useSWR from 'swr';
-import { useMemo, useCallback } from 'react';
+// src/hooks/useDashboardData.js
+import useSWR, { useSWRConfig } from 'swr';
+import { useMemo, useCallback, useRef, useEffect } from 'react';
 import { adminApi } from '../api/apiEndpoints';
 import { 
   buildQueryString, 
@@ -11,57 +12,159 @@ import {
 } from '../utils/dashboardUtils';
 
 // ============================================
-// SWR GLOBAL CONFIG
+// DEBUG MODE CONTROL
+// ============================================
+const DEBUG_MODE = true; // ✅ Set to false to disable all logging
+
+const log = (emoji, label, data) => {
+  if (DEBUG_MODE) {
+    console.log(`${emoji} [${label}]`, data);
+  }
+};
+
+const logGroup = (label, callback) => {
+  if (DEBUG_MODE) {
+    console.group(`📦 ${label}`);
+    callback();
+    console.groupEnd();
+  }
+};
+
+// ============================================
+// OPTIMIZED SWR CONFIG
 // ============================================
 const SWR_CONFIG = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
+  revalidateOnMount: true,
   shouldRetryOnError: true,
-  errorRetryCount: 3,
-  errorRetryInterval: 5000,
-  dedupingInterval: 2000, // Prevent duplicate requests within 2s
+  errorRetryCount: 2,
+  errorRetryInterval: 2000,
+  dedupingInterval: 1000,
   focusThrottleInterval: 5000,
+  loadingTimeout: 5000,
+  onLoadingSlow: (key) => {
+    console.warn(`⏱️ Slow loading (>5s): ${key}`);
+  },
+  onError: (error, key) => {
+    console.error(`❌ SWR Error [${key}]:`, error?.message || error);
+  },
+  onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+    if (error?.response?.status === 500) {
+      console.error(`🚫 Not retrying 500 error for ${key}`);
+      return;
+    }
+    
+    if (retryCount >= 2) return;
+    
+    setTimeout(() => revalidate({ retryCount }), 2000 * (retryCount + 1));
+  },
 };
 
 const CACHE_TIME = {
-  SHORT: 2 * 60 * 1000,   // 2 min
-  MEDIUM: 5 * 60 * 1000,  // 5 min
-  LONG: 15 * 60 * 1000,   // 15 min
+  SHORT: 1 * 60 * 1000,
+  MEDIUM: 3 * 60 * 1000,
+  LONG: 10 * 60 * 1000,
 };
 
 // ============================================
-// HELPER: Stable Cache Key Generation
+// IMPROVED CACHE KEY GENERATION
 // ============================================
 const createCacheKey = (base, filters) => {
   if (!filters) return base;
   
-  // Sort keys for stable cache key
-  const sortedFilters = Object.keys(filters)
+  const normalizedFilters = Object.keys(filters)
     .sort()
     .reduce((acc, key) => {
-      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
-        acc[key] = filters[key];
+      const value = filters[key];
+      
+      if (value === undefined || value === null || value === '') {
+        return acc;
       }
+      
+      if (value instanceof Date) {
+        acc[key] = value.toISOString();
+      } else if (Array.isArray(value)) {
+        acc[key] = value.sort().join(',');
+      } else if (typeof value === 'object') {
+        acc[key] = JSON.stringify(value);
+      } else {
+        acc[key] = value;
+      }
+      
       return acc;
     }, {});
   
-  return Object.keys(sortedFilters).length > 0
-    ? [base, JSON.stringify(sortedFilters)]
-    : base;
+  const hasFilters = Object.keys(normalizedFilters).length > 0;
+  const key = hasFilters ? `${base}::${JSON.stringify(normalizedFilters)}` : base;
+  
+  log('🔑', 'Cache Key Generated', { base, filters: normalizedFilters, key });
+  
+  return key;
 };
 
 // ============================================
-// SAFE API WRAPPER with Error Handling
+// IMPROVED SAFE FETCH WITH TIMEOUT
 // ============================================
-const safeFetch = async (apiFn, fallback = []) => {
+const safeFetch = async (apiFn, fallback = [], timeout = 60000, endpointName = 'Unknown') => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  const startTime = Date.now();
+  log('🚀', `API Call Start: ${endpointName}`, { timeout: `${timeout/1000}s` });
+  
   try {
     const resp = await apiFn();
-    if (!resp) return fallback;
+    clearTimeout(timeoutId);
     
-    // Handle different response structures
-    return resp?.Data ?? resp?.data ?? resp ?? fallback;
+    const duration = Date.now() - startTime;
+    
+    logGroup(`API Response: ${endpointName} (${duration}ms)`, () => {
+      console.log('⏱️ Duration:', `${duration}ms`);
+      console.log('📥 Raw Response:', resp);
+      console.log('📊 Response Type:', typeof resp);
+      console.log('📏 Response Length:', Array.isArray(resp) ? resp.length : 'N/A');
+      
+      if (resp?.Data) console.log('📦 resp.Data:', resp.Data);
+      if (resp?.data) console.log('📦 resp.data:', resp.data);
+      if (resp?.Status !== undefined) console.log('✅ Status:', resp.Status);
+      if (resp?.Message) console.log('💬 Message:', resp.Message);
+    });
+    
+    if (!resp) {
+      console.warn(`⚠️ [${endpointName}] API returned null/undefined response`);
+      return fallback;
+    }
+    
+    const extractedData = resp?.Data ?? resp?.data ?? resp ?? fallback;
+    log('✅', `Extracted Data: ${endpointName}`, { 
+      type: typeof extractedData,
+      length: Array.isArray(extractedData) ? extractedData.length : 'N/A',
+      sample: Array.isArray(extractedData) ? extractedData[0] : extractedData
+    });
+    
+    return extractedData;
   } catch (error) {
-    console.error('API Error:', error);
+    clearTimeout(timeoutId);
+    const duration = Date.now() - startTime;
+    
+    logGroup(`API Error: ${endpointName} (${duration}ms)`, () => {
+      console.error('❌ Error:', error);
+      console.error('📛 Error Name:', error.name);
+      console.error('💬 Error Message:', error.message);
+      console.error('🔢 Status Code:', error.response?.status);
+      console.error('📦 Error Response:', error.response?.data);
+      console.error('🔄 Returning Fallback:', fallback);
+    });
+    
+    if (error.name === 'AbortError') {
+      console.error(`⏱️ [${endpointName}] Request timeout after ${timeout / 1000} seconds`);
+    } else if (error.response?.status === 500) {
+      console.error(`💥 [${endpointName}] Server error (500):`, error.response?.data?.message || error.message);
+    } else if (error.code === 'ECONNABORTED') {
+      console.error(`🔌 [${endpointName}] Connection aborted`);
+    }
+    
     return fallback;
   }
 };
@@ -70,7 +173,16 @@ const safeFetch = async (apiFn, fallback = []) => {
 // DATA PROCESSING UTILITIES
 // ============================================
 const processMetricData = (rawData, metric) => {
-  if (!Array.isArray(rawData) || rawData.length === 0) return [];
+  logGroup(`Processing Metric Data: ${metric}`, () => {
+    console.log('📥 Raw Data:', rawData);
+    console.log('📊 Raw Data Type:', typeof rawData);
+    console.log('📏 Raw Data Length:', Array.isArray(rawData) ? rawData.length : 'N/A');
+  });
+  
+  if (!Array.isArray(rawData) || rawData.length === 0) {
+    console.warn(`⚠️ No data to process for metric: ${metric}`);
+    return [];
+  }
   
   const merged = new Map();
   
@@ -89,7 +201,7 @@ const processMetricData = (rawData, metric) => {
     }
   }
   
-  return Array.from(merged.values())
+  const processed = Array.from(merged.values())
     .map(item => ({
       name: item.name,
       value: ['rsrp', 'rsrq'].includes(metric) ? ensureNegative(item.value) : item.value
@@ -98,13 +210,28 @@ const processMetricData = (rawData, metric) => {
       const isNegative = ['rsrp', 'rsrq'].includes(metric);
       return isNegative ? a.value - b.value : b.value - a.value;
     });
+  
+  logGroup(`Processed Metric Data: ${metric}`, () => {
+    console.log('📤 Processed Data:', processed);
+    console.log('📏 Processed Length:', processed.length);
+    console.log('🎯 Sample:', processed[0]);
+  });
+  
+  return processed;
 };
 
 const processOperatorMetrics = (rawData, metric) => {
+  logGroup(`Processing Operator Metrics: ${metric}`, () => {
+    console.log('📥 Raw Data:', rawData);
+    console.log('📏 Raw Data Length:', Array.isArray(rawData) ? rawData.length : 'N/A');
+  });
+  
   if (!Array.isArray(rawData) || rawData.length === 0) return [];
   
   if (metric === 'samples') {
-    return groupOperatorSamplesByNetwork(rawData);
+    const result = groupOperatorSamplesByNetwork(rawData);
+    log('✅', `Grouped Samples by Network`, result);
+    return result;
   }
   
   const grouped = {};
@@ -134,9 +261,13 @@ const processOperatorMetrics = (rawData, metric) => {
   });
   
   const isNegativeMetric = ['rsrp', 'rsrq'].includes(metric);
-  return result.sort((a, b) => 
+  const sorted = result.sort((a, b) => 
     isNegativeMetric ? a.total - b.total : b.total - a.total
   );
+  
+  log('✅', `Processed Operator Metrics: ${metric}`, sorted);
+  
+  return sorted;
 };
 
 // ============================================
@@ -146,8 +277,18 @@ const processOperatorMetrics = (rawData, metric) => {
 export const useTotals = () => {
   return useSWR(
     'totals',
-    () => safeFetch(() => adminApi.getTotalsV2?.(), {}),
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT }
+    async () => {
+      const data = await safeFetch(() => adminApi.getTotalsV2?.(), {}, 60000, 'getTotalsV2');
+      log('📊', 'Totals Data', data);
+      return data;
+    },
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.SHORT,
+      refreshInterval: 60000,
+      onSuccess: (data) => log('✅', 'useTotals Success', data),
+      onError: (err) => console.error('❌ useTotals Error', err)
+    }
   );
 };
 
@@ -158,9 +299,26 @@ export const useMonthlySamples = (filters) => {
     cacheKey,
     async () => {
       const queryString = buildQueryString(filters);
-      return safeFetch(() => adminApi.getMonthlySamplesV2?.(queryString), []);
+      log('🔍', 'Monthly Samples Query', { filters, queryString });
+      
+      const data = await safeFetch(
+        () => adminApi.getMonthlySamplesV2?.(queryString), 
+        [], 
+        60000, 
+        'getMonthlySamplesV2'
+      );
+      
+      log('📊', 'Monthly Samples Data', data);
+      return data;
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      revalidateIfStale: true,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', 'useMonthlySamples Success', { count: data?.length }),
+      onError: (err) => console.error('❌ useMonthlySamples Error', err)
+    }
   );
 };
 
@@ -171,10 +329,27 @@ export const useOperatorSamples = (filters) => {
     cacheKey,
     async () => {
       const queryString = buildQueryString(filters);
-      const data = await safeFetch(() => adminApi.getOperatorSamplesV2?.(queryString), []);
-      return groupOperatorSamplesByNetwork(data);
+      log('🔍', 'Operator Samples Query', { filters, queryString });
+      
+      const data = await safeFetch(
+        () => adminApi.getOperatorSamplesV2?.(queryString), 
+        [], 
+        60000, 
+        'getOperatorSamplesV2'
+      );
+      
+      const grouped = groupOperatorSamplesByNetwork(data);
+      log('📊', 'Operator Samples Grouped', grouped);
+      
+      return grouped;
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.SHORT,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', 'useOperatorSamples Success', { count: data?.length }),
+      onError: (err) => console.error('❌ useOperatorSamples Error', err)
+    }
   );
 };
 
@@ -185,14 +360,30 @@ export const useNetworkDistribution = (filters) => {
     cacheKey,
     async () => {
       const queryString = buildQueryString(filters);
-      return safeFetch(() => adminApi.getNetworkTypeDistributionV2?.(queryString), []);
+      log('🔍', 'Network Distribution Query', { filters, queryString });
+      
+      const data = await safeFetch(
+        () => adminApi.getNetworkTypeDistributionV2?.(queryString), 
+        [], 
+        60000, 
+        'getNetworkTypeDistributionV2'
+      );
+      
+      log('📊', 'Network Distribution Data', data);
+      return data;
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', 'useNetworkDistribution Success', { count: data?.length }),
+      onError: (err) => console.error('❌ useNetworkDistribution Error', err)
+    }
   );
 };
 
 // ============================================
-// HOOKS: METRICS (Optimized with Memoization)
+// HOOKS: METRICS
 // ============================================
 
 const METRIC_ENDPOINT_MAP = {
@@ -212,18 +403,38 @@ export const useMetricData = (metric, filters) => {
   
   const fetcher = useCallback(async () => {
     const endpoint = METRIC_ENDPOINT_MAP[metric];
-    if (!endpoint || !adminApi[endpoint]) return [];
+    
+    log('🎯', `Metric Data Fetch: ${metric}`, { endpoint, filters });
+    
+    if (!endpoint || !adminApi[endpoint]) {
+      console.warn(`⚠️ No endpoint found for metric: ${metric}`);
+      return [];
+    }
     
     const queryString = buildQueryString(filters);
-    const rawData = await safeFetch(() => adminApi[endpoint](queryString), []);
+    const rawData = await safeFetch(
+      () => adminApi[endpoint](queryString), 
+      [], 
+      60000, 
+      endpoint
+    );
     
-    return processMetricData(rawData, metric);
+    const processed = processMetricData(rawData, metric);
+    log('✅', `Processed Metric: ${metric}`, processed);
+    
+    return processed;
   }, [metric, filters]);
   
   return useSWR(
     cacheKey,
     fetcher,
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.SHORT,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', `useMetricData(${metric}) Success`, { count: data?.length }),
+      onError: (err) => console.error(`❌ useMetricData(${metric}) Error`, err)
+    }
   );
 };
 
@@ -237,18 +448,38 @@ export const useOperatorMetrics = (metric, filters) => {
     };
     
     const endpoint = endpointMap[metric];
-    if (!endpoint || !adminApi[endpoint]) return [];
+    
+    log('🎯', `Operator Metric Fetch: ${metric}`, { endpoint, filters });
+    
+    if (!endpoint || !adminApi[endpoint]) {
+      console.warn(`⚠️ No endpoint found for operator metric: ${metric}`);
+      return [];
+    }
     
     const queryString = buildQueryString(filters);
-    const rawData = await safeFetch(() => adminApi[endpoint](queryString), []);
+    const rawData = await safeFetch(
+      () => adminApi[endpoint](queryString), 
+      [], 
+      60000, 
+      endpoint
+    );
     
-    return processOperatorMetrics(rawData, metric);
+    const processed = processOperatorMetrics(rawData, metric);
+    log('✅', `Processed Operator Metric: ${metric}`, processed);
+    
+    return processed;
   }, [metric, filters]);
   
   return useSWR(
     cacheKey,
     fetcher,
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.SHORT,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', `useOperatorMetrics(${metric}) Success`, { count: data?.length }),
+      onError: (err) => console.error(`❌ useOperatorMetrics(${metric}) Error`, err)
+    }
   );
 };
 
@@ -263,9 +494,25 @@ export const useBandDistributionRaw = (filters) => {
     cacheKey,
     async () => {
       const queryString = buildQueryString(filters);
-      return safeFetch(() => adminApi.getBandDistributionV2?.(queryString), []);
+      log('🔍', 'Band Distribution Raw Query', { filters, queryString });
+      
+      const data = await safeFetch(
+        () => adminApi.getBandDistributionV2?.(queryString), 
+        [], 
+        60000, 
+        'getBandDistributionV2'
+      );
+      
+      log('📊', 'Band Distribution Raw Data', data);
+      return data;
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', 'useBandDistributionRaw Success', { count: data?.length }),
+      onError: (err) => console.error('❌ useBandDistributionRaw Error', err)
+    }
   );
 };
 
@@ -276,22 +523,42 @@ export const useBandDistribution = (filters) => {
     cacheKey,
     async () => {
       const queryString = buildQueryString(filters);
-      const rawData = await safeFetch(() => adminApi.getBandDistributionV2?.(queryString), []);
+      log('🔍', 'Band Distribution Query', { filters, queryString });
       
-      if (!Array.isArray(rawData)) return [];
+      const rawData = await safeFetch(
+        () => adminApi.getBandDistributionV2?.(queryString), 
+        [], 
+        60000, 
+        'getBandDistributionV2'
+      );
+      
+      if (!Array.isArray(rawData) || rawData.length === 0) {
+        log('⚠️', 'No band distribution data', rawData);
+        return [];
+      }
       
       const merged = new Map();
       for (const item of rawData) {
-        const band = `Band ${item?.band || ''}`;
+        const band = `Band ${item?.band || 'Unknown'}`;
         const count = toNumber(item?.count);
         merged.set(band, (merged.get(band) || 0) + count);
       }
       
-      return Array.from(merged.entries())
+      const processed = Array.from(merged.entries())
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
+      
+      log('✅', 'Band Distribution Processed', processed);
+      
+      return processed;
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', 'useBandDistribution Success', { count: data?.length }),
+      onError: (err) => console.error('❌ useBandDistribution Error', err)
+    }
   );
 };
 
@@ -306,16 +573,32 @@ export const useIndoorCount = (filters) => {
     cacheKey,
     async () => {
       const queryString = buildQueryString(filters);
-      const resp = await safeFetch(() => adminApi.getIndoorCount?.(queryString), {});
+      log('🔍', 'Indoor Count Query', { filters, queryString });
+      
+      const resp = await safeFetch(
+        () => adminApi.getIndoorCount?.(queryString), 
+        {}, 
+        60000, 
+        'getIndoorCount'
+      );
       
       if (resp?.Status === 0) {
-        console.error('Indoor count API error:', resp?.Message);
+        console.error('❌ Indoor count API error:', resp?.Message);
         return 0;
       }
       
-      return Number(resp?.Count) || 0;
+      const count = Number(resp?.Count || resp?.count || 0);
+      log('📊', 'Indoor Count', count);
+      
+      return count;
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.SHORT,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', 'useIndoorCount Success', data),
+      onError: (err) => console.error('❌ useIndoorCount Error', err)
+    }
   );
 };
 
@@ -326,16 +609,32 @@ export const useOutdoorCount = (filters) => {
     cacheKey,
     async () => {
       const queryString = buildQueryString(filters);
-      const resp = await safeFetch(() => adminApi.getOutdoorCount?.(queryString), {});
+      log('🔍', 'Outdoor Count Query', { filters, queryString });
+      
+      const resp = await safeFetch(
+        () => adminApi.getOutdoorCount?.(queryString), 
+        {}, 
+        60000, 
+        'getOutdoorCount'
+      );
       
       if (resp?.Status === 0) {
-        console.error('Outdoor count API error:', resp?.Message);
+        console.error('❌ Outdoor count API error:', resp?.Message);
         return 0;
       }
       
-      return Number(resp?.Count) || 0;
+      const count = Number(resp?.Count || resp?.count || 0);
+      log('📊', 'Outdoor Count', count);
+      
+      return count;
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.SHORT,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', 'useOutdoorCount Success', data),
+      onError: (err) => console.error('❌ useOutdoorCount Error', err)
+    }
   );
 };
 
@@ -344,34 +643,80 @@ export const useOutdoorCount = (filters) => {
 // ============================================
 
 export const useCoverageRanking = (rsrpMin = -95, rsrpMax = 0) => {
-  const cacheKey = useMemo(() => ['coverageRank', rsrpMin, rsrpMax], [rsrpMin, rsrpMax]);
+  const cacheKey = useMemo(() => 
+    createCacheKey('coverageRank', { min: rsrpMin, max: rsrpMax }), 
+    [rsrpMin, rsrpMax]
+  );
   
   return useSWR(
     cacheKey,
     async () => {
-      const payload = await safeFetch(
-        () => adminApi.getOperatorCoverageRanking({ min: rsrpMin, max: rsrpMax }),
-        []
-      );
-      return buildRanking(payload, { nameKey: 'name', countKey: 'count' });
+      log('🔍', 'Coverage Ranking Query', { rsrpMin, rsrpMax });
+      
+      try {
+        const payload = await safeFetch(
+          () => adminApi.getOperatorCoverageRanking({ min: rsrpMin, max: rsrpMax }),
+          [],
+          60000,
+          'getOperatorCoverageRanking'
+        );
+        
+        const ranking = buildRanking(payload, { nameKey: 'name', countKey: 'count' });
+        log('✅', 'Coverage Ranking Built', ranking);
+        
+        return ranking;
+      } catch (error) {
+        console.error('❌ Coverage ranking error:', error);
+        return [];
+      }
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      keepPreviousData: true,
+      shouldRetryOnError: false,
+      onSuccess: (data) => log('✅', 'useCoverageRanking Success', { count: data?.length }),
+      onError: (err) => console.error('❌ useCoverageRanking Error', err)
+    }
   );
 };
 
 export const useQualityRanking = (rsrqMin = -10, rsrqMax = 0) => {
-  const cacheKey = useMemo(() => ['qualityRank', rsrqMin, rsrqMax], [rsrqMin, rsrqMax]);
+  const cacheKey = useMemo(() => 
+    createCacheKey('qualityRank', { min: rsrqMin, max: rsrqMax }), 
+    [rsrqMin, rsrqMax]
+  );
   
   return useSWR(
     cacheKey,
     async () => {
-      const payload = await safeFetch(
-        () => adminApi.getOperatorQualityRanking({ min: rsrqMin, max: rsrqMax }),
-        []
-      );
-      return buildRanking(payload, { nameKey: 'name', countKey: 'count' });
+      log('🔍', 'Quality Ranking Query', { rsrqMin, rsrqMax });
+      
+      try {
+        const payload = await safeFetch(
+          () => adminApi.getOperatorQualityRanking({ min: rsrqMin, max: rsrqMax }),
+          [],
+          60000,
+          'getOperatorQualityRanking'
+        );
+        
+        const ranking = buildRanking(payload, { nameKey: 'name', countKey: 'count' });
+        log('✅', 'Quality Ranking Built', ranking);
+        
+        return ranking;
+      } catch (error) {
+        console.error('❌ Quality ranking error (DB timeout):', error);
+        return [];
+      }
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      keepPreviousData: true,
+      shouldRetryOnError: false,
+      onSuccess: (data) => log('✅', 'useQualityRanking Success', { count: data?.length }),
+      onError: (err) => console.error('❌ useQualityRanking Error (likely DB timeout)', err)
+    }
   );
 };
 
@@ -383,37 +728,109 @@ export const useHandsetPerformance = () => {
   return useSWR(
     'handsetAvg',
     async () => {
-      const resp = await safeFetch(() => adminApi.getDashboardGraphData(), {});
-      const data = resp?.handsetWiseAvg_bar || [];
+      log('🔄', 'Fetching handset performance data...', {});
       
-      return data.map(item => ({
-        Make: item?.Make || '',
-        Avg: ensureNegative(item?.Avg || 0),
-        Samples: toNumber(item?.Samples || 0)
-      }));
+      const resp = await safeFetch(
+        () => adminApi.getDashboardGraphData(), 
+        {}, 
+        60000, 
+        'getDashboardGraphData'
+      );
+      
+      logGroup('Handset Performance Response Analysis', () => {
+        console.log('📦 Full Response:', resp);
+        console.log('🔑 Response Keys:', Object.keys(resp || {}));
+        console.log('📊 handsetWiseAvg_bar:', resp?.handsetWiseAvg_bar);
+        console.log('📊 HandsetWiseAvg_bar:', resp?.HandsetWiseAvg_bar);
+      });
+      
+      const rawData = resp?.handsetWiseAvg_bar || resp?.HandsetWiseAvg_bar || [];
+      
+      if (!Array.isArray(rawData)) {
+        console.error('❌ Invalid handset data structure:', typeof rawData);
+        return [];
+      }
+      
+      if (rawData.length === 0) {
+        console.warn('⚠️ No handset performance data available');
+        return [];
+      }
+      
+      const processedData = rawData.map(item => {
+        const make = item?.Make || item?.make || 'Unknown';
+        const avg = ensureNegative(toNumber(item?.Avg || item?.avg || 0));
+        const samples = toNumber(item?.Samples || item?.samples || 0);
+        
+        return {
+          Make: make,
+          Avg: avg,
+          Samples: samples
+        };
+      });
+      
+      log('✅', 'Handset Performance Processed', {
+        count: processedData.length,
+        sample: processedData[0],
+        data: processedData
+      });
+      
+      return processedData;
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      keepPreviousData: true,
+      revalidateOnMount: true,
+      onSuccess: (data) => {
+        log('✅', 'useHandsetPerformance Success', {
+          count: data?.length || 0,
+          items: data
+        });
+      },
+      onError: (error) => {
+        console.error('❌ Handset performance fetch failed:', error.message);
+      }
+    }
   );
 };
 
 // ============================================
-// HOOKS: OPERATORS & NETWORKS (Optimized)
+// HOOKS: OPERATORS & NETWORKS
 // ============================================
 
 export const useOperatorsAndNetworks = () => {
   const { data: rawOperators = [], isLoading: operatorsLoading, error: operatorsError } = useSWR(
     'operators',
-    () => safeFetch(() => adminApi.getOperatorsV2?.(), []),
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.LONG }
+    async () => {
+      const data = await safeFetch(() => adminApi.getOperatorsV2?.(), [], 60000, 'getOperatorsV2');
+      log('📊', 'Raw Operators Data', data);
+      return data;
+    },
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.LONG,
+      revalidateOnMount: false,
+      onSuccess: (data) => log('✅', 'Operators Loaded', { count: data?.length }),
+      onError: (err) => console.error('❌ Operators Error', err)
+    }
   );
 
   const { data: networks = [], isLoading: networksLoading, error: networksError } = useSWR(
     'networks',
-    () => safeFetch(() => adminApi.getNetworksV2?.(), []),
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.LONG }
+    async () => {
+      const data = await safeFetch(() => adminApi.getNetworksV2?.(), [], 60000, 'getNetworksV2');
+      log('📊', 'Networks Data', data);
+      return data;
+    },
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.LONG,
+      revalidateOnMount: false,
+      onSuccess: (data) => log('✅', 'Networks Loaded', { count: data?.length }),
+      onError: (err) => console.error('❌ Networks Error', err)
+    }
   );
 
-  // Memoized operators deduplication
   const operators = useMemo(() => {
     if (!Array.isArray(rawOperators) || rawOperators.length === 0) return [];
     
@@ -426,7 +843,10 @@ export const useOperatorsAndNetworks = () => {
       }
     });
     
-    return Array.from(uniqueOperators).sort();
+    const result = Array.from(uniqueOperators).sort();
+    log('✅', 'Unique Operators Processed', result);
+    
+    return result;
   }, [rawOperators]);
 
   const operatorCount = operators.length;
@@ -441,81 +861,82 @@ export const useOperatorsAndNetworks = () => {
 };
 
 // ============================================
-// HOOKS: PARALLEL DASHBOARD DATA (NEW!)
+// HOOKS: PARALLEL DASHBOARD DATA
 // ============================================
 
-/**
- * Fetch multiple metrics in parallel for performance optimization
- */
-export const useParallelMetrics = (metrics = [], filters) => {
-  const cacheKey = useMemo(
-    () => createCacheKey(`parallel_${metrics.join('_')}`, filters),
-    [metrics, filters]
-  );
-  
-  const fetcher = useCallback(async () => {
-    if (!Array.isArray(metrics) || metrics.length === 0) return {};
-    
-    const queryString = buildQueryString(filters);
-    const promises = metrics.map(async (metric) => {
-      const endpoint = METRIC_ENDPOINT_MAP[metric];
-      if (!endpoint || !adminApi[endpoint]) return [metric, []];
-      
-      const rawData = await safeFetch(() => adminApi[endpoint](queryString), []);
-      return [metric, processMetricData(rawData, metric)];
-    });
-    
-    const results = await Promise.all(promises);
-    return Object.fromEntries(results);
-  }, [metrics, filters]);
-  
-  return useSWR(
-    cacheKey,
-    fetcher,
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT }
-  );
-};
-
-/**
- * Fetch all dashboard data in one go (most optimized)
- */
 export const useDashboardDataParallel = (filters) => {
   const cacheKey = useMemo(() => createCacheKey('dashboardAll', filters), [filters]);
   
   const fetcher = useCallback(async () => {
     const queryString = buildQueryString(filters);
     
-    // Execute all API calls in parallel
-    const [
-      totals,
-      monthlySamples,
-      operatorSamples,
-      networkDist,
-      rsrpData,
-      rsrqData,
-      sinrData,
-      bandDist,
-    ] = await Promise.all([
-      safeFetch(() => adminApi.getTotalsV2?.(), {}),
-      safeFetch(() => adminApi.getMonthlySamplesV2?.(queryString), []),
-      safeFetch(() => adminApi.getOperatorSamplesV2?.(queryString), []),
-      safeFetch(() => adminApi.getNetworkTypeDistributionV2?.(queryString), []),
-      safeFetch(() => adminApi.getAvgRsrpV2?.(queryString), []),
-      safeFetch(() => adminApi.getAvgRsrqV2?.(queryString), []),
-      safeFetch(() => adminApi.getAvgSinrV2?.(queryString), []),
-      safeFetch(() => adminApi.getBandDistributionV2?.(queryString), []),
-    ]);
+    log('🚀', 'Starting Parallel Dashboard Fetch', { filters, queryString });
+    console.time('⏱️ Dashboard Parallel Fetch');
     
-    return {
-      totals,
-      monthlySamples,
-      operatorSamples: groupOperatorSamplesByNetwork(operatorSamples),
-      networkDist,
-      rsrp: processMetricData(rsrpData, 'rsrp'),
-      rsrq: processMetricData(rsrqData, 'rsrq'),
-      sinr: processMetricData(sinrData, 'sinr'),
-      bandDist,
-    };
+    try {
+      const results = await Promise.allSettled([
+        safeFetch(() => adminApi.getTotalsV2?.(), {}, 60000, 'getTotalsV2'),
+        safeFetch(() => adminApi.getMonthlySamplesV2?.(queryString), [], 60000, 'getMonthlySamplesV2'),
+        safeFetch(() => adminApi.getOperatorSamplesV2?.(queryString), [], 60000, 'getOperatorSamplesV2'),
+        safeFetch(() => adminApi.getNetworkTypeDistributionV2?.(queryString), [], 60000, 'getNetworkTypeDistributionV2'),
+        safeFetch(() => adminApi.getAvgRsrpV2?.(queryString), [], 60000, 'getAvgRsrpV2'),
+        safeFetch(() => adminApi.getAvgRsrqV2?.(queryString), [], 60000, 'getAvgRsrqV2'),
+        safeFetch(() => adminApi.getAvgSinrV2?.(queryString), [], 60000, 'getAvgSinrV2'),
+        safeFetch(() => adminApi.getBandDistributionV2?.(queryString), [], 60000, 'getBandDistributionV2'),
+      ]);
+      
+      logGroup('Parallel Fetch Results', () => {
+        results.forEach((result, index) => {
+          const endpoints = ['getTotalsV2', 'getMonthlySamplesV2', 'getOperatorSamplesV2', 
+                           'getNetworkTypeDistributionV2', 'getAvgRsrpV2', 'getAvgRsrqV2', 
+                           'getAvgSinrV2', 'getBandDistributionV2'];
+          
+          if (result.status === 'fulfilled') {
+            console.log(`✅ [${index}] ${endpoints[index]}:`, result.value);
+          } else {
+            console.error(`❌ [${index}] ${endpoints[index]}:`, result.reason);
+          }
+        });
+      });
+      
+      const [
+        totals,
+        monthlySamples,
+        operatorSamples,
+        networkDist,
+        rsrpData,
+        rsrqData,
+        sinrData,
+        bandDist,
+      ] = results.map((result, index) => {
+        if (result.status === 'fulfilled') {
+          return result.value;
+        } else {
+          console.error(`❌ Promise ${index} rejected:`, result.reason);
+          return index === 0 ? {} : [];
+        }
+      });
+      
+      console.timeEnd('⏱️ Dashboard Parallel Fetch');
+      
+      const finalData = {
+        totals,
+        monthlySamples,
+        operatorSamples: groupOperatorSamplesByNetwork(operatorSamples),
+        networkDist,
+        rsrp: processMetricData(rsrpData, 'rsrp'),
+        rsrq: processMetricData(rsrqData, 'rsrq'),
+        sinr: processMetricData(sinrData, 'sinr'),
+        bandDist,
+      };
+      
+      log('✅', 'Parallel Dashboard Data Complete', finalData);
+      
+      return finalData;
+    } catch (error) {
+      console.error('❌ Dashboard parallel fetch failed:', error);
+      throw error;
+    }
   }, [filters]);
   
   return useSWR(
@@ -524,37 +945,147 @@ export const useDashboardDataParallel = (filters) => {
     { 
       ...SWR_CONFIG, 
       dedupingInterval: CACHE_TIME.SHORT,
-      revalidateOnMount: true 
+      revalidateOnMount: true,
+      keepPreviousData: true,
+      suspense: false,
+      onSuccess: (data) => log('✅', 'useDashboardDataParallel Success', data),
+      onError: (err) => console.error('❌ useDashboardDataParallel Error', err)
+    }
+  );
+};
+
+export const useParallelMetrics = (metrics = [], filters) => {
+  const cacheKey = useMemo(
+    () => createCacheKey(`parallel_${metrics.sort().join('_')}`, filters),
+    [metrics, filters]
+  );
+  
+  const fetcher = useCallback(async () => {
+    if (!Array.isArray(metrics) || metrics.length === 0) return {};
+    
+    const queryString = buildQueryString(filters);
+    
+    log('🚀', 'Starting Parallel Metrics Fetch', { metrics, filters });
+    
+    const results = await Promise.allSettled(
+      metrics.map(async (metric) => {
+        const endpoint = METRIC_ENDPOINT_MAP[metric];
+        if (!endpoint || !adminApi[endpoint]) {
+          console.warn(`⚠️ No endpoint for metric: ${metric}`);
+          return [metric, []];
+        }
+        
+        const rawData = await safeFetch(() => adminApi[endpoint](queryString), [], 60000, endpoint);
+        const processed = processMetricData(rawData, metric);
+        
+        return [metric, processed];
+      })
+    );
+    
+    const finalData = Object.fromEntries(
+      results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => r.value)
+    );
+    
+    log('✅', 'Parallel Metrics Complete', finalData);
+    
+    return finalData;
+  }, [metrics, filters]);
+  
+  return useSWR(
+    cacheKey,
+    fetcher,
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.SHORT,
+      keepPreviousData: true,
+      onSuccess: (data) => log('✅', 'useParallelMetrics Success', data),
+      onError: (err) => console.error('❌ useParallelMetrics Error', err)
     }
   );
 };
 
 // ============================================
-// HOOKS: PREFETCH FOR PERFORMANCE
+// CACHE MANAGEMENT
 // ============================================
 
-/**
- * Prefetch commonly needed data
- */
 export const usePrefetchDashboard = (filters) => {
-  const { mutate } = useSWR();
+  const { mutate } = useSWRConfig();
+  const prefetchRef = useRef(false);
   
   const prefetch = useCallback(() => {
+    if (prefetchRef.current) return;
+    
     const queryString = buildQueryString(filters);
     
-    // Prefetch in background
-    Promise.all([
+    log('🚀', 'Prefetching dashboard data...', { filters });
+    
+    Promise.allSettled([
       adminApi.getTotalsV2?.(),
       adminApi.getOperatorSamplesV2?.(queryString),
       adminApi.getNetworkTypeDistributionV2?.(queryString),
-    ]);
-  }, [filters, mutate]);
+    ]).then(() => {
+      log('✅', 'Prefetch complete', {});
+      prefetchRef.current = true;
+    });
+  }, [filters]);
   
   return prefetch;
 };
 
-// ============================================
-// EXPORT CONFIG FOR APP-LEVEL USE
-// ============================================
+export const useClearDashboardCache = () => {
+  const { cache, mutate } = useSWRConfig();
+  
+  const clearCache = useCallback(() => {
+    log('🗑️', 'Clearing dashboard cache...', {});
+    
+    const keysToDelete = [];
+    
+    if (cache instanceof Map) {
+      cache.forEach((_, key) => {
+        if (
+          typeof key === 'string' && (
+            key.startsWith('dashboard') ||
+            key.startsWith('metric_') ||
+            key.startsWith('opMetric_') ||
+            key.startsWith('parallel_') ||
+            key === 'handsetAvg'
+          )
+        ) {
+          keysToDelete.push(key);
+        }
+      });
+      
+      keysToDelete.forEach(key => cache.delete(key));
+      log('✅', `Cleared ${keysToDelete.length} cache entries`, keysToDelete);
+    }
+    
+    mutate(() => true, undefined, { revalidate: true });
+  }, [cache, mutate]);
+  
+  return clearCache;
+};
+
+export const useDebugDashboard = () => {
+  const { cache } = useSWRConfig();
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (cache instanceof Map) {
+        const keys = Array.from(cache.keys()).filter(k => typeof k === 'string');
+        
+        logGroup('SWR Cache Status', () => {
+          console.log('📊 Cache Size:', cache.size);
+          console.log('🔑 Cache Keys:', keys);
+          console.log('🎯 Has handsetAvg:', keys.includes('handsetAvg'));
+          console.log('📦 Cache Entries:', Array.from(cache.entries()));
+        });
+      }
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [cache]);
+};
 
 export { SWR_CONFIG, CACHE_TIME };

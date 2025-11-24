@@ -1,9 +1,9 @@
 // src/components/MapLegend.jsx
 import React from "react";
 import { resolveMetricConfig } from "@/utils/metrics";
-import { PCI_COLOR_PALETTE } from "./layers/MultiColorCirclesLayer"; // Import from your existing component
+import { PCI_COLOR_PALETTE } from "./layers/MultiColorCirclesLayer"; 
 
-// --- Copied from MapSidebarFloating.jsx ---
+
 const COLOR_SCHEMES = {
   provider: {
     JIO: "#3B82F6",
@@ -14,10 +14,14 @@ const COLOR_SCHEMES = {
   },
   technology: {
     "5G": "#EC4899",
+    
     "4G": "#8B5CF6",
+    
     "3G": "#10B981",
     "2G": "#6B7280",
+    
     Unknown: "#F59E0B",
+    
   },
   band: {
     "3": "#EF4444",

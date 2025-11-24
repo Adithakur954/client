@@ -1,3 +1,4 @@
+// src/components/ChartCard.jsx
 import React, { useRef, useState, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -18,12 +19,13 @@ const ChartCard = ({
   children, 
   exportFileName, 
   settings, 
-  isLoading,
+  isLoading = false,
   chartFilters,
   onChartFiltersChange,
   operators = [],
   networks = [],
-  showChartFilters = true
+  showChartFilters = true,
+  error = null // ✅ Added error prop
 }) => {
   const cardRef = useRef(null);
   const [showTable, setShowTable] = useState(false);
@@ -33,36 +35,59 @@ const ChartCard = ({
   const handleDownloadPNG = async () => {
     try {
       const node = cardRef.current?.querySelector('.chart-content') ?? cardRef.current;
-      if (!node) return toast.error("Chart not found for export");
+      if (!node) {
+        toast.error("Chart not found for export");
+        return;
+      }
+      
       const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 2 });
+      const dataUrl = await toPng(node, { 
+        cacheBust: true, 
+        pixelRatio: 2,
+        backgroundColor: '#ffffff' // ✅ Add white background
+      });
+      
       const link = document.createElement('a');
       link.download = `${sanitizeFileName(exportFileName || title || 'chart')}.png`;
       link.href = dataUrl;
       link.click();
+      
       toast.success("Chart exported as PNG");
     } catch (e) {
-      console.error(e);
+      console.error('PNG export error:', e);
       toast.error("Failed to export PNG");
     }
   };
 
   const handleDownloadCSV = () => {
-    downloadCSVFromData(dataset, `${sanitizeFileName(exportFileName || title || 'chart')}.csv`);
-    toast.success("Data exported as CSV");
+    if (!dataset || dataset.length === 0) {
+      toast.error("No data to export");
+      return;
+    }
+    
+    try {
+      downloadCSVFromData(dataset, `${sanitizeFileName(exportFileName || title || 'chart')}.csv`);
+      toast.success("Data exported as CSV");
+    } catch (e) {
+      console.error('CSV export error:', e);
+      toast.error("Failed to export CSV");
+    }
   };
 
   const columns = useMemo(() => {
     if (!Array.isArray(dataset) || dataset.length === 0) return [];
+    
     const keys = Array.from(
       dataset.reduce((set, row) => {
         Object.entries(row || {}).forEach(([k, v]) => {
-          if (['object', 'function'].includes(typeof v)) return;
+          // Skip objects, functions, and internal keys
+          if (['object', 'function'].includes(typeof v) || k.startsWith('_')) return;
           set.add(k);
         });
         return set;
       }, new Set())
     );
+    
     return keys;
   }, [dataset]);
 
@@ -76,8 +101,9 @@ const ChartCard = ({
     return count;
   }, [chartFilters]);
 
+  // ✅ Show skeleton during loading
   if (isLoading) {
-    return <ChartCardSkeleton />;
+    return <ChartCardSkeleton title={title} />;
   }
 
   return (
@@ -97,57 +123,76 @@ const ChartCard = ({
               </div>
             )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                <MoreVertical className="h-5 w-5 text-gray-600" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border border-gray-200 text-gray-800 w-56 shadow-lg">
-              {showChartFilters && (
-                <>
-                  <DropdownMenuItem className="hover:bg-blue-50 cursor-pointer" onClick={() => setFilterSettingsOpen(true)}>
-                    <Filter className="h-4 w-4 mr-2 text-blue-600" />
-                    <span className="font-medium">Chart Filters</span>
-                    {activeChartFiltersCount > 0 && (
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        {activeChartFiltersCount}
-                      </Badge>
-                    )}
-                  </DropdownMenuItem>
-                  <div className="h-px bg-gray-200 my-1" />
-                </>
-              )}
-              {settings && (
-                <>
-                  <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={() => setSettingsOpen(true)}>
-                    <SettingsIcon className="h-4 w-4 mr-2 text-gray-600" />
-                    Settings
-                  </DropdownMenuItem>
-                  <div className="h-px bg-gray-200 my-1" />
-                </>
-              )}
-              <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={() => setShowTable(v => !v)}>
-                <TableIcon className="h-4 w-4 mr-2 text-gray-600" />
-                {showTable ? 'Show Chart' : 'Show Table'}
-              </DropdownMenuItem>
-              <div className="h-px bg-gray-200 my-1" />
-              <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Export</div>
-              <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={handleDownloadPNG}>
-                <Download className="h-4 w-4 mr-2 text-gray-600" />
-                Download PNG
-              </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={handleDownloadCSV}>
-                <Download className="h-4 w-4 mr-2 text-gray-600" />
-                Download CSV
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          
+          {/* ✅ Only show menu if there's data or settings */}
+          {(dataset?.length > 0 || settings || showChartFilters) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                  <MoreVertical className="h-5 w-5 text-gray-600" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-white border border-gray-200 text-gray-800 w-56 shadow-lg">
+                {showChartFilters && (
+                  <>
+                    <DropdownMenuItem className="hover:bg-blue-50 cursor-pointer" onClick={() => setFilterSettingsOpen(true)}>
+                      <Filter className="h-4 w-4 mr-2 text-blue-600" />
+                      <span className="font-medium">Chart Filters</span>
+                      {activeChartFiltersCount > 0 && (
+                        <Badge variant="secondary" className="ml-auto text-xs">
+                          {activeChartFiltersCount}
+                        </Badge>
+                      )}
+                    </DropdownMenuItem>
+                    <div className="h-px bg-gray-200 my-1" />
+                  </>
+                )}
+                
+                {settings && (
+                  <>
+                    <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={() => setSettingsOpen(true)}>
+                      <SettingsIcon className="h-4 w-4 mr-2 text-gray-600" />
+                      Settings
+                    </DropdownMenuItem>
+                    <div className="h-px bg-gray-200 my-1" />
+                  </>
+                )}
+                
+                {dataset?.length > 0 && (
+                  <>
+                    <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={() => setShowTable(v => !v)}>
+                      <TableIcon className="h-4 w-4 mr-2 text-gray-600" />
+                      {showTable ? 'Show Chart' : 'Show Table'}
+                    </DropdownMenuItem>
+                    <div className="h-px bg-gray-200 my-1" />
+                    <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Export</div>
+                    <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={handleDownloadPNG}>
+                      <Download className="h-4 w-4 mr-2 text-gray-600" />
+                      Download PNG
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={handleDownloadCSV}>
+                      <Download className="h-4 w-4 mr-2 text-gray-600" />
+                      Download CSV
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </CardHeader>
 
       <CardContent className="h-[380px] relative p-6">
-        {!dataset || dataset.length === 0 ? (
+        {/* ✅ Error State */}
+        {error ? (
+          <div className="flex flex-col items-center justify-center h-full text-red-400">
+            <svg className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-lg font-medium">Failed to load data</p>
+            <p className="text-sm mt-1 text-gray-500">{error.message || 'An error occurred'}</p>
+          </div>
+        ) : !dataset || dataset.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
             <ChartBar className="h-16 w-16 mb-4 opacity-20" />
             <p className="text-lg font-medium">No data available</p>
@@ -170,7 +215,9 @@ const ChartCard = ({
                   <tr key={i} className="hover:bg-blue-50 transition-colors border-b border-gray-100">
                     {columns.map(c => (
                       <td key={c} className="px-4 py-3 text-gray-700">
-                        {typeof row[c] === 'number' ? row[c].toLocaleString() : String(row[c] ?? '')}
+                        {typeof row[c] === 'number' 
+                          ? row[c].toLocaleString(undefined, { maximumFractionDigits: 2 })
+                          : String(row[c] ?? '')}
                       </td>
                     ))}
                   </tr>
@@ -179,7 +226,7 @@ const ChartCard = ({
             </table>
           </div>
         ) : (
-          <div ref={cardRef} className="chart-content h-full">
+          <div ref={cardRef} className="chart-content h-full w-full">
             {children}
           </div>
         )}

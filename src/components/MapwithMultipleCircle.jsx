@@ -5,6 +5,73 @@ import { getColorForMetric } from "../utils/metrics";
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
+// ✅ NEW: Color schemes for provider, band, technology
+const COLOR_SCHEMES = {
+  provider: {
+     JIO: "#3B82F6",
+    "Jio True5G": "#3B82F6",
+    "JIO 4G": "#3B82F6",
+    "JIO4G": "#3B82F6",
+    "IND-JIO": "#3B82F6",
+    Airtel: "#EF4444",
+    "IND Airtel": "#EF4444",
+    "Airtel 5G": "#EF4444",
+    "VI India": "#22C55E",
+    "Vi India": "#22C55E",
+    "Vodafone IN": "#22C55E",
+    BSNL: "#F59E0B",
+    Unknown: "#6B7280",
+  },
+  technology: {
+   "5G": "#EC4899",
+    "NR (5G)": "#EC4899",
+    "NR (5G SA)": "#EC4899",
+    "NR (5G NSA)": "#EC4899",
+    "4G": "#8B5CF6",
+    "LTE (4G)": "#8B5CF6",
+    "3G": "#10B981",
+    "2G": "#6B7280",
+    "EDGE (2G)": "#6B7280",
+    Unknown: "#F59E0B",
+  },
+  band: {
+    "3": "#EF4444",
+    "5": "#F59E0B",
+    "8": "#10B981",
+    "40": "#3B82F6",
+    "41": "#8B5CF6",
+    "n28": "#EC4899",
+    "n78": "#F472B6",
+    "1": "#EF4444",
+    "2": "#F59E0B",
+    "7": "#10B781",
+    Unknown: "#6B7280",
+  },
+};
+
+// ✅ NEW: Helper function to get color based on colorBy scheme
+const getColorByScheme = (location, colorBy) => {
+  if (!colorBy) return null;
+
+  const scheme = COLOR_SCHEMES[colorBy];
+  if (!scheme) return null;
+
+  const value = location[colorBy];
+  if (!value) return scheme["Unknown"] || "#6B7280";
+
+  // Try exact match first
+  if (scheme[value]) return scheme[value];
+
+  // Try case-insensitive match
+  const lowerValue = String(value).toLowerCase();
+  const matchKey = Object.keys(scheme).find(
+    (key) => key.toLowerCase() === lowerValue
+  );
+  if (matchKey) return scheme[matchKey];
+
+  return scheme["Unknown"] || "#6B7280";
+};
+
 function getThresholdColor(thresholdArray, value, fallback = "#3b82f6") {
   if (value === null || value === undefined || isNaN(Number(value))) {
     return "#9ca3af";
@@ -40,6 +107,7 @@ const MapWithMultipleSquares = ({
   locations = [],
   thresholds = {},
   selectedMetric = "rsrp",
+  colorBy = null, // ✅ NEW: 'provider', 'band', 'technology', or null
   activeMarkerIndex,
   onMarkerClick,
   options,
@@ -85,6 +153,21 @@ const MapWithMultipleSquares = ({
     mapRef.current = null;
   }, []);
 
+  // ✅ NEW: Get color for a location based on colorBy or metric
+  const getLocationColor = useCallback(
+    (loc) => {
+      // If colorBy is set, use scheme-based coloring
+      if (colorBy) {
+        return getColorByScheme(loc, colorBy);
+      }
+
+      // Otherwise, use metric-based coloring
+      const value = loc?.[selectedMetric];
+      return getColorForMetric(selectedMetric, value, thresholds);
+    },
+    [colorBy, selectedMetric, thresholds]
+  );
+
   if (loadError) {
     return (
       <div className="flex items-center justify-center w-full h-full text-red-500">
@@ -109,8 +192,8 @@ const MapWithMultipleSquares = ({
       >
         {Array.isArray(locations) &&
           locations.map((loc, idx) => {
-            const value = loc?.[selectedMetric];
-            const color = getColorForMetric(selectedMetric, value, thresholds);
+            // ✅ UPDATED: Use new getLocationColor function
+            const color = getLocationColor(loc);
             const isActive = idx === activeMarkerIndex;
             const halfSide = 0.00011;
 

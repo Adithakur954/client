@@ -1,65 +1,121 @@
 // src/api/pythonApiService.js
+import axios from 'axios';
 
-// const PYTHON_BASE_URL = import.meta.env.VITE_PYTHON_API_URL;
-const PYTHON_BASE_URL = "https://python-ml-backend-iqz0.onrender.com";
+const PYTHON_BASE_URL = import.meta.env.VITE_PYTHON_API_URL || "https://python-ml-backend-iqz0.onrender.com";
 
 /**
- * Python API Service using fetch (similar pattern to your C# service)
+ * Create axios instance for Python backend
  */
-const pythonApiService = async (endpoint, { body, params, ...customOptions } = {}) => {
-  const isFormData = body instanceof FormData;
-  const headers = isFormData ? {} : { "Content-Type": "application/json" };
+const pythonAxios = axios.create({
+  baseURL: PYTHON_BASE_URL,
+  timeout: 300000, // 5 minutes default
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-  const config = {
-    method: customOptions.method || "GET",
-    ...customOptions,
-    headers: {
-      ...headers,
-      ...customOptions.headers,
-    },
-  };
+/**
+ * Request Interceptor
+ */
+pythonAxios.interceptors.request.use(
+  (config) => {
+    console.log(`🚀 Python API Request: ${config.method.toUpperCase()} ${config.url}`);
+    
+    // Handle FormData
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type']; // Let browser set it with boundary
+    }
+    
+    return config;
+  },
+  (error) => {
+    console.error('❌ Python API Request Error:', error);
+    return Promise.reject(error);
+  }
+);
 
-  if (body) config.body = isFormData ? body : JSON.stringify(body);
+/**
+ * Response Interceptor
+ */
+pythonAxios.interceptors.response.use(
+  (response) => {
+    console.log(`✅ Python API Response: ${response.config.url}`, response.data);
+    return response;
+  },
+  (error) => {
+    if (error.response) {
+      // Server responded with error status
+      const { status, data } = error.response;
+      console.error(`❌ Python API Error [${status}]:`, data);
+      
+      const errorMessage = 
+        data?.error || 
+        data?.message || 
+        data?.Message || 
+        error.message || 
+        'Unknown error occurred';
+      
+      error.message = `Python API error! Status: ${status} - ${errorMessage}`;
+    } else if (error.request) {
+      // Request made but no response
+      console.error('❌ Python API No Response:', error.request);
+      error.message = 'No response from Python backend. Server may be down.';
+    } else {
+      // Request setup error
+      console.error('❌ Python API Request Setup Error:', error.message);
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
-  const url = new URL(`${PYTHON_BASE_URL}${endpoint}`);
-  if (params) url.search = new URLSearchParams(params).toString();
-
+/**
+ * Python API Service
+ */
+const pythonApiService = async (endpoint, options = {}) => {
   try {
-    const response = await fetch(url.toString(), config);
-
-    if (response.status === 204) return null;
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({
-        message: response.statusText,
-      }));
-      throw new Error(
-        `Python API error! Status: ${response.status} - ${errorData.message || errorData.Message || "Unknown error"}`
-      );
+    const response = await pythonAxios({
+      url: endpoint,
+      ...options,
+    });
+    
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return null;
     }
-
-    const responseText = await response.text();
-    try {
-      return JSON.parse(responseText);
-    } catch (e) {
-      return responseText;
-    }
+    
+    return response.data;
   } catch (error) {
-    console.error(`Python API call to ${endpoint} failed:`, error);
+    console.error(`Python API call to ${endpoint} failed:`, error.message);
     throw error;
   }
 };
 
+/**
+ * Exported Python API methods
+ */
 export const pythonApi = {
   get: (endpoint, options = {}) =>
-    pythonApiService(endpoint, { ...options, method: "GET" }),
+    pythonApiService(endpoint, { ...options, method: 'GET' }),
+  
   post: (endpoint, body, options = {}) =>
-    pythonApiService(endpoint, { ...options, method: "POST", body }),
+    pythonApiService(endpoint, { 
+      ...options, 
+      method: 'POST', 
+      data: body 
+    }),
+  
   put: (endpoint, body, options = {}) =>
-    pythonApiService(endpoint, { ...options, method: "PUT", body }),
+    pythonApiService(endpoint, { 
+      ...options, 
+      method: 'PUT', 
+      data: body 
+    }),
+  
   delete: (endpoint, options = {}) =>
-    pythonApiService(endpoint, { ...options, method: "DELETE" }),
+    pythonApiService(endpoint, { ...options, method: 'DELETE' }),
 };
 
-// Export the base URL for reference
+// Export base URL and axios instance
 export const PYTHON_BASE_URL_EXPORT = PYTHON_BASE_URL;
+export const pythonAxiosInstance = pythonAxios;
