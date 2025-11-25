@@ -1,7 +1,6 @@
 // src/api/pythonApiService.js
 import axios from 'axios';
 
-// const PYTHON_BASE_URL = import.meta.env.VITE_PYTHON_API_URL || "https://python-ml-backend-iqz0.onrender.com";
 const PYTHON_BASE_URL = "http://127.0.0.1:8080";
 
 /**
@@ -20,11 +19,11 @@ const pythonAxios = axios.create({
  */
 pythonAxios.interceptors.request.use(
   (config) => {
-    console.log(`🚀 Python API Request: ${config.method.toUpperCase()} ${config.url}`);
+    console.log(`🚀 Python API Request: ${config.method?.toUpperCase()} ${config.url}`);
     
     // Handle FormData
     if (config.data instanceof FormData) {
-      delete config.headers['Content-Type']; // Let browser set it with boundary
+      delete config.headers['Content-Type'];
     }
     
     return config;
@@ -45,7 +44,6 @@ pythonAxios.interceptors.response.use(
   },
   (error) => {
     if (error.response) {
-      // Server responded with error status
       const { status, data } = error.response;
       console.error(`❌ Python API Error [${status}]:`, data);
       
@@ -58,11 +56,9 @@ pythonAxios.interceptors.response.use(
       
       error.message = `Python API error! Status: ${status} - ${errorMessage}`;
     } else if (error.request) {
-      // Request made but no response
       console.error('❌ Python API No Response:', error.request);
       error.message = 'No response from Python backend. Server may be down.';
     } else {
-      // Request setup error
       console.error('❌ Python API Request Setup Error:', error.message);
     }
     
@@ -71,16 +67,24 @@ pythonAxios.interceptors.response.use(
 );
 
 /**
- * Python API Service
+ * Python API Service - Fixed to properly handle config
  */
 const pythonApiService = async (endpoint, options = {}) => {
   try {
-    const response = await pythonAxios({
-      url: endpoint,
-      ...options,
-    });
+    // Extract only valid axios config options
+    const { method = 'GET', data, params, headers, timeout, ...rest } = options;
     
-    // Handle 204 No Content
+    const config = {
+      url: endpoint,
+      method,
+      ...(data && { data }),
+      ...(params && { params }),
+      ...(headers && { headers }),
+      ...(timeout && { timeout }),
+    };
+    
+    const response = await pythonAxios(config);
+    
     if (response.status === 204) {
       return null;
     }
@@ -96,27 +100,33 @@ const pythonApiService = async (endpoint, options = {}) => {
  * Exported Python API methods
  */
 export const pythonApi = {
-  get: (endpoint, options = {}) =>
-    pythonApiService(endpoint, { ...options, method: 'GET' }),
+  get: (endpoint, params = {}, options = {}) =>
+    pythonApiService(endpoint, { 
+      method: 'GET', 
+      params,
+      ...options 
+    }),
   
   post: (endpoint, body, options = {}) =>
     pythonApiService(endpoint, { 
-      ...options, 
       method: 'POST', 
-      data: body 
+      data: body,
+      ...options 
     }),
   
   put: (endpoint, body, options = {}) =>
     pythonApiService(endpoint, { 
-      ...options, 
       method: 'PUT', 
-      data: body 
+      data: body,
+      ...options 
     }),
   
   delete: (endpoint, options = {}) =>
-    pythonApiService(endpoint, { ...options, method: 'DELETE' }),
+    pythonApiService(endpoint, { 
+      method: 'DELETE',
+      ...options 
+    }),
 };
 
-// Export base URL and axios instance
 export const PYTHON_BASE_URL_EXPORT = PYTHON_BASE_URL;
 export const pythonAxiosInstance = pythonAxios;

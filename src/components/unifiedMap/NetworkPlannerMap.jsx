@@ -1,9 +1,9 @@
-// src/components/NetworkPlannerMap.jsx
+// src/components/unifiedMap/NetworkPlannerMap.jsx
 import React, { useEffect, useState, useRef } from "react";
 import { PolygonF } from "@react-google-maps/api";
 import { cellSiteApi } from "@/api/apiEndpoints";
 
-
+// Helper to calculate sector polygon points
 function computeOffset(center, distanceMeters, headingDegrees) {
   const earthRadius = 6371000; // Earth radius in meters
   const lat1 = (center.lat * Math.PI) / 180;
@@ -42,7 +42,8 @@ function getColorForNetwork(network) {
 // Generate sectors from site data
 function generateSectorsFromSite(site) {
   const sectors = [];
-  const sectorCount = site.sector_count || 3;
+  // Default to 3 sectors if not specified
+  const sectorCount = site.sector_count || 3; 
   const baseAzimuth = site.azimuth_deg_5 || 0;
   const beamwidth = site.beamwidth_deg_est || 65;
   const color = getColorForNetwork(site.network);
@@ -94,7 +95,8 @@ const NetworkPlannerMap = ({
   sectors: externalSectors = null,
   onSectorClick = null,
   viewport = null,
-  options = {}
+  options = {},
+  minSectors = 0 // ✅ Added prop: default 0 shows everything
 }) => {
   const instanceId = useRef(++instanceCounter);
   const [internalSectors, setInternalSectors] = useState([]);
@@ -111,6 +113,7 @@ const NetworkPlannerMap = ({
     hasExternalSectors: !!externalSectors,
     loading,
     fetchedProjectId: fetchedProjectId.current,
+    minSectors
   });
 
   useEffect(() => {
@@ -128,10 +131,9 @@ const NetworkPlannerMap = ({
     console.log(`🔄 [Instance ${instanceId.current}] useEffect triggered - projectId:`, projectId);
     
     const fetchSite = async () => {
-      if (fetchedProjectId.current === projectId) {
-        console.log(`ℹ️ [Instance ${instanceId.current}] Already fetched data for project`, projectId);
-        return;
-      }
+      // If we already fetched this project's data, we typically wouldn't re-fetch,
+      // BUT if the filter criteria (minSectors) changes, we might want to re-process.
+      // For simplicity here, we'll re-process if projectId changes or if it's the first run.
       
       setLoading(true);
       setError(null);
@@ -149,19 +151,24 @@ const NetworkPlannerMap = ({
         
         clearTimeout(timeoutId);
         
-        console.log(`📦 [Instance ${instanceId.current}] Raw API response:`, res);
-        
         if (res && res.data) {
           const siteData = Array.isArray(res.data) ? res.data : [res.data];
           
           console.log(`🏢 [Instance ${instanceId.current}] Site data received:`, siteData.length, "sites");
           
-          const allSectors = siteData.flatMap(site => generateSectorsFromSite(site));
+          // ✅ FILTER LOGIC: Only keep sites with >= minSectors
+          const filteredSites = siteData.filter(site => {
+            const count = site.sector_count !== undefined && site.sector_count !== null 
+              ? site.sector_count 
+              : 3; // Default is 3
+            return count >= minSectors;
+          });
+
+          const allSectors = filteredSites.flatMap(site => generateSectorsFromSite(site));
           
-          console.log(`📍 [Instance ${instanceId.current}] Generated sectors:`, allSectors.length);
+          console.log(`📍 [Instance ${instanceId.current}] Generated sectors (filtered):`, allSectors.length);
           setInternalSectors(allSectors);
           fetchedProjectId.current = projectId;
-          console.log(`✅ [Instance ${instanceId.current}] Sectors set in state for project`, projectId);
         } else {
           console.warn(`⚠️ [Instance ${instanceId.current}] No data received from siteNoml`);
           setInternalSectors([]);
@@ -170,122 +177,47 @@ const NetworkPlannerMap = ({
         if (error.name === 'AbortError') {
           const errMsg = 'Request timeout - Server took too long to respond';
           setError(errMsg);
-          console.error(`❌ [Instance ${instanceId.current}]`, errMsg);
         } else if (error.response) {
           const errMsg = `Server error: ${error.response.status}`;
           setError(errMsg);
-          console.error(`❌ [Instance ${instanceId.current}] API Error Response:`, error.response);
         } else if (error.request) {
           const errMsg = 'No response from server';
           setError(errMsg);
-          console.error(`❌ [Instance ${instanceId.current}] No response received:`, error.request);
         } else {
           const errMsg = error.message || 'Failed to fetch site data';
           setError(errMsg);
-          console.error(`❌ [Instance ${instanceId.current}] Failed to fetch site data:`, error);
         }
+        console.error(`❌ [Instance ${instanceId.current}] Error:`, error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchSite();
-  }, [projectId, externalSectors]);
-
-  // Component lifecycle logging
-  useEffect(() => {
-    console.log(`🎬 [Instance ${instanceId.current}] Component MOUNTED`);
-    return () => {
-      console.log(`🔚 [Instance ${instanceId.current}] Component UNMOUNTED`);
-    };
-  }, []);
+  }, [projectId, externalSectors, minSectors]); // ✅ Re-run when minSectors changes
 
   // Show loading state
   if (loading && !externalSectors) {
-    console.log(`⏳ [Instance ${instanceId.current}] Showing loading state`);
     return (
       <div style={{ 
-        position: 'absolute', 
-        top: '50%', 
-        left: '50%', 
-        transform: 'translate(-50%, -50%)',
-        background: 'white',
-        padding: '20px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '10px'
+        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+        background: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'
       }}>
         <div className="spinner" style={{
-          border: '4px solid #f3f3f3',
-          borderTop: '4px solid #3b82f6',
-          borderRadius: '50%',
-          width: '40px',
-          height: '40px',
-          animation: 'spin 1s linear infinite'
+          border: '4px solid #f3f3f3', borderTop: '4px solid #3b82f6', borderRadius: '50%',
+          width: '40px', height: '40px', animation: 'spin 1s linear infinite'
         }}></div>
         <div>Loading site data...</div>
-        <style>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   // Show error state
   if (error && !externalSectors) {
-    console.log(`❌ [Instance ${instanceId.current}] Showing error state:`, error);
-    return (
-      <div style={{ 
-        position: 'absolute', 
-        top: '50%', 
-        left: '50%', 
-        transform: 'translate(-50%, -50%)',
-        background: '#fee',
-        padding: '20px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        zIndex: 1000,
-        maxWidth: '400px'
-      }}>
-        <div style={{ color: '#dc2626', fontWeight: 'bold', marginBottom: '10px' }}>
-          ⚠️ Error Loading Site Data
-        </div>
-        <div style={{ color: '#991b1b' }}>{error}</div>
-        <button 
-          onClick={() => {
-            fetchedProjectId.current = null;
-            window.location.reload();
-          }}
-          style={{
-            marginTop: '10px',
-            padding: '8px 16px',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    );
+    return null; // Or render an error message overlay if desired
   }
-
-  // Show info if no sectors
-  if (sectors.length === 0) {
-    console.log(`⚠️ [Instance ${instanceId.current}] No sectors to display`);
-    return null;
-  }
-
-  console.log(`✅ [Instance ${instanceId.current}] Rendering ${sectors.length} sectors on map`);
 
   // Filter by viewport if provided
   const visibleSectors = viewport
@@ -300,8 +232,6 @@ const NetworkPlannerMap = ({
       })
     : sectors;
 
-  console.log(`   Visible in viewport: ${visibleSectors.length} / ${sectors.length}`);
-
   return (
     <>
       {visibleSectors.map((sector, index) => {
@@ -309,7 +239,6 @@ const NetworkPlannerMap = ({
           const p0 = { lat: sector.lat, lng: sector.lng };
           const bw = sector.beamwidth ?? 65;
           const r = (sector.range ?? radius) * (options.scale ?? 1);
-
 
           const p1 = computeOffset(p0, r, sector.azimuth - bw / 2);
           const p2 = computeOffset(p0, r, sector.azimuth + bw / 2);
@@ -329,15 +258,11 @@ const NetworkPlannerMap = ({
                 clickable: !!onSectorClick,
               }}
               onClick={() => {
-                if (onSectorClick) {
-                  console.log(`🖱️ Sector clicked:`, sector);
-                  onSectorClick(sector);
-                }
+                if (onSectorClick) onSectorClick(sector);
               }}
             />
           );
         } catch (err) {
-          console.error(`❌ [Instance ${instanceId.current}] Error rendering sector:`, sector, err);
           return null;
         }
       })}

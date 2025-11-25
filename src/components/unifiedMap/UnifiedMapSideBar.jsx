@@ -174,6 +174,8 @@ const UnifiedMapSidebar = ({
   showNeighbors,
   setShowNeighbors,
   neighborStats,
+  areaEnabled,
+  setAreaEnabled,
 }) => {
   const sideClasses = useMemo(() => {
     const base =
@@ -263,9 +265,11 @@ const updateDataFilter = useCallback((filterType, value) => {
     () => [
       { value: "sample", label: "Sample" },
       { value: "prediction", label: "Prediction" },
+      
     ],
     []
   );
+  
 
   const polygonToggleOptions = useMemo(() => [
     { value: "map", label: "Map Regions" },
@@ -350,11 +354,26 @@ const updateDataFilter = useCallback((filterType, value) => {
                 />
                 <span className="text-sm">Enable Data Layer</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
+  <input
+    type="checkbox"
+    checked={areaEnabled}
+    onChange={(e) => setAreaEnabled?.(e.target.checked)}
+    className="w-4 h-4"
+  />
+  <div className="flex-1">
+    <div className="text-sm">Area Zones</div>
+    {/* {areaEnabled && areaPolygonCount > 0 && (
+      <div className="text-xs text-purple-400">
+        {areaPolygonCount} zone{areaPolygonCount > 1 ? 's' : ''} loaded
+      </div>
+    )} */}
+  </div>
+</label>
+
 
               <div>
-                <Label className="text-xs text-slate-300 mb-2 block">
-                  Sample or Prediction
-                </Label>
+               
                 <ToggleButton
                   value={dataToggle}
                   onChange={handleDataToggleChange}

@@ -1,6 +1,7 @@
 // src/api/apiEndpoints.js
 import { api } from "./apiService"; // C# Backend
 import { pythonApi } from "./pythonApiService"; // Python Backend
+import axios from "axios";
 
 
 
@@ -290,6 +291,9 @@ export const cellSiteApi = {
 export const areaBreakdownApi = {
   getAreaBreakdown: (params) => 
     pythonApi.post("/api/area-breakup/process", params),
+
+  getAreaPolygons: (projectId) => 
+    pythonApi.get(`/api/area-breakup/fetch/${projectId}`),
 };
 
 export const predictionApi = {
