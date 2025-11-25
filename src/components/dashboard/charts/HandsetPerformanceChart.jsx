@@ -1,5 +1,5 @@
 // src/components/charts/HandsetPerformanceChart.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   ResponsiveContainer, 
   ComposedChart, 
@@ -13,83 +13,38 @@ import {
 } from 'recharts';
 import ChartCard from '../ChartCard';
 import { TOOLTIP_STYLE } from '@/components/constants/dashboardConstants';
-import { adminApi } from '@/api/apiEndpoints';
+import { useHandsetPerformance } from '@/hooks/useDashboardData';
 import { getRSRPPointColor } from '@/utils/chartUtils';
-import { ensureNegative, toNumber } from '@/utils/dashboardUtils';
 
 const HandsetPerformanceChart = () => {
   // ============================================
-  // STATE MANAGEMENT
+  // SWR HOOK - SINGLE SOURCE OF TRUTH
   // ============================================
-  const [data, setData] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // Filter States
+  const { 
+    data: rawData, 
+    isLoading, 
+    error,
+    mutate 
+  } = useHandsetPerformance();
+
+  // Ensure data is always an array
+  const data = useMemo(() => {
+    if (!rawData || !Array.isArray(rawData)) return [];
+    return rawData;
+  }, [rawData]);
+
+  // ============================================
+  // LOCAL FILTER STATES
+  // ============================================
   const [topN, setTopN] = useState(10);
   const [minSamples, setMinSamples] = useState(0);
-  const [sortBy, setSortBy] = useState('avg'); // 'avg' or 'samples'
+  const [sortBy, setSortBy] = useState('avg');
 
   // ============================================
   // CONSTANTS
   // ============================================
   const CHART_Y_MIN = -120;
   const CHART_Y_MAX = -60;
-
-  // ============================================
-  // DATA FETCHING
-  // ============================================
-  useEffect(() => {
-    const fetchHandsetData = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      console.log('🔄 [HandsetChart] Fetching handset performance data...');
-      
-      try {
-        const response = await adminApi.getDashboardGraphData();
-        
-        console.log('📥 [HandsetChart] Raw API Response:', response);
-        
-        // Handle different response structures
-        const rawData = response?.handsetWiseAvg_bar || 
-                       response?.HandsetWiseAvg_bar || 
-                       response?.Data?.handsetWiseAvg_bar ||
-                       response?.data?.handsetWiseAvg_bar ||
-                       [];
-        
-        console.log('📊 [HandsetChart] Extracted Data:', rawData);
-        
-        if (!Array.isArray(rawData)) {
-          throw new Error('Invalid data structure: Expected array');
-        }
-        
-        if (rawData.length === 0) {
-          console.warn('⚠️ [HandsetChart] No data available');
-          setData([]);
-          return;
-        }
-        
-        // Process and normalize data
-        const processedData = rawData.map(item => ({
-          Make: item?.Make || item?.make || item?.name || 'Unknown',
-          Avg: ensureNegative(toNumber(item?.Avg || item?.avg || 0)),
-          Samples: toNumber(item?.Samples || item?.samples || 0),
-        }));
-        
-        console.log('✅ [HandsetChart] Processed Data:', processedData);
-        
-        setData(processedData);
-      } catch (err) {
-        console.error('❌ [HandsetChart] Fetch Error:', err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchHandsetData();
-  }, []);
 
   // ============================================
   // SIGNAL QUALITY HELPER
@@ -112,16 +67,13 @@ const HandsetPerformanceChart = () => {
     
     // Sort
     if (sortBy === 'avg') {
-      filtered.sort((a, b) => b.Avg - a.Avg); // Best signal first
+      filtered.sort((a, b) => b.Avg - a.Avg);
     } else {
-      filtered.sort((a, b) => b.Samples - a.Samples); // Most samples first
+      filtered.sort((a, b) => b.Samples - a.Samples);
     }
     
-    // Take top N
-    const topItems = filtered.slice(0, topN);
-    
-    // Add baseline for chart rendering
-    return topItems.map(item => ({
+    // Take top N and add baseline
+    return filtered.slice(0, topN).map(item => ({
       ...item,
       BaselineValue: CHART_Y_MIN,
     }));
@@ -303,22 +255,30 @@ const HandsetPerformanceChart = () => {
         </div>
       </div>
 
-      {/* Reset Button */}
-      <button
-        onClick={() => {
-          setTopN(10);
-          setMinSamples(0);
-          setSortBy('avg');
-        }}
-        className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
-      >
-        Reset Filters
-      </button>
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            setTopN(10);
+            setMinSamples(0);
+            setSortBy('avg');
+          }}
+          className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
+        >
+          Reset
+        </button>
+        <button
+          onClick={() => mutate()}
+          className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+        >
+          Refresh
+        </button>
+      </div>
     </div>
   );
 
   // ============================================
-  // RENDER CHART
+  // RENDER
   // ============================================
   return (
     <ChartCard
@@ -331,9 +291,7 @@ const HandsetPerformanceChart = () => {
       settings={{
         title: 'Handset Performance Settings',
         render: settingsRender,
-        onApply: () => {
-          console.log('✅ Settings applied');
-        }
+        onApply: () => console.log('✅ Settings applied')
       }}
     >
       <ResponsiveContainer width="100%" height="100%">
@@ -347,7 +305,6 @@ const HandsetPerformanceChart = () => {
           <ReferenceArea y1={-95} y2={-105} fill="#F59E0B" fillOpacity={0.08} />
           <ReferenceArea y1={-105} y2={-120} fill="#EF4444" fillOpacity={0.08} />
 
-          {/* X-Axis */}
           <XAxis
             dataKey="Make"
             type="category"
@@ -358,7 +315,6 @@ const HandsetPerformanceChart = () => {
             interval={0}
           />
 
-          {/* Y-Axis */}
           <YAxis
             type="number"
             domain={[CHART_Y_MIN, CHART_Y_MAX]}
@@ -369,22 +325,15 @@ const HandsetPerformanceChart = () => {
               value: 'RSRP (dBm)', 
               angle: -90, 
               position: 'insideLeft',
-              style: { 
-                textAnchor: 'middle', 
-                fill: '#6b7280', 
-                fontSize: 12, 
-                fontWeight: 500 
-              }
+              style: { textAnchor: 'middle', fill: '#6b7280', fontSize: 12, fontWeight: 500 }
             }}
           />
           
-          {/* Tooltip */}
           <Tooltip 
             content={<CustomTooltip />} 
             cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
           />
 
-          {/* Lollipop sticks */}
           <Bar
             dataKey="Avg"
             fill="transparent"
@@ -398,7 +347,6 @@ const HandsetPerformanceChart = () => {
             ))}
           </Bar>
 
-          {/* Lollipop dots */}
           <Scatter
             dataKey="Avg"
             fill="#8884d8"

@@ -1,5 +1,5 @@
-import { adminApi } from "@/api/apiEndpoints";
-import React, { useEffect, useState } from "react";
+// src/components/charts/AppChart.jsx
+import React, { useState, useMemo } from "react";
 import {
   Bar,
   Legend,
@@ -12,101 +12,228 @@ import {
   ComposedChart,
 } from "recharts";
 import ChartCard from "../ChartCard";
+import { useAppData } from "@/hooks/useDashboardData";
+
+const METRIC_CONFIG = [
+  { key: "avgDlTptMbps", label: "Download Mbps", color: "#3B82F6" },
+  { key: "avgUlTptMbps", label: "Upload Mbps", color: "#10B981" },
+  { key: "avgMos", label: "MOS", color: "#F59E0B" },
+  { key: "sampleCount", label: "Sample Count", color: "#EF4444", isLine: true },
+  { key: "avgRsrp", label: "RSRP", color: "#8B5CF6" },
+  { key: "avgRsrq", label: "RSRQ", color: "#6366F1" },
+  { key: "avgSinr", label: "SINR", color: "#14B8A6" },
+  { key: "avgDuration", label: "Duration (Hours)", color: "#EC4899" },
+];
 
 function AppChart() {
-  const [chartData, setChartData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // ============================================
+  // SWR HOOK - SINGLE SOURCE OF TRUTH
+  // ============================================
+  const { 
+    data: chartData, 
+    isLoading, 
+    error,
+    mutate,
+    isValidating
+  } = useAppData();
 
-  // ✅ Add this missing state for metrics
+  // ✅ Debug logging
+  console.log('🔍 [AppChart] Hook Result:', {
+    chartData,
+    isLoading,
+    error,
+    isValidating,
+    dataType: typeof chartData,
+    isArray: Array.isArray(chartData),
+    length: chartData?.length
+  });
+
+  // Ensure data is always an array
+  const data = useMemo(() => {
+    if (!chartData) {
+      console.warn('⚠️ [AppChart] chartData is null/undefined');
+      return [];
+    }
+    if (!Array.isArray(chartData)) {
+      console.warn('⚠️ [AppChart] chartData is not an array:', typeof chartData);
+      return [];
+    }
+    return chartData;
+  }, [chartData]);
+
+  // ============================================
+  // LOCAL FILTER STATES
+  // ============================================
   const [selectedMetrics, setSelectedMetrics] = useState([
     "avgDlTptMbps",
     "avgUlTptMbps",
   ]);
+  const [topN, setTopN] = useState(15);
+  const [sortBy, setSortBy] = useState('sampleCount');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const resp = await adminApi.getAppValue();
-        console.log("API response:", resp);
+  // ============================================
+  // FILTERED & SORTED DATA
+  // ============================================
+  const displayData = useMemo(() => {
+    if (!data || data.length === 0) {
+      console.warn('⚠️ [AppChart] No data to display');
+      return [];
+    }
+    
+    const sorted = [...data].sort((a, b) => {
+      if (sortBy === 'sampleCount') return (b.sampleCount || 0) - (a.sampleCount || 0);
+      if (sortBy === 'avgDlTptMbps') return (b.avgDlTptMbps || 0) - (a.avgDlTptMbps || 0);
+      if (sortBy === 'appName') return (a.appName || '').localeCompare(b.appName || '');
+      return 0;
+    });
+    
+    const result = sorted.slice(0, topN);
+    console.log('✅ [AppChart] Display Data:', result);
+    return result;
+  }, [data, topN, sortBy]);
 
-        const formattedData = (resp?.Data || []).map((item) => ({
-          appName: item.appName,
-          avgDlTptMbps: parseFloat(item.avgDlTptMbps) || 0,
-          avgUlTptMbps: parseFloat(item.avgUlTptMbps) || 0,
-          avgMos: parseFloat(item.avgMos) || 0,
-          sampleCount: parseInt(item.sampleCount) || 0,
-          avgRsrp: parseFloat(item.avgRsrp) || 0,
-          avgRsrq: parseFloat(item.avgRsrq) || 0,
-          avgSinr: parseFloat(item.avgSinr) || 0,
-          avgDuration: parseFloat(item.durationMinutes/60) || 0,
-        }));
+  // ============================================
+  // SETTINGS RENDER
+  // ============================================
+  const settingsRender = () => (
+    <div className="space-y-4">
+      {/* Metric Selection */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Select Metrics to Display
+        </label>
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {METRIC_CONFIG.map(({ key, label, color }) => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedMetrics.includes(key)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedMetrics((prev) => [...prev, key]);
+                  } else {
+                    setSelectedMetrics((prev) => prev.filter((m) => m !== key));
+                  }
+                }}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div 
+                className="w-3 h-3 rounded" 
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-sm text-gray-700">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
 
-        console.log("Formatted data:", formattedData);
-        setChartData(formattedData);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      {/* Top N */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Show Top Apps
+        </label>
+        <select
+          value={topN}
+          onChange={(e) => setTopN(Number(e.target.value))}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+        >
+          <option value={10}>Top 10</option>
+          <option value={15}>Top 15</option>
+          <option value={20}>Top 20</option>
+          <option value={25}>Top 25</option>
+        </select>
+      </div>
 
-    fetchData();
-  }, []);
+      {/* Sort By */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Sort By
+        </label>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="sampleCount">Most Samples</option>
+          <option value="avgDlTptMbps">Highest Download Speed</option>
+          <option value="appName">App Name (A-Z)</option>
+        </select>
+      </div>
 
+      {/* Info */}
+      <div className="pt-3 border-t border-gray-200">
+        <div className="text-xs text-gray-600 space-y-1">
+          <div className="flex justify-between">
+            <span>Total Apps:</span>
+            <span className="font-semibold text-gray-900">{data.length}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Showing:</span>
+            <span className="font-semibold text-gray-900">{displayData.length}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Metrics Selected:</span>
+            <span className="font-semibold text-gray-900">{selectedMetrics.length}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            setSelectedMetrics(["avgDlTptMbps", "avgUlTptMbps"]);
+            setTopN(15);
+            setSortBy('sampleCount');
+          }}
+          className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
+        >
+          Reset
+        </button>
+        <button
+          onClick={() => mutate()}
+          disabled={isValidating}
+          className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+        >
+          {isValidating ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // ============================================
+  // GET ACTIVE METRICS CONFIG
+  // ============================================
+  const activeMetrics = useMemo(() => {
+    return METRIC_CONFIG.filter(m => selectedMetrics.includes(m.key));
+  }, [selectedMetrics]);
+
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <ChartCard
-      title="App wise distribution"
-      dataset={chartData}
-      isLoading={loading}
+      title="App Wise Distribution"
+      dataset={data}
+      exportFileName="app_distribution"
+      isLoading={isLoading}
+      error={error}
       showChartFilters={false}
       settings={{
-        title: "Select Metrics to Display",
-        render: () => (
-          <div className="space-y-3">
-            {[
-              { key: "avgDlTptMbps", label: "Download Mbps" },
-              { key: "avgUlTptMbps", label: "Upload Mbps" },
-              { key: "avgMos", label: "MOS (Mean Opinion Score)" },
-              { key: "sampleCount", label: "Sample Count" },
-              { key: "avgRsrp", label: "RSRP" },
-              { key: "avgRsrq", label: "RSRQ" },
-              { key: "avgSinr", label: "SINR" },
-              { key: "avgDuration", label: "Duration (Minutes)" },
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedMetrics.includes(key)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedMetrics((prev) => [...prev, key]);
-                    } else {
-                      setSelectedMetrics((prev) =>
-                        prev.filter((m) => m !== key)
-                      );
-                    }
-                  }}
-                  className="accent-blue-600"
-                />
-                <span>{label}</span>
-              </label>
-            ))}
-          </div>
-        ),
+        title: "App Chart Settings",
+        render: settingsRender,
         onApply: () => console.log("Selected metrics:", selectedMetrics),
       }}
     >
-      {chartData.length > 0 ? (
+      {displayData.length > 0 ? (
         <div style={{ width: "100%", height: "100%" }}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
-              data={chartData}
+              data={displayData}
               margin={{ top: 20, right: 50, left: 30, bottom: 60 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
 
-              {/* X Axis */}
               <XAxis
                 dataKey="appName"
                 angle={-45}
@@ -116,7 +243,6 @@ function AppChart() {
                 tick={{ fill: "#111827", fontSize: 11, fontWeight: 600 }}
               />
 
-              {/* LEFT Y AXIS — Main Metrics */}
               <YAxis
                 yAxisId="left"
                 tick={{ fill: "#6b7280", fontSize: 11 }}
@@ -128,7 +254,6 @@ function AppChart() {
                 }}
               />
 
-              {/* RIGHT Y AXIS — Sample Count */}
               <YAxis
                 yAxisId="right"
                 orientation="right"
@@ -141,79 +266,44 @@ function AppChart() {
                 }}
               />
 
-              {/* Tooltip + Legend */}
               <Tooltip />
               <Legend />
 
-              {/* ZIG-ZAG LINE FOR SAMPLE COUNT */}
-              <defs>
-                <pattern
-                  id="zigzagStroke"
-                  width="6"
-                  height="6"
-                  patternUnits="userSpaceOnUse"
-                >
-                  <path
-                    d="M0 3 L3 0 L6 3 L3 6 Z"
-                    fill="none"
-                    stroke="#EF4444"
-                    strokeWidth="1.5"
-                  />
-                </pattern>
-              </defs>
-
-             
-
-              {/* METRIC BARS */}
-              {selectedMetrics
-                .filter((m) => m !== "sampleCount")
-                .map((metric, idx) => (
+              {/* Render Bars */}
+              {activeMetrics
+                .filter((m) => !m.isLine)
+                .map((metric) => (
                   <Bar
-                    key={metric}
+                    key={metric.key}
                     yAxisId="left"
-                    dataKey={metric}
-                    name={
-                      {
-                        avgDlTptMbps: "Download Mbps",
-                        avgUlTptMbps: "Upload Mbps",
-                        avgMos: "MOS",
-                        avgRsrp: "RSRP",
-                        avgRsrq: "RSRQ",
-                        avgSinr: "SINR",
-                      }[metric]
-                    }
-                    fill={
-                      [
-                        "#3B82F6",
-                        "#10B981",
-                        "#F59E0B",
-                        "#8B5CF6",
-                        "#EF4444",
-                        "#6366F1",
-                        "#14B8A6",
-                      ][idx % 7]
-                    }
+                    dataKey={metric.key}
+                    name={metric.label}
+                    fill={metric.color}
                     barSize={20}
                     radius={[4, 4, 0, 0]}
                   />
                 ))}
 
-              {/* SAMPLE COUNT LINE (ZIGZAG) */}
+              {/* Render Line for Sample Count */}
               {selectedMetrics.includes("sampleCount") && (
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="sampleCount"
                   name="Sample Count"
-                  stroke="url(#zigzagStroke)"
-                  strokeWidth={3}
-                  dot={{ r: 3, fill: "#EF4444" }}
+                  stroke="#EF4444"
+                  strokeWidth={2}
+                  dot={{ r: 4, fill: "#EF4444" }}
                 />
               )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-      ) : null}
+      ) : (
+        <div className="flex items-center justify-center h-full text-gray-500">
+          {isLoading ? 'Loading...' : 'No data available'}
+        </div>
+      )}
     </ChartCard>
   );
 }

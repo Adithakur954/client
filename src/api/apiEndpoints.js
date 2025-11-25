@@ -2,11 +2,7 @@
 import { api } from "./apiService"; // C# Backend
 import { pythonApi } from "./pythonApiService"; // Python Backend
 
-/**
- * ============================================
- * PYTHON BACKEND APIs (Port 5000/8080)
- * ============================================
- */
+
 
 export const generalApi = {
   healthCheck: async () => {
@@ -291,11 +287,73 @@ export const cellSiteApi = {
   },
 };
 
-/**
- * ============================================
- * C# BACKEND APIs (Port 5224)
- * ============================================
- */
+export const areaBreakdownApi = {
+  getAreaBreakdown: (params) => 
+    pythonApi.post("/api/area-breakup/process", params),
+};
+
+export const predictionApi = {
+  /**
+   * Run LTE Prediction Pipeline
+   * @param {Object} params - Prediction parameters
+   * @param {number} params.Project_id - Project ID
+   * @param {number[]} params.Session_ids - Array of session IDs
+   * @param {string} [params.indoor_mode='heuristic'] - Indoor mode (optional)
+   * @returns {Promise<Object>} Prediction result
+   */
+  runPrediction: async (params) => {
+    try {
+      console.log('🚀 Starting LTE Prediction Pipeline...');
+      console.log('Parameters:', JSON.stringify(params, null, 2));
+
+      if (!params.Project_id) {
+        throw new Error('Project_id is required');
+      }
+      if (!params.Session_ids || !Array.isArray(params.Session_ids) || params.Session_ids.length === 0) {
+        throw new Error('Session_ids array is required and must not be empty');
+      }
+
+      const payload = {
+        Project_id: params.Project_id,
+        Session_ids: params.Session_ids,
+        indoor_mode: params.indoor_mode || 'heuristic'
+      };
+
+      const response = await pythonApi.post('/api/prediction/run', payload, {
+        timeout: 600000, // 10 minutes
+      });
+
+      console.log('✅ Prediction completed successfully:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ Prediction pipeline error:', error);
+      
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Prediction timed out. The dataset may be too large.');
+      }
+      
+      if (error.response?.data?.detail) {
+        throw new Error(`Prediction failed: ${error.response.data.detail}`);
+      }
+      
+      throw error;
+    }
+  },
+
+  /**
+   * Health check for prediction service
+   */
+  healthCheck: async () => {
+    try {
+      return await pythonApi.get('/api/prediction/health');
+    } catch (error) {
+      console.error('Prediction service health check failed:', error);
+      throw error;
+    }
+  },
+};
+
+
 
 export const authApi = {
   checkStatus: () => api.get("/api/auth/status"),

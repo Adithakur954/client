@@ -1,3 +1,5 @@
+// src/pages/Dashboard.jsx
+
 import React, { useState, useMemo } from 'react';
 import { 
   BarChart2, RefreshCw, Users, Car, Waypoints, FileText, 
@@ -25,9 +27,14 @@ import {
   useOutdoorCount
 } from '@/hooks/useDashboardData';
 
+import { usePersistedFilters, clearAllPersistedFilters } from '@/hooks/usePersistedFilters'; // ✅ Import
+
 const DashboardPage = () => {
-  // Individual chart filters
-  const [chartFilters, setChartFilters] = useState({});
+  // ✅ Use persisted filters for each chart
+  const [monthlySamplesFilters, setMonthlySamplesFilters] = usePersistedFilters('monthlySamples');
+  const [operatorSamplesFilters, setOperatorSamplesFilters] = usePersistedFilters('operatorSamples');
+  const [metricFilters, setMetricFilters] = usePersistedFilters('metric');
+  const [bandDistFilters, setBandDistFilters] = usePersistedFilters('bandDist');
 
   // Fetch totals and available operators/networks
   const { data: totalsData = {}, isLoading: isTotalsLoading } = useTotals();
@@ -48,21 +55,11 @@ const DashboardPage = () => {
   }, [bandDistData]);
 
   const totalLocationSamples = (Number(indoorData) || 0) + (Number(outdoorData) || 0);
-  
-
-  // Extract indoor/outdoor counts
-  // const indoorCount = useMemo(() => {
-  //   return indoorData?.Count ??  0;
-  // }, [indoorData]);
-
-  // const outdoorCount = useMemo(() => {
-  //   return outdoorData?.Count ?? 0;
-  // }, [outdoorData]);
 
   // Check if any KPI data is loading
   const isKPILoading = isTotalsLoading || isIndoorLoading || isOutdoorLoading;
 
-  // Stats for KPI cards - ALL 8 KPIs
+  // Stats for KPI cards
   const stats = useMemo(() => {
     return [
       {
@@ -122,16 +119,17 @@ const DashboardPage = () => {
         description: "Outdoor measurements"
       },
     ];
-  }, [totalsData, operatorCount, bandCount, indoorData, outdoorData]);
- 
-  const handleChartFilterChange = (chartKey, newFilters) => {
-    setChartFilters(prev => ({
-      ...prev,
-      [chartKey]: newFilters
-    }));
-  };
+  }, [totalsData, operatorCount, bandCount, indoorData, outdoorData, totalLocationSamples]);
 
+  // ✅ Handle refresh all - clear cache and filters
   const handleRefreshAll = () => {
+    // Clear SWR cache
+    localStorage.removeItem('app-swr-cache');
+    
+    // Clear all persisted filters
+    clearAllPersistedFilters();
+    
+    // Reload page
     window.location.reload();
   };
 
@@ -157,7 +155,7 @@ const DashboardPage = () => {
           </button>
         </div>
 
-       
+        {/* KPI Cards */}
         <div className="flex flex-wrap gap-6">
           {isKPILoading ? (
             Array.from({ length: 8 }).map((_, i) => (
@@ -174,50 +172,40 @@ const DashboardPage = () => {
           )}
         </div>
 
-    
+        {/* Charts Grid - ✅ Using persisted filters */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         
           <MonthlySamplesChart
-            chartFilters={chartFilters['monthlySamples']}
-            onChartFiltersChange={(f) => handleChartFilterChange('monthlySamples', f)}
+            chartFilters={monthlySamplesFilters}
+            onChartFiltersChange={setMonthlySamplesFilters}
             operators={operators}
             networks={networks}
           />
 
-          
           <OperatorNetworkChart
-            chartFilters={chartFilters['operatorSamples']}
-            onChartFiltersChange={(f) => handleChartFilterChange('operatorSamples', f)}
+            chartFilters={operatorSamplesFilters}
+            onChartFiltersChange={setOperatorSamplesFilters}
             operators={operators}
             networks={networks}
           />
 
-          {/* Network Type Distribution */}
           <AppChart />
 
-          {/* Dynamic Metric Chart */}
           <MetricChart
-            chartFilters={chartFilters['metric']}
-            onChartFiltersChange={(f) => handleChartFilterChange('metric', f)}
+            chartFilters={metricFilters}
+            onChartFiltersChange={setMetricFilters}
             operators={operators}
             networks={networks}
           />
 
-          {/* Band Distribution */}
           <BandDistributionChart
-            chartFilters={chartFilters['bandDist']}
-            onChartFiltersChange={(f) => handleChartFilterChange('bandDist', f)}
+            chartFilters={bandDistFilters}
+            onChartFiltersChange={setBandDistFilters}
             operators={operators}
             networks={networks}
           />
 
-          {/* Handset Performance */}
           <HandsetPerformanceChart />
-
-          {/* Coverage Ranking */}
           <CoverageRankingChart />
-
-          {/* Quality Ranking */}
           <QualityRankingChart />
         </div>
       </div>

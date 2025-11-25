@@ -10,6 +10,7 @@ import {
   toNumber,
   ensureNegative
 } from '../utils/dashboardUtils';
+import { localStorageProvider } from '../utils/localStorageProvider';
 
 // ============================================
 // DEBUG MODE CONTROL
@@ -42,6 +43,7 @@ const SWR_CONFIG = {
   errorRetryInterval: 2000,
   dedupingInterval: 1000,
   focusThrottleInterval: 5000,
+   
   loadingTimeout: 5000,
   onLoadingSlow: (key) => {
     console.warn(`⏱️ Slow loading (>5s): ${key}`);
@@ -798,62 +800,184 @@ export const useHandsetPerformance = () => {
 // HOOKS: OPERATORS & NETWORKS
 // ============================================
 
+// ============================================
+// HOOKS: OPERATORS & NETWORKS
+// ============================================
+
 export const useOperatorsAndNetworks = () => {
-  const { data: rawOperators = [], isLoading: operatorsLoading, error: operatorsError } = useSWR(
+  const { 
+    data: rawOperators = [], 
+    isLoading: operatorsLoading, 
+    error: operatorsError 
+  } = useSWR(
     'operators',
     async () => {
-      const data = await safeFetch(() => adminApi.getOperatorsV2?.(), [], 60000, 'getOperatorsV2');
+      log('🔄', 'Fetching operators...', {});
+      
+      const resp = await safeFetch(
+        () => adminApi.getOperatorsV2?.(), 
+        [], 
+        60000, 
+        'getOperatorsV2'
+      );
+      
+      logGroup('Operators Response Analysis', () => {
+        console.log('📦 Response:', resp);
+        console.log('📊 Type:', typeof resp);
+        console.log('📏 Is Array:', Array.isArray(resp));
+        console.log('📏 Length:', Array.isArray(resp) ? resp.length : 'N/A');
+        console.log('🎯 Sample:', Array.isArray(resp) ? resp[0] : resp);
+      });
+      
+      // Handle different response formats
+      let data;
+      if (Array.isArray(resp)) {
+        data = resp;
+      } else if (resp?.Data && Array.isArray(resp.Data)) {
+        data = resp.Data;
+      } else if (resp?.data && Array.isArray(resp.data)) {
+        data = resp.data;
+      } else {
+        console.warn('⚠️ Unexpected operators response format:', resp);
+        data = [];
+      }
+      
       log('📊', 'Raw Operators Data', data);
       return data;
     },
     { 
       ...SWR_CONFIG, 
       dedupingInterval: CACHE_TIME.LONG,
-      revalidateOnMount: false,
+      revalidateOnMount: true, // ✅ Changed from false to true
       onSuccess: (data) => log('✅', 'Operators Loaded', { count: data?.length }),
       onError: (err) => console.error('❌ Operators Error', err)
     }
   );
 
-  const { data: networks = [], isLoading: networksLoading, error: networksError } = useSWR(
+  const { 
+    data: rawNetworks = [], 
+    isLoading: networksLoading, 
+    error: networksError 
+  } = useSWR(
     'networks',
     async () => {
-      const data = await safeFetch(() => adminApi.getNetworksV2?.(), [], 60000, 'getNetworksV2');
+      log('🔄', 'Fetching networks...', {});
+      
+      const resp = await safeFetch(
+        () => adminApi.getNetworksV2?.(), 
+        [], 
+        60000, 
+        'getNetworksV2'
+      );
+      
+      logGroup('Networks Response Analysis', () => {
+        console.log('📦 Response:', resp);
+        console.log('📊 Type:', typeof resp);
+        console.log('📏 Is Array:', Array.isArray(resp));
+        console.log('📏 Length:', Array.isArray(resp) ? resp.length : 'N/A');
+      });
+      
+      // Handle different response formats
+      let data;
+      if (Array.isArray(resp)) {
+        data = resp;
+      } else if (resp?.Data && Array.isArray(resp.Data)) {
+        data = resp.Data;
+      } else if (resp?.data && Array.isArray(resp.data)) {
+        data = resp.data;
+      } else {
+        console.warn('⚠️ Unexpected networks response format:', resp);
+        data = [];
+      }
+      
       log('📊', 'Networks Data', data);
       return data;
     },
     { 
       ...SWR_CONFIG, 
       dedupingInterval: CACHE_TIME.LONG,
-      revalidateOnMount: false,
+      revalidateOnMount: true, // ✅ Changed from false to true
       onSuccess: (data) => log('✅', 'Networks Loaded', { count: data?.length }),
       onError: (err) => console.error('❌ Networks Error', err)
     }
   );
 
+  // ✅ Improved operator processing
   const operators = useMemo(() => {
-    if (!Array.isArray(rawOperators) || rawOperators.length === 0) return [];
+    if (!rawOperators || !Array.isArray(rawOperators) || rawOperators.length === 0) {
+      log('⚠️', 'No raw operators to process', rawOperators);
+      return [];
+    }
     
     const uniqueOperators = new Set();
     
     rawOperators.forEach(op => {
-      const canonical = canonicalOperatorName(op);
-      if (canonical && canonical !== 'Unknown') {
-        uniqueOperators.add(canonical);
+      // Handle different data formats
+      let operatorName;
+      
+      if (typeof op === 'string') {
+        operatorName = op;
+      } else if (typeof op === 'object' && op !== null) {
+        // Try different property names
+        operatorName = op?.operatorName || op?.OperatorName || op?.name || op?.Name || op?.operator || op?.Operator;
+      }
+      
+      if (operatorName) {
+        const canonical = canonicalOperatorName(operatorName);
+        if (canonical && canonical !== 'Unknown') {
+          uniqueOperators.add(canonical);
+        }
       }
     });
     
     const result = Array.from(uniqueOperators).sort();
-    log('✅', 'Unique Operators Processed', result);
+    log('✅', 'Unique Operators Processed', { count: result.length, operators: result });
     
     return result;
   }, [rawOperators]);
 
+  // ✅ Improved networks processing
+  const networks = useMemo(() => {
+    if (!rawNetworks || !Array.isArray(rawNetworks) || rawNetworks.length === 0) {
+      log('⚠️', 'No raw networks to process', rawNetworks);
+      return [];
+    }
+    
+    const uniqueNetworks = new Set();
+    
+    rawNetworks.forEach(net => {
+      let networkName;
+      
+      if (typeof net === 'string') {
+        networkName = net;
+      } else if (typeof net === 'object' && net !== null) {
+        networkName = net?.network || net?.Network || net?.networkType || net?.NetworkType || net?.name || net?.Name;
+      }
+      
+      if (networkName && networkName !== 'Unknown') {
+        uniqueNetworks.add(networkName);
+      }
+    });
+    
+    const result = Array.from(uniqueNetworks).sort();
+    log('✅', 'Unique Networks Processed', { count: result.length, networks: result });
+    
+    return result;
+  }, [rawNetworks]);
+
   const operatorCount = operators.length;
+
+  // ✅ Debug logging
+  log('📊', 'useOperatorsAndNetworks Result', {
+    operatorCount,
+    operators,
+    networks,
+    isLoading: operatorsLoading || networksLoading
+  });
 
   return { 
     operators, 
-    networks: networks || [], 
+    networks, 
     operatorCount,
     isLoading: operatorsLoading || networksLoading,
     error: operatorsError || networksError
@@ -1086,6 +1210,87 @@ export const useDebugDashboard = () => {
     
     return () => clearInterval(interval);
   }, [cache]);
+};
+
+// ============================================
+// HOOKS: APP DATA
+// ============================================
+
+export const useAppData = () => {
+  return useSWR(
+    'appData',
+    async () => {
+      log('🔄', 'Fetching app data...', {});
+      
+      const resp = await safeFetch(
+        () => adminApi.getAppValue(), 
+        [], // ✅ Changed fallback to array instead of object
+        60000, 
+        'getAppValue'
+      );
+      
+      logGroup('App Data Response Analysis', () => {
+        console.log('📦 Response from safeFetch:', resp);
+        console.log('📊 Response Type:', typeof resp);
+        console.log('📏 Is Array:', Array.isArray(resp));
+        console.log('📏 Response Length:', Array.isArray(resp) ? resp.length : 'N/A');
+      });
+      
+      // ✅ FIX: safeFetch already extracts Data/data, so resp IS the data
+      // Handle both cases: resp could be array (already extracted) or object (needs extraction)
+      let rawData;
+      if (Array.isArray(resp)) {
+        rawData = resp;
+      } else if (resp && typeof resp === 'object') {
+        rawData = resp?.Data || resp?.data || [];
+      } else {
+        rawData = [];
+      }
+      
+      log('📊', 'Raw Data Extracted', { 
+        isArray: Array.isArray(rawData), 
+        length: rawData.length,
+        sample: rawData[0]
+      });
+      
+      if (!Array.isArray(rawData)) {
+        console.error('❌ Invalid app data structure:', typeof rawData, rawData);
+        return [];
+      }
+      
+      if (rawData.length === 0) {
+        console.warn('⚠️ No app data available');
+        return [];
+      }
+      
+      const processedData = rawData.map(item => ({
+        appName: item?.appName || item?.AppName || 'Unknown',
+        avgDlTptMbps: toNumber(item?.avgDlTptMbps || item?.AvgDlTptMbps),
+        avgUlTptMbps: toNumber(item?.avgUlTptMbps || item?.AvgUlTptMbps),
+        avgMos: toNumber(item?.avgMos || item?.AvgMos),
+        sampleCount: toNumber(item?.sampleCount || item?.SampleCount),
+        avgRsrp: toNumber(item?.avgRsrp || item?.AvgRsrp),
+        avgRsrq: toNumber(item?.avgRsrq || item?.AvgRsrq),
+        avgSinr: toNumber(item?.avgSinr || item?.AvgSinr),
+        avgDuration: toNumber(item?.durationMinutes || item?.DurationMinutes) / 60,
+      }));
+      
+      log('✅', 'App Data Processed', {
+        count: processedData.length,
+        sample: processedData[0],
+      });
+      
+      return processedData;
+    },
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      keepPreviousData: true,
+      revalidateOnMount: true,
+      onSuccess: (data) => log('✅', 'useAppData Success', { count: data?.length }),
+      onError: (err) => console.error('❌ useAppData Error', err)
+    }
+  );
 };
 
 export { SWR_CONFIG, CACHE_TIME };
