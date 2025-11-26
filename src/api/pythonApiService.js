@@ -1,7 +1,7 @@
 // src/api/pythonApiService.js
 import axios from 'axios';
 
-const PYTHON_BASE_URL = "http://127.0.0.1:8080";
+const PYTHON_BASE_URL = import.meta.env.VITE_PYTHON_API_URL;
 
 /**
  * Create axios instance for Python backend
