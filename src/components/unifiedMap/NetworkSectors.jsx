@@ -25,12 +25,19 @@ function computeOffset(center, distanceMeters, headingDegrees) {
 
 // Color mapping by operator
 const OPERATOR_COLORS = {
-  'Airtel': '#ef4444',
-  'JIO': '#3b82f6',
-  'Jio': '#3b82f6',
-  'Vi': '#a855f7',
-  'BSNL': '#22c55e',
-  'default': '#6b7280',
+  "Jio True5G": "#3B82F6",
+    "JIO 4G": "#3B82F6",
+    "JIO4G": "#3B82F6",
+    "IND-JIO": "#3B82F6",
+    "IND airtel": "#EF4444",
+    "IND Airtel": "#EF4444",
+    "airtel": "#EF4444",
+    "Airtel 5G": "#EF4444",
+    "VI India": "#22C55E",
+    "vi India": "#22C55E",
+    "Vodafone IN": "#22C55E",
+    BSNL: "#F59E0B",
+    Unknown: "#6B7280",
 };
 
 const getOperatorColor = (operator) => {

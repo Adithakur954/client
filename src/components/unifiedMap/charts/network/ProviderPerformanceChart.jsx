@@ -143,53 +143,7 @@ export const ProviderPerformanceChart = React.forwardRef(({ locations }, ref) =>
         </ResponsiveContainer>
       </div>
 
-      {/* Radar Chart - Top 3 Providers */}
-      {radarData.length > 0 && (
-        <div className="mb-4">
-          <div className="text-xs text-slate-400 mb-2 font-medium">
-            Top 3 Providers - Overall Performance
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <RadarChart data={radarData}>
-              <PolarGrid stroke="#475569" />
-              <PolarAngleAxis
-                dataKey="provider"
-                tick={{ fill: "#9CA3AF", fontSize: 11 }}
-              />
-              <PolarRadiusAxis
-                angle={90}
-                domain={[0, 100]}
-                tick={{ fill: "#9CA3AF", fontSize: 10 }}
-              />
-              <Tooltip
-                contentStyle={CHART_CONFIG.tooltip}
-                formatter={(value) => `${value.toFixed(1)}%`}
-              />
-              <Radar
-                name={radarData[0]?.provider}
-                dataKey="Signal Quality"
-                stroke="#3b82f6"
-                fill="#3b82f6"
-                fillOpacity={0.3}
-              />
-              <Radar
-                name={radarData[1]?.provider}
-                dataKey="Throughput"
-                stroke="#10b981"
-                fill="#10b981"
-                fillOpacity={0.3}
-              />
-              <Radar
-                name={radarData[2]?.provider}
-                dataKey="MOS"
-                stroke="#facc15"
-                fill="#facc15"
-                fillOpacity={0.3}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      
 
       {/* Sample Count Footer */}
       <div className="flex flex-wrap gap-3 text-xs text-slate-400 justify-center bg-slate-800 p-3 rounded-lg">
@@ -201,54 +155,7 @@ export const ProviderPerformanceChart = React.forwardRef(({ locations }, ref) =>
         ))}
       </div>
 
-      {/* Detailed Metrics Grid */}
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        {validData.slice(0, 4).map((item, idx) => (
-          <div
-            key={idx}
-            className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-slate-600 transition-colors"
-          >
-            <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-700">
-              <span className="font-semibold text-white">{item.provider}</span>
-              <span className="text-xs text-slate-400">{item.samples} samples</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <div className="text-slate-400">MOS</div>
-                <div className="text-yellow-400 font-semibold">
-                  {item.MOS != null ? item.MOS.toFixed(2) : "N/A"}
-                </div>
-              </div>
-              <div>
-                <div className="text-slate-400">RSRP</div>
-                <div
-                  className={`font-semibold ${
-                    item.avgRsrp >= -90
-                      ? "text-green-400"
-                      : item.avgRsrp >= -105
-                      ? "text-yellow-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  {item.avgRsrp != null ? item.avgRsrp : "N/A"}
-                </div>
-              </div>
-              <div>
-                <div className="text-slate-400">Download</div>
-                <div className="text-cyan-400 font-semibold">
-                  {item["Download (Mbps)"] != null ? `${item["Download (Mbps)"]} Mbps` : "N/A"}
-                </div>
-              </div>
-              <div>
-                <div className="text-slate-400">Upload</div>
-                <div className="text-orange-400 font-semibold">
-                  {item["Upload (Mbps)"] != null ? `${item["Upload (Mbps)"]} Mbps` : "N/A"}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      
     </ChartContainer>
   );
 });

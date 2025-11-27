@@ -324,8 +324,8 @@ const AreaPolygonTooltip = ({ polygon, position, selectedMetric }) => {
       'rsrp': 'dBm',
       'rsrq': 'dB',
       'sinr': 'dB',
-      'dl_thpt': 'Mbps',
-      'ul_thpt': 'Mbps',
+      'dl_tpt': 'Mbps',
+      'ul_tpt': 'Mbps',
       'mos': '',
       'lte_bler': '%',
       'pci': ''
@@ -635,7 +635,7 @@ const [hoverPosition, setHoverPosition] = useState(null);
     }
 
     try {
-      console.log(`🔄 Fetching area polygons for project ${projectId}...`);
+     
       const res = await areaBreakdownApi.getAreaPolygons(projectId);
 
       let aiZones = [];
@@ -652,7 +652,7 @@ const [hoverPosition, setHoverPosition] = useState(null);
       }
 
       if (aiZones.length === 0) {
-        console.log("ℹ️ No area zones found");
+       
         setAreaData([]);
         toast.info("No area zones defined for this project");
         return;
@@ -835,9 +835,7 @@ const [hoverPosition, setHoverPosition] = useState(null);
         )
         .map((result) => result.value);
 
-      console.log(
-        `✅ Successful sessions: ${successfulSessions.length}/${sessionIds.length}`
-      );
+      
 
       if (failedSessions.length > 0) {
         console.warn("❌ Failed sessions:", failedSessions);
@@ -992,7 +990,7 @@ const [hoverPosition, setHoverPosition] = useState(null);
 
         toast.success(`${formatted.length} prediction points loaded`);
       } else {
-        console.log("❌ Prediction data fetch failed:", projectId, res);
+        ("❌ Prediction data fetch failed:", projectId, res);console.log
         toast.error(res?.Message || "No prediction data available");
         setLocations([]);
       }

@@ -1,11 +1,11 @@
 // src/components/unifiedMap/NetworkPlannerMap.jsx
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { PolygonF } from "@react-google-maps/api";
 import { cellSiteApi } from "@/api/apiEndpoints";
 
 // Helper to calculate sector polygon points
 function computeOffset(center, distanceMeters, headingDegrees) {
-  const earthRadius = 6371000; // Earth radius in meters
+  const earthRadius = 6371000;
   const lat1 = (center.lat * Math.PI) / 180;
   const lng1 = (center.lng * Math.PI) / 180;
   const heading = (headingDegrees * Math.PI) / 180;
@@ -24,59 +24,181 @@ function computeOffset(center, distanceMeters, headingDegrees) {
   return { lat: (lat2 * 180) / Math.PI, lng: (lng2 * 180) / Math.PI };
 }
 
-// Map network/operator to color
+// ✅ Operator to color mapping with fallback
 function getColorForNetwork(network) {
-  if (!network) return "#808080"; // gray for unknown
+  // Default color if no network
+  const DEFAULT_COLOR = "#3B82F6"; // Blue as default instead of gray
   
-  const networkLower = network.toLowerCase();
+  if (!network || network === "" || network === "null" || network === "undefined") {
+    console.log("⚠️ No network value, using default color:", DEFAULT_COLOR);
+    return DEFAULT_COLOR;
+  }
+
+  const OPERATOR_COLORS = {
+    // Jio variants
+    "Jio True5G": "#3B82F6",
+    "JIO 4G": "#3B82F6",
+    "JIO4G": "#3B82F6",
+    "IND-JIO": "#3B82F6",
+    "jio": "#3B82F6",
+    
+    // Airtel variants
+    "IND airtel": "#EF4444",
+    "IND Airtel": "#EF4444",
+    "airtel": "#EF4444",
+    "Airtel 5G": "#EF4444",
+    "Airtel": "#EF4444",
+    
+    // VI variants
+    "VI India": "#22C55E",
+    "Vi India": "#22C55E",
+    "Vodafone IN": "#22C55E",
+    "VI": "#22C55E",
+    "Vi": "#22C55E",
+    
+    // BSNL
+    "BSNL": "#F59E0B",
+    "bsnl": "#F59E0B",
+    
+    // Unknown
+    "Unknown": "#8B5CF6", // Purple for unknown
+  };
+
+  const networkStr = String(network).trim();
+
+  // Exact match
+  if (OPERATOR_COLORS[networkStr]) {
+    return OPERATOR_COLORS[networkStr];
+  }
+
+  // Case-insensitive match
+  const exactMatch = Object.keys(OPERATOR_COLORS).find(
+    key => key.toLowerCase() === networkStr.toLowerCase()
+  );
   
-  if (networkLower.includes("airtel")) return "#ef4444"; // red
-  if (networkLower.includes("jio")) return "#3b82f6"; // blue
-  if (networkLower.includes("vi") || networkLower.includes("vodafone")) return "#a855f7"; // purple
-  if (networkLower.includes("bsnl")) return "#22c55e"; // green
-  if (networkLower.includes("idea")) return "#f59e0b"; // orange
+  if (exactMatch) {
+    return OPERATOR_COLORS[exactMatch];
+  }
+
+  // Keyword fallback
+  const lowerNetwork = networkStr.toLowerCase();
   
-  return "#808080"; // default gray
+  if (lowerNetwork.includes("jio")) return "#3B82F6";
+  if (lowerNetwork.includes("airtel")) return "#EF4444";
+  if (lowerNetwork.includes("vi") || lowerNetwork.includes("vodafone")) return "#22C55E";
+  if (lowerNetwork.includes("bsnl")) return "#F59E0B";
+
+  // Return a visible color instead of gray
+  console.log("⚠️ Unknown operator:", networkStr, "using purple");
+  return "#8B5CF6"; // Purple for unmatched
+}
+
+// ✅ Extract network/operator from site with multiple field checks
+function extractNetworkFromSite(site) {
+  // Check multiple possible field names
+  const possibleFields = [
+    'network',
+    'Network',
+    'operator', 
+    'Operator',
+    'provider',
+    'Provider',
+    'carrier',
+    'Carrier',
+    'mno',
+    'MNO'
+  ];
+  
+  for (const field of possibleFields) {
+    if (site[field] && site[field] !== "" && site[field] !== "null") {
+      console.log(`✅ Found network in field "${field}":`, site[field]);
+      return site[field];
+    }
+  }
+  
+  console.log("⚠️ No network field found in site:", Object.keys(site));
+  return null;
+}
+
+// ✅ Generate unique ID for sector
+function generateUniqueSectorId(site, sectorIndex, siteIndex) {
+  const cellId = site.cell_id_representative ?? site.cell_id ?? 'unknown';
+  const siteKey = site.site_key_inferred ?? site.site_key ?? '';
+  const lat = (site.lat_pred ?? site.lat)?.toFixed?.(6) ?? '0';
+  const lng = (site.lon_pred ?? site.lng ?? site.lon)?.toFixed?.(6) ?? '0';
+  
+  return `sector-${siteIndex}-${cellId}-${siteKey}-${sectorIndex}-${lat}-${lng}`.replace(/\s+/g, '_');
 }
 
 // Generate sectors from site data
-function generateSectorsFromSite(site) {
+function generateSectorsFromSite(site, siteIndex) {
   const sectors = [];
-  // Default to 3 sectors if not specified
-  const sectorCount = site.sector_count || 3; 
-  const baseAzimuth = site.azimuth_deg_5 || 0;
-  const beamwidth = site.beamwidth_deg_est || 65;
-  const color = getColorForNetwork(site.network);
+  const sectorCount = site.sector_count || 3;
+  const baseAzimuth = site.azimuth_deg_5 || site.azimuth || 0;
+  const beamwidth = site.beamwidth_deg_est || site.beamwidth || 65;
   
-  // Default range based on network type
-  let range = 60; 
-  if (site.network?.toLowerCase().includes("5g") || site.network?.toLowerCase().includes("jio")) {
-    range = 45;
-  } else if (site.network?.toLowerCase().includes("vi") || site.network?.toLowerCase().includes("900")) {
-    range = 80;
+  // ✅ Extract network with fallback
+  const network = extractNetworkFromSite(site);
+  const color = getColorForNetwork(network);
+  
+  // ✅ Debug log for first few sites
+  if (siteIndex < 3) {
+    console.log(`🏗️ Site ${siteIndex}:`, {
+      network: network,
+      color: color,
+      sectorCount: sectorCount,
+      lat: site.lat_pred ?? site.lat,
+      lng: site.lon_pred ?? site.lng ?? site.lon,
+      allFields: Object.keys(site)
+    });
   }
   
-  // Generate sectors evenly spaced
+  // ✅ Get coordinates with fallbacks
+  const lat = site.lat_pred ?? site.lat;
+  const lng = site.lon_pred ?? site.lng ?? site.lon;
+  
+  if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+    console.warn(`⚠️ Invalid coordinates for site ${siteIndex}:`, { lat, lng });
+    return [];
+  }
+  
+  // Network-based range
+  let range = 60;
+  const networkLower = String(network || "").toLowerCase();
+  
+  if (networkLower.includes("5g") || networkLower.includes("true5g")) {
+    range = 45;
+  } else if (networkLower.includes("vi") || networkLower.includes("vodafone")) {
+    range = 80;
+  } else if (networkLower.includes("jio")) {
+    range = 50;
+  } else if (networkLower.includes("airtel")) {
+    range = 55;
+  }
+  
   const azimuthSpacing = 360 / sectorCount;
   
   for (let i = 0; i < sectorCount; i++) {
     const azimuth = (baseAzimuth + (i * azimuthSpacing)) % 360;
+    const uniqueId = generateUniqueSectorId(site, i, siteIndex);
     
     sectors.push({
-      id: `${site.cell_id_representative}-${i + 1}`,
-      cell_id: site.cell_id_representative,
-      site_key: site.site_key_inferred,
-      lat: site.lat_pred,
-      lng: site.lon_pred,
+      id: uniqueId,
+      cell_id: site.cell_id_representative ?? site.cell_id,
+      site_key: site.site_key_inferred ?? site.site_key,
+      lat: lat,
+      lng: lng,
       azimuth: azimuth,
       beamwidth: beamwidth,
-      color: color,
-      network: site.network,
+      color: color, // ✅ Color is set here
+      network: network,
       range: range,
       samples: site.samples,
-      pci: site.pci_or_psi,
-      earfcn: site.earfcn_or_narfcn,
+      pci: site.pci_or_psi ?? site.pci,
+      earfcn: site.earfcn_or_narfcn ?? site.earfcn,
       azimuth_reliability: site.azimuth_reliability,
+      sectorIndex: i,
+      siteIndex: siteIndex,
     });
   }
   
@@ -96,7 +218,7 @@ const NetworkPlannerMap = ({
   onSectorClick = null,
   viewport = null,
   options = {},
-  minSectors = 0 // ✅ Added prop: default 0 shows everything
+  minSectors = 0
 }) => {
   const instanceId = useRef(++instanceCounter);
   const [internalSectors, setInternalSectors] = useState([]);
@@ -104,165 +226,209 @@ const NetworkPlannerMap = ({
   const [error, setError] = useState(null);
   const fetchedProjectId = useRef(null);
 
-  // Use external sectors if provided, otherwise use internal
   const sectors = externalSectors || internalSectors;
 
-  console.log(` [Instance ${instanceId.current}] NetworkPlannerMap RENDER:`, {
-    projectId,
-    sectorsCount: sectors.length,
-    hasExternalSectors: !!externalSectors,
-    loading,
-    fetchedProjectId: fetchedProjectId.current,
-    minSectors
-  });
-
   useEffect(() => {
-    // Skip fetch if external sectors provided
     if (externalSectors && externalSectors.length > 0) {
-      console.log(`ℹ️ [Instance ${instanceId.current}] Using external sectors (${externalSectors.length})`);
+      console.log(`ℹ️ [NetworkPlanner ${instanceId.current}] Using ${externalSectors.length} external sectors`);
       return;
     }
 
     if (!projectId) {
-      console.warn(`⚠️ [Instance ${instanceId.current}] No projectId and no external sectors`);
+      console.warn(`⚠️ [NetworkPlanner ${instanceId.current}] No projectId provided`);
       return;
     }
-
-    console.log(`🔄 [Instance ${instanceId.current}] useEffect triggered - projectId:`, projectId);
     
     const fetchSite = async () => {
-      // If we already fetched this project's data, we typically wouldn't re-fetch,
-      // BUT if the filter criteria (minSectors) changes, we might want to re-process.
-      // For simplicity here, we'll re-process if projectId changes or if it's the first run.
-      
       setLoading(true);
       setError(null);
       
       try {
-        console.log(`📡 [Instance ${instanceId.current}] Fetching site data for project:`, projectId);
+        console.log(`📡 [NetworkPlanner ${instanceId.current}] Fetching site data for project ${projectId}`);
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          console.error(`⏱️ [Instance ${instanceId.current}] Request timeout`);
-        }, 30000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         const res = await cellSiteApi.siteNoml(projectId, controller.signal);
-        
         clearTimeout(timeoutId);
         
-        if (res && res.data) {
-          const siteData = Array.isArray(res.data) ? res.data : [res.data];
+        // ✅ Debug: Log the raw response structure
+        console.log("📦 Raw API response:", res);
+        console.log("📦 Response keys:", Object.keys(res || {}));
+        
+        // ✅ Handle different response structures
+        let siteData = [];
+        if (res?.data) {
+          siteData = Array.isArray(res.data) ? res.data : [res.data];
+        } else if (res?.Data) {
+          siteData = Array.isArray(res.Data) ? res.Data : [res.Data];
+        } else if (Array.isArray(res)) {
+          siteData = res;
+        }
+        
+        if (siteData.length > 0) {
+          // ✅ Debug: Log first site's structure
+          console.log("📋 First site structure:", siteData[0]);
+          console.log("📋 First site keys:", Object.keys(siteData[0]));
           
-          console.log(`🏢 [Instance ${instanceId.current}] Site data received:`, siteData.length, "sites");
+          console.log(`🏢 [NetworkPlanner ${instanceId.current}] Received ${siteData.length} sites`);
           
-          // ✅ FILTER LOGIC: Only keep sites with >= minSectors
+          // Log unique operators
+          const uniqueOperators = [...new Set(siteData.map(s => extractNetworkFromSite(s)).filter(Boolean))];
+          console.log("📋 Unique operators found:", uniqueOperators);
+          
+          // Filter by minSectors
           const filteredSites = siteData.filter(site => {
-            const count = site.sector_count !== undefined && site.sector_count !== null 
-              ? site.sector_count 
-              : 3; // Default is 3
+            const count = site.sector_count ?? 3;
             return count >= minSectors;
           });
 
-          const allSectors = filteredSites.flatMap(site => generateSectorsFromSite(site));
+          console.log(`🔍 Filtered: ${filteredSites.length}/${siteData.length} sites (minSectors=${minSectors})`);
+
+          // Generate sectors with site index
+          const allSectors = filteredSites.flatMap((site, siteIndex) => 
+            generateSectorsFromSite(site, siteIndex)
+          );
           
-          console.log(`📍 [Instance ${instanceId.current}] Generated sectors (filtered):`, allSectors.length);
+          // ✅ Debug: Log color distribution
+          const colorStats = allSectors.reduce((acc, s) => {
+            const key = `${s.network || 'No Network'} → ${s.color}`;
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+          }, {});
+          
+          console.log(`🎨 [NetworkPlanner ${instanceId.current}] Color distribution:`);
+          console.table(colorStats);
+          
+          // ✅ Debug: Log sample sectors
+          console.log("📍 Sample sectors:", allSectors.slice(0, 3).map(s => ({
+            id: s.id,
+            network: s.network,
+            color: s.color,
+            lat: s.lat,
+            lng: s.lng
+          })));
+          
           setInternalSectors(allSectors);
           fetchedProjectId.current = projectId;
         } else {
-          console.warn(`⚠️ [Instance ${instanceId.current}] No data received from siteNoml`);
+          console.warn(`⚠️ [NetworkPlanner ${instanceId.current}] No site data found`);
           setInternalSectors([]);
         }
       } catch (error) {
+        let errMsg = 'Failed to fetch site data';
+        
         if (error.name === 'AbortError') {
-          const errMsg = 'Request timeout - Server took too long to respond';
-          setError(errMsg);
+          errMsg = 'Request timeout';
         } else if (error.response) {
-          const errMsg = `Server error: ${error.response.status}`;
-          setError(errMsg);
+          errMsg = `Server error: ${error.response.status}`;
         } else if (error.request) {
-          const errMsg = 'No response from server';
-          setError(errMsg);
-        } else {
-          const errMsg = error.message || 'Failed to fetch site data';
-          setError(errMsg);
+          errMsg = 'No response from server';
+        } else if (error.message) {
+          errMsg = error.message;
         }
-        console.error(`❌ [Instance ${instanceId.current}] Error:`, error);
+        
+        console.error(`❌ [NetworkPlanner ${instanceId.current}] ${errMsg}`, error);
+        setError(errMsg);
+        setInternalSectors([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchSite();
-  }, [projectId, externalSectors, minSectors]); // ✅ Re-run when minSectors changes
+  }, [projectId, externalSectors, minSectors]);
 
-  // Show loading state
+  // ✅ Memoize visible sectors
+  const visibleSectors = useMemo(() => {
+    if (!viewport) return sectors;
+    
+    return sectors.filter((sector) => {
+      const { lat, lng } = sector;
+      return (
+        lat >= viewport.south &&
+        lat <= viewport.north &&
+        lng >= viewport.west &&
+        lng <= viewport.east
+      );
+    });
+  }, [sectors, viewport]);
+
   if (loading && !externalSectors) {
-    return (
-      <div style={{ 
-        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-        background: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'
-      }}>
-        <div className="spinner" style={{
-          border: '4px solid #f3f3f3', borderTop: '4px solid #3b82f6', borderRadius: '50%',
-          width: '40px', height: '40px', animation: 'spin 1s linear infinite'
-        }}></div>
-        <div>Loading site data...</div>
-        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    return null;
   }
 
-  // Show error state
   if (error && !externalSectors) {
-    return null; // Or render an error message overlay if desired
+    return null;
   }
 
-  // Filter by viewport if provided
-  const visibleSectors = viewport
-    ? sectors.filter((sector) => {
-        const { lat, lng } = sector;
-        return (
-          lat >= viewport.south &&
-          lat <= viewport.north &&
-          lng >= viewport.west &&
-          lng <= viewport.east
-        );
-      })
-    : sectors;
+  if (visibleSectors.length === 0) {
+    return null;
+  }
+
+  // ✅ Settings with better defaults for visibility
+  const effectiveScale = options.scale ?? 1;
+  const effectiveZIndex = options.zIndex ?? 200;
+  const effectiveOpacity = options.opacity ?? 0.6; // ✅ Higher opacity for visibility
+
+  console.log(`🖼️ [NetworkPlanner ${instanceId.current}] Rendering ${visibleSectors.length} sectors`);
 
   return (
     <>
       {visibleSectors.map((sector, index) => {
         try {
+          if (!sector.lat || !sector.lng || isNaN(sector.lat) || isNaN(sector.lng)) {
+            return null;
+          }
+
           const p0 = { lat: sector.lat, lng: sector.lng };
           const bw = sector.beamwidth ?? 65;
-          const r = (sector.range ?? radius) * (options.scale ?? 1);
+          const r = (sector.range ?? radius) * effectiveScale;
 
           const p1 = computeOffset(p0, r, sector.azimuth - bw / 2);
           const p2 = computeOffset(p0, r, sector.azimuth + bw / 2);
 
           const triangleCoords = [p0, p1, p2];
+          const uniqueKey = sector.id || `sector-fallback-${index}`;
+          
+          // ✅ Ensure color is valid
+          const fillColor = sector.color || "#3B82F6";
+          const strokeColor = sector.color || "#3B82F6";
+
+          // ✅ Debug first sector
+          if (index === 0) {
+            console.log("🔺 First sector polygon:", {
+              key: uniqueKey,
+              fillColor,
+              strokeColor,
+              fillOpacity: effectiveOpacity,
+              network: sector.network,
+              coords: triangleCoords
+            });
+          }
 
           return (
             <PolygonF
-              key={sector.id || `sector-${index}`}
+              key={uniqueKey}
               paths={triangleCoords}
               options={{
-                fillColor: sector.color,
-                fillOpacity: 0.5,
-                strokeColor: sector.color,
-                strokeWeight: 1.5,
-                zIndex: options.zIndex || 200,
+                fillColor: fillColor,
+                fillOpacity: effectiveOpacity,
+                strokeColor: strokeColor,
+                strokeWeight: 2,
+                strokeOpacity: 1,
+                zIndex: effectiveZIndex,
                 clickable: !!onSectorClick,
               }}
               onClick={() => {
-                if (onSectorClick) onSectorClick(sector);
+                if (onSectorClick) {
+                  onSectorClick(sector);
+                }
               }}
             />
           );
         } catch (err) {
+          console.error(`❌ Error rendering sector:`, err);
           return null;
         }
       })}

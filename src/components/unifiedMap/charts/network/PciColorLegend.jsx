@@ -48,7 +48,6 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
       acc[pci].count++;
       acc[pci].samples.push(loc);
 
-      // Track providers, operators, bands
       const provider = loc.provider || "Unknown";
       const operator = loc.operator || "Unknown";
       const band = loc.band || "Unknown";
@@ -61,7 +60,6 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
         acc[pci].nodebIds.add(String(loc.nodeb_id));
       }
 
-      // Collect metrics
       if (loc.rsrp != null) acc[pci].avgRsrp.push(loc.rsrp);
       if (loc.rsrq != null) acc[pci].avgRsrq.push(loc.rsrq);
       if (loc.sinr != null) acc[pci].avgSinr.push(loc.sinr);
@@ -120,30 +118,30 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
   const ViewModeButton = ({ mode, icon: Icon, label }) => (
     <button
       onClick={() => setViewMode(mode)}
-      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all rounded-md ${
+      className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium transition-all rounded ${
         viewMode === mode
-          ? "bg-blue-600 text-white shadow-md"
-          : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+          ? "bg-blue-600 text-white"
+          : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300"
       }`}
     >
-      {Icon && <Icon className="h-3.5 w-3.5" />}
+      {Icon && <Icon className="h-3 w-3" />}
       {label}
     </button>
   );
 
   return (
-    <ChartContainer ref={ref} title={`PCI Analysis (${pciColorMap.length} PCIs)`} icon={Antenna}>
-      {/* View Mode Buttons */}
-      <div className="flex flex-wrap gap-2 bg-slate-900 p-2 rounded-lg border border-slate-700 mb-3">
-        <ViewModeButton mode="color-map" icon={MapPin} label="Color Map" />
-        <ViewModeButton mode="by-provider" icon={Globe} label="By Provider" />
+    <ChartContainer ref={ref} title={`PCI Analysis (${pciColorMap.length})`} icon={Antenna}>
+      {/* Minimal View Mode Buttons */}
+      <div className="flex gap-1 mb-2">
+        <ViewModeButton mode="color-map" icon={MapPin} label="Map" />
+        <ViewModeButton mode="by-provider" icon={Globe} label="Provider" />
         <ViewModeButton mode="performance" icon={Signal} label="Performance" />
-        <ViewModeButton mode="distribution" icon={BarChart3} label="Distribution" />
+        <ViewModeButton mode="distribution" icon={BarChart3} label="Stats" />
       </div>
 
       {/* Color Map View */}
       {viewMode === "color-map" && (
-        <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+        <div className="space-y-1 max-h-[350px] overflow-y-auto scrollbar-hide">
           {pciColorMap.map((item, idx) => (
             <PCIColorMapCard key={idx} item={item} />
           ))}
@@ -163,102 +161,76 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// Sub-components
+// Minimal Sub-components
 const PCIColorMapCard = ({ item }) => (
-  <div className="flex flex-col gap-2 p-3 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors border border-slate-700">
-    <div className="flex items-center gap-2">
-      <div
-        className="w-6 h-6 rounded-full border-2 border-slate-600 flex-shrink-0"
-        style={{ backgroundColor: item.color }}
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-semibold text-white text-sm">PCI {item.pci}</span>
-          <span className="text-xs text-slate-400">{item.count} samples</span>
-        </div>
-      </div>
+  <div className="flex items-center gap-2 p-1.5 bg-slate-800/50 rounded hover:bg-slate-800 transition-colors">
+    <div
+      className="w-4 h-4 rounded-full flex-shrink-0"
+      style={{ backgroundColor: item.color }}
+    />
+    <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+      <span className="font-medium text-white text-xs">PCI {item.pci}</span>
+      <span className="text-[10px] text-slate-400">{item.count}</span>
     </div>
-
     {item.nodebIds?.length > 0 && (
-      <div className="mt-1 pt-2 border-t border-slate-700">
-        <div className="text-slate-400 mb-1 text-[10px] font-medium">
-          🏢 Cell IDs ({item.nodebIds.length}):
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {item.nodebIds.map((nodeb, nodebIdx) => (
-            <span
-              key={`${nodeb}-${nodebIdx}`}
-              className="bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded border border-orange-500/30 text-[9px] font-mono"
-            >
-              {nodeb}
-            </span>
-          ))}
-        </div>
+      <div className="flex items-center gap-1">
+        <span className="text-[9px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
+          {item.nodebIds.length} Cell{item.nodebIds.length > 1 ? 's' : ''}
+        </span>
       </div>
     )}
   </div>
 );
 
 const PCIPerformanceView = ({ pciColorMap }) => (
-  <div className="space-y-3">
-    <ResponsiveContainer width="100%" height={300}>
-      <ComposedChart data={pciColorMap} margin={{ ...CHART_CONFIG.margin, bottom: 60 }}>
-        <CartesianGrid {...CHART_CONFIG.grid} />
+  <div className="space-y-2">
+    <ResponsiveContainer width="100%" height={200}>
+      <ComposedChart data={pciColorMap} margin={{ top: 5, right: 10, left: -10, bottom: 40 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
         <XAxis
-          dataKey={(item) => `PCI ${item.pci}`}
+          dataKey={(item) => item.pci}
           angle={-45}
           textAnchor="end"
-          height={80}
-          tick={{ fill: "#9CA3AF", fontSize: 11 }}
+          height={50}
+          tick={{ fill: "#94A3B8", fontSize: 9 }}
         />
-        <YAxis
-          yAxisId="left"
-          tick={{ fill: "#9CA3AF", fontSize: 12 }}
-          label={{ value: "Signal (dBm)", angle: -90, position: "insideLeft", fill: "#9CA3AF" }}
-        />
-        <YAxis
-          yAxisId="right"
-          orientation="right"
-          domain={[0, 5]}
-          tick={{ fill: "#9CA3AF", fontSize: 12 }}
-          label={{ value: "MOS", angle: 90, position: "insideRight", fill: "#9CA3AF" }}
-        />
-        <Tooltip contentStyle={CHART_CONFIG.tooltip} />
-        <Legend wrapperStyle={{ fontSize: "11px" }} />
-        <Bar yAxisId="left" dataKey="avgRsrp" fill="#3b82f6" name="Avg RSRP (dBm)" radius={[8, 8, 0, 0]} />
-        <Line yAxisId="right" type="monotone" dataKey="avgMos" stroke="#facc15" strokeWidth={2} name="Avg MOS" dot={{ r: 4 }} />
+        <YAxis yAxisId="left" tick={{ fill: "#94A3B8", fontSize: 9 }} />
+        <YAxis yAxisId="right" orientation="right" domain={[0, 5]} tick={{ fill: "#94A3B8", fontSize: 9 }} />
+        <Tooltip contentStyle={{ ...CHART_CONFIG.tooltip, fontSize: '10px' }} />
+        <Bar yAxisId="left" dataKey="avgRsrp" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        <Line yAxisId="right" type="monotone" dataKey="avgMos" stroke="#facc15" strokeWidth={1.5} dot={{ r: 2 }} />
       </ComposedChart>
     </ResponsiveContainer>
 
-    {/* Performance Table */}
-    <div className="overflow-x-auto max-h-[250px] overflow-y-auto scrollbar-hide">
-      <table className="w-full text-xs">
+    {/* Compact Performance Table */}
+    <div className="overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-hide">
+      <table className="w-full text-[10px]">
         <thead className="sticky top-0 bg-slate-900 z-10">
           <tr className="border-b border-slate-700">
-            <th className="text-left p-2 text-slate-400 font-medium">PCI</th>
-            <th className="text-center p-2 text-slate-400 font-medium">Cells</th>
-            <th className="text-center p-2 text-slate-400 font-medium">RSRP</th>
-            <th className="text-center p-2 text-slate-400 font-medium">SINR</th>
-            <th className="text-center p-2 text-slate-400 font-medium">MOS</th>
+            <th className="text-left p-1 text-slate-400 font-medium">PCI</th>
+            <th className="text-center p-1 text-slate-400 font-medium">Cells</th>
+            <th className="text-center p-1 text-slate-400 font-medium">RSRP</th>
+            <th className="text-center p-1 text-slate-400 font-medium">SINR</th>
+            <th className="text-center p-1 text-slate-400 font-medium">MOS</th>
           </tr>
         </thead>
         <tbody>
           {pciColorMap.map((item, idx) => (
-            <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/50">
-              <td className="p-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="font-semibold text-white">PCI {item.pci}</span>
+            <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/30">
+              <td className="p-1">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="font-medium text-white">{item.pci}</span>
                 </div>
               </td>
-              <td className="p-2 text-center text-orange-400">{item.nodebIds.length}</td>
-              <td className={`p-2 text-center font-semibold ${
+              <td className="p-1 text-center text-orange-400">{item.nodebIds.length}</td>
+              <td className={`p-1 text-center font-medium ${
                 item.avgRsrp >= -90 ? "text-green-400" : item.avgRsrp >= -105 ? "text-yellow-400" : "text-red-400"
               }`}>
-                {item.avgRsrp || "N/A"}
+                {item.avgRsrp || "-"}
               </td>
-              <td className="p-2 text-center text-green-400 font-semibold">{item.avgSinr || "N/A"}</td>
-              <td className="p-2 text-center text-yellow-400 font-semibold">{item.avgMos || "N/A"}</td>
+              <td className="p-1 text-center text-green-400 font-medium">{item.avgSinr || "-"}</td>
+              <td className="p-1 text-center text-yellow-400 font-medium">{item.avgMos || "-"}</td>
             </tr>
           ))}
         </tbody>
@@ -268,65 +240,70 @@ const PCIPerformanceView = ({ pciColorMap }) => (
 );
 
 const PCIDistributionView = ({ pciColorMap, locations }) => (
-  <div className="space-y-3">
-    <div className="grid grid-cols-2 gap-4">
-      {/* Pie Chart */}
+  <div className="space-y-2">
+    {/* Compact Summary Stats */}
+    <div className="grid grid-cols-5 gap-1">
+      <StatCard label="PCIs" value={pciColorMap.length} color="blue" />
+      <StatCard label="Samples" value={pciColorMap.reduce((sum, p) => sum + p.count, 0)} color="green" />
+      <StatCard label="Avg/PCI" value={(pciColorMap.reduce((sum, p) => sum + p.count, 0) / pciColorMap.length).toFixed(0)} color="purple" />
+      <StatCard label="Cells" value={pciColorMap.reduce((sum, p) => sum + p.nodebIds.length, 0)} color="orange" />
+      <StatCard label="Providers" value={[...new Set(locations.map((l) => l.provider || "Unknown"))].length} color="cyan" />
+    </div>
+
+    <div className="grid grid-cols-2 gap-2">
+      {/* Compact Pie Chart */}
       <div>
-        <div className="text-xs text-slate-400 mb-2 font-medium">Top 10 PCIs by Sample Count</div>
-        <ResponsiveContainer width="100%" height={250}>
+        <div className="text-[10px] text-slate-400 mb-1 font-medium">Top 10 PCIs</div>
+        <ResponsiveContainer width="100%" height={180}>
           <PieChart>
             <Pie
               data={pciColorMap.slice(0, 10)}
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ pci, count }) => `${pci}: ${count}`}
-              outerRadius={80}
+              label={({ pci, count }) => `${pci}:${count}`}
+              outerRadius={60}
               dataKey="count"
             >
               {pciColorMap.slice(0, 10).map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
             </Pie>
-            <Tooltip contentStyle={CHART_CONFIG.tooltip} />
+            <Tooltip contentStyle={{ ...CHART_CONFIG.tooltip, fontSize: '10px' }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Band Distribution */}
+      {/* Compact Band Distribution */}
       <div>
-        <div className="text-xs text-slate-400 mb-2 font-medium">Band Distribution (Top 5 PCIs)</div>
-        <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-hide">
+        <div className="text-[10px] text-slate-400 mb-1 font-medium">Band Distribution</div>
+        <div className="space-y-1.5 max-h-[180px] overflow-y-auto scrollbar-hide">
           {pciColorMap.slice(0, 5).map((item, idx) => (
-            <div key={idx} className="bg-slate-800 rounded-lg p-2">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="font-semibold text-white text-sm">PCI {item.pci}</span>
+            <div key={idx} className="bg-slate-800/50 rounded p-1.5">
+              <div className="flex items-center justify-between gap-1.5 mb-1">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="font-medium text-white text-[10px]">PCI {item.pci}</span>
                 </div>
                 {item.nodebIds.length > 0 && (
-                  <span className="text-[10px] text-orange-400 bg-orange-500/20 px-2 py-0.5 rounded">
-                    {item.nodebIds.length} Cell{item.nodebIds.length > 1 ? 's' : ''}
+                  <span className="text-[9px] text-orange-400 bg-orange-500/10 px-1 py-0.5 rounded">
+                    {item.nodebIds.length}
                   </span>
                 )}
               </div>
-              <div className="ml-5 space-y-1">
-                {Object.entries(item.bands).map(([band, count], bidx) => {
+              <div className="ml-3 space-y-0.5">
+                {Object.entries(item.bands).slice(0, 3).map(([band, count], bidx) => {
                   const percentage = ((count / item.count) * 100).toFixed(0);
                   return (
-                    <div key={bidx} className="flex items-center gap-2">
-                      <div className="flex-1 bg-slate-900 rounded-full h-4 overflow-hidden">
+                    <div key={bidx} className="flex items-center gap-1">
+                      <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
                         <div
-                          className="bg-blue-500 h-full flex items-center justify-end pr-1"
+                          className="bg-blue-500 h-full"
                           style={{ width: `${percentage}%` }}
-                        >
-                          {percentage > 15 && (
-                            <span className="text-[10px] text-white font-bold">{percentage}%</span>
-                          )}
-                        </div>
+                        />
                       </div>
-                      <span className="text-xs text-slate-300 w-16">Band {band}</span>
-                      <span className="text-xs text-slate-400 w-8 text-right">{count}</span>
+                      <span className="text-[9px] text-slate-300 w-10">B{band}</span>
+                      <span className="text-[9px] text-slate-400 w-6 text-right">{count}</span>
                     </div>
                   );
                 })}
@@ -336,39 +313,24 @@ const PCIDistributionView = ({ pciColorMap, locations }) => (
         </div>
       </div>
     </div>
-
-    {/* Summary Stats */}
-    <div className="grid grid-cols-5 gap-2 mt-4">
-      <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-        <div className="text-xs text-slate-400 mb-1">Unique PCIs</div>
-        <div className="text-2xl font-bold text-blue-400">{pciColorMap.length}</div>
-      </div>
-      <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-        <div className="text-xs text-slate-400 mb-1">Total Samples</div>
-        <div className="text-2xl font-bold text-green-400">
-          {pciColorMap.reduce((sum, p) => sum + p.count, 0)}
-        </div>
-      </div>
-      <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-        <div className="text-xs text-slate-400 mb-1">Avg per PCI</div>
-        <div className="text-2xl font-bold text-purple-400">
-          {(pciColorMap.reduce((sum, p) => sum + p.count, 0) / pciColorMap.length).toFixed(0)}
-        </div>
-      </div>
-      <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-        <div className="text-xs text-slate-400 mb-1">Total Cells</div>
-        <div className="text-2xl font-bold text-orange-400">
-          {pciColorMap.reduce((sum, p) => sum + p.nodebIds.length, 0)}
-        </div>
-      </div>
-      <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-        <div className="text-xs text-slate-400 mb-1">Providers</div>
-        <div className="text-2xl font-bold text-cyan-400">
-          {[...new Set(locations.map((l) => l.provider || "Unknown"))].length}
-        </div>
-      </div>
-    </div>
   </div>
 );
+
+const StatCard = ({ label, value, color }) => {
+  const colors = {
+    blue: "text-blue-400",
+    green: "text-green-400",
+    purple: "text-purple-400",
+    orange: "text-orange-400",
+    cyan: "text-cyan-400",
+  };
+
+  return (
+    <div className="bg-slate-800/50 rounded p-1.5 text-center">
+      <div className="text-[9px] text-slate-400 mb-0.5">{label}</div>
+      <div className={`text-lg font-bold ${colors[color]}`}>{value}</div>
+    </div>
+  );
+};
 
 PciColorLegend.displayName = "PciColorLegend";
