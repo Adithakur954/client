@@ -600,6 +600,9 @@ export const homeApi = {
   logout: (ip) => api.get("/Home/Logout", { params: { IP: ip || "" } }),
   getLoggedUser: (ip) => api.post("/Home/GetLoggedUser", { ip }),
   getMasterUserTypes: () => api.get("/Home/GetMasterUserTypes"),
+  
+  // ✅ ADD THIS METHOD
+  getAuthStatus: () => api.get("/api/auth/status"),
 };
 
 export const settingApi = {

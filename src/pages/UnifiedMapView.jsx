@@ -1821,7 +1821,7 @@ const technologyStats = calculateCategoryStats(pointsInside, 'technology', selec
             <MapWithMultipleCircles
               isLoaded={isLoaded}
               loadError={loadError}
-              locations={showDataCircles ? filteredLocations : []}
+               locations={showDataCircles && !areaEnabled ? filteredLocations : []}
               thresholds={effectiveThresholds}
               selectedMetric={selectedMetric}
               colorBy={colorBy}
