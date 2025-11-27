@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Spinner from '../components/common/Spinner';
-import Logo from '../assets/vinfocom.png';
+import Logo from '../assets/logo.png';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');

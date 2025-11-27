@@ -16,19 +16,47 @@ export const ApplicationTab = ({ appSummary, expanded, chartRefs }) => {
   const [appSubTab, setAppSubTab] = useState("details");
 
   const chartData = useMemo(() => {
-    if (!appSummary || !Object.keys(appSummary).length) return [];
+  if (!appSummary || !Object.keys(appSummary).length) return [];
 
-    return Object.entries(appSummary).flatMap(([sessionId, apps]) =>
-      Object.entries(apps).map(([appName, metrics]) => ({
-        name: metrics.appName || appName,
-        mos: metrics.avgMos || 0,
-        dl: metrics.avgDlTptMbps || 0,
-        ul: metrics.avgUlTptMbps || 0,
-        latency: metrics.avgLatency || 0,
-        sessionId,
-      }))
-    );
-  }, [appSummary]);
+  // Aggregate by app name
+  const appAggregates = {};
+
+  Object.entries(appSummary).forEach(([sessionId, apps]) => {
+    Object.entries(apps).forEach(([appName, metrics]) => {
+      const name = metrics.appName || appName;
+      
+      if (!appAggregates[name]) {
+        appAggregates[name] = {
+          name,
+          totalMos: 0,
+          totalDl: 0,
+          totalUl: 0,
+          totalLatency: 0,
+          count: 0,
+          sessionIds: [],
+        };
+      }
+      
+      appAggregates[name].totalMos += metrics.avgMos || 0;
+      appAggregates[name].totalDl += metrics.avgDlTptMbps || 0;
+      appAggregates[name].totalUl += metrics.avgUlTptMbps || 0;
+      appAggregates[name].totalLatency += metrics.avgLatency || 0;
+      appAggregates[name].count += 1;
+      appAggregates[name].sessionIds.push(sessionId);
+    });
+  });
+
+  // Calculate averages
+  return Object.values(appAggregates).map((app) => ({
+    name: app.name,
+    mos: app.count > 0 ? app.totalMos / app.count : 0,
+    dl: app.count > 0 ? app.totalDl / app.count : 0,
+    ul: app.count > 0 ? app.totalUl / app.count : 0,
+    latency: app.count > 0 ? app.totalLatency / app.count : 0,
+    sessionCount: app.count,
+    sessionIds: app.sessionIds,
+  }));
+}, [appSummary]);
 
   if (!appSummary || Object.keys(appSummary).length === 0) {
     return (
