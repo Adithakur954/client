@@ -19,7 +19,7 @@ export default function UnifiedHeader({
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  // Get project and session info from URL if not passed as props
+  
   const effectiveProjectId =
     projectId || searchParams.get("project_id") || searchParams.get("project");
   const sessionParam =
@@ -68,7 +68,7 @@ export default function UnifiedHeader({
       fetchProject();
     }
   }, [effectiveProjectId]);
-  // Detect if we're on the map page
+  
   const isMapPage = location.pathname.includes("unified-map");
 
   return (

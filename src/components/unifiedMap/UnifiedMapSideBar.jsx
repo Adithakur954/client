@@ -559,8 +559,8 @@ const updateDataFilter = useCallback((filterType, value) => {
                       <SelectItem value="rsrp">RSRP</SelectItem>
                       <SelectItem value="rsrq">RSRQ</SelectItem>
                       <SelectItem value="sinr">SINR</SelectItem>
-                      <SelectItem value="dl_thpt">DL Throughput</SelectItem>
-                      <SelectItem value="ul_thpt">UL Throughput</SelectItem>
+                      <SelectItem value="dl_tpt">DL Throughput</SelectItem>
+                      <SelectItem value="ul_tpt">UL Throughput</SelectItem>
                       <SelectItem value="mos">MOS</SelectItem>
                       <SelectItem value="lte_bler">LTE BLER</SelectItem>
                       <SelectItem value="pci">PCI</SelectItem>

@@ -1,4 +1,4 @@
-// src/components/MapLegend.jsx
+
 import React from 'react';
 
 const OPERATOR_LEGEND = [

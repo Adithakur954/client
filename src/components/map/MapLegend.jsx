@@ -8,6 +8,7 @@ const COLOR_SCHEMES = {
   provider: {
     JIO: "#3B82F6",
     Airtel: "#EF4444",
+    "IND airtel": "#EF4444",
     "VI India": "#22C55E",
     BSNL: "#F59E0B",
     Unknown: "#6B7280",
@@ -62,7 +63,6 @@ const ColorSchemeLegend = ({ colorBy }) => {
   );
 };
 
-// Legend for PCI metric
 const PciLegend = () => (
   <div>
     <div className="font-semibold text-sm mb-2">PCI Color Map</div>
