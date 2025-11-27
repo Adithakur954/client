@@ -9,6 +9,8 @@
   SECRETS_SCAN_OMIT_KEYS = "VITE_API_BASE_URL,VITE_GOOGLE_MAPS_API_KEY,VITE_GOOGLE_MAPS_MAP_ID"
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/api/*"
+  to = "http://65.2.162.237/:splat"
   status = 200
+  force = true
+
