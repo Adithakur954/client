@@ -1942,7 +1942,13 @@ const areaPolygonsWithColors = useMemo(() => {
             <MapWithMultipleCircles
               isLoaded={isLoaded}
               loadError={loadError}
-               locations={showDataCircles && !areaEnabled ? filteredLocations : []}
+              locations={
+    showDataCircles && 
+    !areaEnabled && 
+    !(onlyInsidePolygons && showPolygons)  
+      ? filteredLocations 
+      : []
+  }
               thresholds={effectiveThresholds}
               selectedMetric={selectedMetric}
               colorBy={colorBy}
