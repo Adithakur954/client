@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Spinner from '../components/common/Spinner';
-import Logo from '../assets/logo.png';
+import vinfocom from '../assets/vinfocom.png';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -52,11 +52,11 @@ const LoginPage = () => {
                     </div>
                 )}
 
-                {/* Branding / Logo */}
+                {/* Branding / vinfocom */}
                 <div className="text-center">
                     <div className="flex justify-center mb-4">
                         <span className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gray-800/90 backdrop-blur-3xl shadow-white text-white text-xl font-bold shadow-md">
-                            <img src={Logo} alt="logo" />
+                            <img src={vinfocom} alt="vinfocom" />
                         </span>
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome Back</h2>

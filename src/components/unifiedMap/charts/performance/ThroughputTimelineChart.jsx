@@ -42,12 +42,12 @@ export const ThroughputTimelineChart = React.forwardRef(({ locations }, ref) => 
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data} margin={CHART_CONFIG.margin}>
           <CartesianGrid {...CHART_CONFIG.grid} />
-          <XAxis
+          <YAxis
             dataKey="index"
             tick={{ fill: "#9CA3AF", fontSize: 11 }}
             label={{ value: "Sample Number", position: "insideBottom", offset: -5, fill: "#9CA3AF" }}
           />
-          <YAxis
+          <XAxis
             tick={{ fill: "#9CA3AF", fontSize: 11 }}
             label={{ value: "Throughput (Mbps)", angle: -90, position: "insideLeft", fill: "#9CA3AF" }}
           />

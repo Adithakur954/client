@@ -16,7 +16,7 @@ import {
     ChevronRight,
     FileText
 } from 'lucide-react';
-import logoLogo from '../assets/logo.png';
+import vinfocomvinfocom from '../assets/vinfocom.png';
 
 const SideBar = ({ collapsed }) => {
     const location = useLocation();
@@ -138,10 +138,10 @@ const SideBar = ({ collapsed }) => {
             className={`h-screen bg-gray-800 text-white flex flex-col shadow-lg transition-width duration-300 ease-in-out
                 ${collapsed ? 'w-16' : 'w-60'}`}
         >
-            {/* Logo */}
+            {/* vinfocom */}
             <div className="p-4 flex items-center justify-center border-b border-gray-700 h-16 flex-shrink-0">
-                <img src={logoLogo} alt="Logo" className="h-8 sm:h-10 object-contain" />
-                {!collapsed && <span className="ml-2 font-bold text-lg whitespace-nowrap">FrogCell</span>}
+                <img src={vinfocomvinfocom} alt="vinfocom" className="h-8 sm:h-10 object-contain" />
+                {!collapsed && <span className="ml-2 font-bold text-lg whitespace-nowrap">Vinfocom</span>}
             </div>
 
             {/* Navigation */}
