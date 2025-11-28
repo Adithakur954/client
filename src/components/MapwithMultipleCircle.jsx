@@ -225,7 +225,7 @@ const MapWithMultipleSquares = ({
       </GoogleMap>
 
       {/* Opacity Control */}
-      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg">
+      <div className="absolute top-15 left-4 bg-white rounded-lg shadow-lg">
         <button
           onClick={() => setShowOpacityControl(!showOpacityControl)}
           className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-2"

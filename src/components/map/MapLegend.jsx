@@ -142,7 +142,7 @@ export default function MapLegend({
   }
 
   return (
-    <div className="absolute top-20 right-4 z-10 rounded-lg border bg-slate-950 text-white p-3 shadow-xl max-w-xs">
+    <div className="absolute top-30 left-4 z-10 rounded-lg border bg-slate-950 text-white p-3 shadow-xl max-w-xs">
       {content}
     </div>
   );

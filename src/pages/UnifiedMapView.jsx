@@ -371,7 +371,7 @@ const AreaPolygonTooltip = ({ polygon, position, selectedMetric }) => {
 
       {/* Horizontal Grid Layout */}
       <div className="grid grid-cols-3 gap-2">
-        {/* Operators Column */}
+        
         {stats?.provider && stats.provider.stats.length > 0 && (
           <div className="min-w-0">
             <div className="text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1">
@@ -990,7 +990,7 @@ const [hoverPosition, setHoverPosition] = useState(null);
 
         toast.success(`${formatted.length} prediction points loaded`);
       } else {
-        ("❌ Prediction data fetch failed:", projectId, res);console.log
+        (" Prediction data fetch failed:", projectId, res);console.log
         toast.error(res?.Message || "No prediction data available");
         setLocations([]);
       }
@@ -1285,123 +1285,123 @@ const [hoverPosition, setHoverPosition] = useState(null);
 
   // Area polygons with colors based on median metric values
   // Area polygons with colors based on median metric values OR categorical data
-const areaPolygonsWithColors = useMemo(() => {
-  if (!areaEnabled || !areaData || areaData.length === 0) {
-    return [];
-  }
+// const areaPolygonsWithColors = useMemo(() => {
+//   if (!areaEnabled || !areaData || areaData.length === 0) {
+//     return [];
+//   }
 
-  // If no location data, return default styled polygons
-  if (!locations || locations.length === 0) {
-    return areaData.map((poly) => ({
-      ...poly,
-      fillColor: "#9333ea",
-      fillOpacity: 0.25,
-      pointCount: 0,
-      medianValue: null,
-      categoryStats: null,
-    }));
-  }
+//   // If no location data, return default styled polygons
+//   if (!locations || locations.length === 0) {
+//     return areaData.map((poly) => ({
+//       ...poly,
+//       fillColor: "#9333ea",
+//       fillOpacity: 0.25,
+//       pointCount: 0,
+//       medianValue: null,
+//       categoryStats: null,
+//     }));
+//   }
 
-  // Determine if we're using categorical coloring
-  const useCategoricalColoring = colorBy && ['provider', 'band', 'technology'].includes(colorBy);
+//   // Determine if we're using categorical coloring
+//   const useCategoricalColoring = colorBy && ['provider', 'band', 'technology'].includes(colorBy);
   
-  // Use DEFAULT thresholds for metric-based coloring
-  const currentThresholds = thresholds[selectedMetric] || [];
+//   // Use DEFAULT thresholds for metric-based coloring
+//   const currentThresholds = thresholds[selectedMetric] || [];
 
-  console.log(`🎨 Coloring area polygons by: ${useCategoricalColoring ? colorBy : selectedMetric}`);
+//   console.log(`🎨 Coloring area polygons by: ${useCategoricalColoring ? colorBy : selectedMetric}`);
 
-  return areaData.map((poly) => {
-    // Find all points inside this polygon
-    const pointsInside = locations.filter((point) =>
-      isPointInPolygon(point, poly)
-    );
+//   return areaData.map((poly) => {
+//     // Find all points inside this polygon
+//     const pointsInside = locations.filter((point) =>
+//       isPointInPolygon(point, poly)
+//     );
 
-    if (pointsInside.length === 0) {
-      // No points - gray color
-      return {
-        ...poly,
-        fillColor: "#cccccc",
-        fillOpacity: 0.3,
-        pointCount: 0,
-        medianValue: null,
-        categoryStats: null,
-      };
-    }
+//     if (pointsInside.length === 0) {
+//       // No points - gray color
+//       return {
+//         ...poly,
+//         fillColor: "#cccccc",
+//         fillOpacity: 0.3,
+//         pointCount: 0,
+//         medianValue: null,
+//         categoryStats: null,
+//       };
+//     }
 
-    // Calculate category statistics (always, for hover tooltip)
-    const providerStats = calculateCategoryStats(pointsInside, 'provider', selectedMetric);
-const bandStats = calculateCategoryStats(pointsInside, 'band', selectedMetric);
-const technologyStats = calculateCategoryStats(pointsInside, 'technology', selectedMetric);
+//     // Calculate category statistics (always, for hover tooltip)
+//     const providerStats = calculateCategoryStats(pointsInside, 'provider', selectedMetric);
+// const bandStats = calculateCategoryStats(pointsInside, 'band', selectedMetric);
+// const technologyStats = calculateCategoryStats(pointsInside, 'technology', selectedMetric);
 
-    let fillColor;
-    let coloringInfo;
+//     let fillColor;
+//     let coloringInfo;
 
-    if (useCategoricalColoring) {
-      // COLOR BY CATEGORY (provider/band/technology)
-      const stats = colorBy === 'provider' ? providerStats :
-                    colorBy === 'band' ? bandStats :
-                    technologyStats;
+//     if (useCategoricalColoring) {
+//       // COLOR BY CATEGORY (provider/band/technology)
+//       const stats = colorBy === 'provider' ? providerStats :
+//                     colorBy === 'band' ? bandStats :
+//                     technologyStats;
       
-      if (stats && stats.dominant) {
-        fillColor = getCategoricalColor(stats.dominant.name, colorBy);
-        coloringInfo = `${stats.dominant.name} (${stats.dominant.percentage}%)`;
-      } else {
-        fillColor = "#cccccc";
-        coloringInfo = "No data";
-      }
+//       if (stats && stats.dominant) {
+//         fillColor = getCategoricalColor(stats.dominant.name, colorBy);
+//         coloringInfo = `${stats.dominant.name} (${stats.dominant.percentage}%)`;
+//       } else {
+//         fillColor = "#cccccc";
+//         coloringInfo = "No data";
+//       }
 
-      console.log(
-        `🎨 Zone ${poly.zoneId}: ${pointsInside.length} points, ` +
-        `dominant ${colorBy}=${coloringInfo}, color=${fillColor}`
-      );
-    } else {
-      // COLOR BY METRIC VALUE (RSRP, SINR, etc.)
-      const values = pointsInside
-        .map((point) => point[selectedMetric])
-        .filter((val) => val !== null && val !== undefined && !isNaN(val));
+//       console.log(
+//         `🎨 Zone ${poly.zoneId}: ${pointsInside.length} points, ` +
+//         `dominant ${colorBy}=${coloringInfo}, color=${fillColor}`
+//       );
+//     } else {
+//       // COLOR BY METRIC VALUE (RSRP, SINR, etc.)
+//       const values = pointsInside
+//         .map((point) => point[selectedMetric])
+//         .filter((val) => val !== null && val !== undefined && !isNaN(val));
 
-      if (values.length === 0) {
-        fillColor = "#cccccc";
-        coloringInfo = "No metric data";
-      } else {
-        const medianValue = calculateMedian(values);
-        fillColor = getColorFromValue(medianValue, currentThresholds);
-        coloringInfo = `Median ${selectedMetric}=${medianValue?.toFixed(2)}`;
+//       if (values.length === 0) {
+//         fillColor = "#cccccc";
+//         coloringInfo = "No metric data";
+//       } else {
+//         const medianValue = calculateMedian(values);
+//         fillColor = getColorFromValue(medianValue, currentThresholds);
+//         coloringInfo = `Median ${selectedMetric}=${medianValue?.toFixed(2)}`;
 
-        console.log(
-          `🎨 Zone ${poly.zoneId}: ${pointsInside.length} points, ` +
-          `${values.length} valid values, ${coloringInfo}, color=${fillColor}`
-        );
-      }
-    }
+//         console.log(
+//           `🎨 Zone ${poly.zoneId}: ${pointsInside.length} points, ` +
+//           `${values.length} valid values, ${coloringInfo}, color=${fillColor}`
+//         );
+//       }
+//     }
 
-    return {
-      ...poly,
-      fillColor: fillColor,
-      fillOpacity: 0.7,
-      strokeWeight: 2.5,
-      pointCount: pointsInside.length,
-      medianValue: useCategoricalColoring ? null : calculateMedian(
-        pointsInside
-          .map((point) => point[selectedMetric])
-          .filter((val) => val !== null && val !== undefined && !isNaN(val))
-      ),
-      categoryStats: {
-        provider: providerStats,
-        band: bandStats,
-        technology: technologyStats,
-      },
-      coloringInfo,
-    };
-  });
-}, [
-  areaEnabled,
-  areaData,
-  locations,
-  selectedMetric,
-  thresholds,
-  colorBy, // Add this dependency
-]);
+//     return {
+//       ...poly,
+//       fillColor: fillColor,
+//       fillOpacity: 0.7,
+//       strokeWeight: 2.5,
+//       pointCount: pointsInside.length,
+//       medianValue: useCategoricalColoring ? null : calculateMedian(
+//         pointsInside
+//           .map((point) => point[selectedMetric])
+//           .filter((val) => val !== null && val !== undefined && !isNaN(val))
+//       ),
+//       categoryStats: {
+//         provider: providerStats,
+//         band: bandStats,
+//         technology: technologyStats,
+//       },
+//       coloringInfo,
+//     };
+//   });
+// }, [
+//   areaEnabled,
+//   areaData,
+//   locations,
+//   selectedMetric,
+//   thresholds,
+//   colorBy, // Add this dependency
+// ]);
 
   // ✅ Filter locations with coverage and data filters
   const filteredLocations = useMemo(() => {
@@ -1500,6 +1500,128 @@ const technologyStats = calculateCategoryStats(pointsInside, 'technology', selec
     showPolygons,
     polygons,
   ]);
+
+  // Area polygons with colors based on median metric values OR categorical data
+const areaPolygonsWithColors = useMemo(() => {
+  if (!areaEnabled || !areaData || areaData.length === 0) {
+    return [];
+  }
+
+  // ✅ CHANGED: Use filteredLocations instead of locations
+  if (!filteredLocations || filteredLocations.length === 0) {
+    return areaData.map((poly) => ({
+      ...poly,
+      fillColor: "#9333ea",
+      fillOpacity: 0.25,
+      pointCount: 0,
+      medianValue: null,
+      categoryStats: null,
+    }));
+  }
+
+  // Determine if we're using categorical coloring
+  const useCategoricalColoring = colorBy && ['provider', 'band', 'technology'].includes(colorBy);
+  
+  // Use DEFAULT thresholds for metric-based coloring
+  const currentThresholds = thresholds[selectedMetric] || [];
+
+  console.log(`🎨 Coloring area polygons by: ${useCategoricalColoring ? colorBy : selectedMetric}`);
+  console.log(`🔍 Using ${filteredLocations.length} filtered points (from ${locations.length} total)`);
+
+  return areaData.map((poly) => {
+    // ✅ CHANGED: Find all FILTERED points inside this polygon
+    const pointsInside = filteredLocations.filter((point) =>
+      isPointInPolygon(point, poly)
+    );
+
+    if (pointsInside.length === 0) {
+      // No points - gray color
+      return {
+        ...poly,
+        fillColor: "#cccccc",
+        fillOpacity: 0.3,
+        pointCount: 0,
+        medianValue: null,
+        categoryStats: null,
+      };
+    }
+
+    // Calculate category statistics (always, for hover tooltip)
+    const providerStats = calculateCategoryStats(pointsInside, 'provider', selectedMetric);
+    const bandStats = calculateCategoryStats(pointsInside, 'band', selectedMetric);
+    const technologyStats = calculateCategoryStats(pointsInside, 'technology', selectedMetric);
+
+    let fillColor;
+    let coloringInfo;
+
+    if (useCategoricalColoring) {
+      // COLOR BY CATEGORY (provider/band/technology)
+      const stats = colorBy === 'provider' ? providerStats :
+                    colorBy === 'band' ? bandStats :
+                    technologyStats;
+      
+      if (stats && stats.dominant) {
+        fillColor = getCategoricalColor(stats.dominant.name, colorBy);
+        coloringInfo = `${stats.dominant.name} (${stats.dominant.percentage}%)`;
+      } else {
+        fillColor = "#cccccc";
+        coloringInfo = "No data";
+      }
+
+      console.log(
+        `🎨 Zone ${poly.zoneId}: ${pointsInside.length} filtered points, ` +
+        `dominant ${colorBy}=${coloringInfo}, color=${fillColor}`
+      );
+    } else {
+      // COLOR BY METRIC VALUE (RSRP, SINR, etc.)
+      const values = pointsInside
+        .map((point) => point[selectedMetric])
+        .filter((val) => val !== null && val !== undefined && !isNaN(val));
+
+      if (values.length === 0) {
+        fillColor = "#cccccc";
+        coloringInfo = "No metric data";
+      } else {
+        const medianValue = calculateMedian(values);
+        fillColor = getColorFromValue(medianValue, currentThresholds);
+        coloringInfo = `Median ${selectedMetric}=${medianValue?.toFixed(2)}`;
+
+        console.log(
+          `🎨 Zone ${poly.zoneId}: ${pointsInside.length} filtered points, ` +
+          `${values.length} valid values, ${coloringInfo}, color=${fillColor}`
+        );
+      }
+    }
+
+    return {
+      ...poly,
+      fillColor: fillColor,
+      fillOpacity: 0.7,
+      strokeWeight: 2.5,
+      pointCount: pointsInside.length,
+      medianValue: useCategoricalColoring ? null : calculateMedian(
+        pointsInside
+          .map((point) => point[selectedMetric])
+          .filter((val) => val !== null && val !== undefined && !isNaN(val))
+      ),
+      categoryStats: {
+        provider: providerStats,
+        band: bandStats,
+        technology: technologyStats,
+      },
+      coloringInfo,
+    };
+  });
+}, [
+  areaEnabled,
+  areaData,
+  filteredLocations, // ✅ CHANGED: Use filteredLocations instead of locations
+  locations.length,  // ✅ ADD: For logging comparison
+  selectedMetric,
+  thresholds,
+  colorBy,
+  dataFilters, // ✅ ADD: Ensure recalculation when filters change
+]);
 
   // ✅ Debug effect to log filter state
   useEffect(() => {
@@ -1990,6 +2112,8 @@ const technologyStats = calculateCategoryStats(pointsInside, 'technology', selec
                   options={{ zIndex: 100 }}
                   projectId={projectId}
                   minSectors={3}
+                  legendPosition="bottom-right" 
+         
                 />
               )}
             </MapWithMultipleCircles>

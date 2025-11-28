@@ -30,7 +30,7 @@ function getColorForNetwork(network) {
   const DEFAULT_COLOR = "#3B82F6"; // Blue as default instead of gray
   
   if (!network || network === "" || network === "null" || network === "undefined") {
-    console.log("⚠️ No network value, using default color:", DEFAULT_COLOR);
+    console.log(" No network value, using default color:", DEFAULT_COLOR);
     return DEFAULT_COLOR;
   }
 
@@ -44,6 +44,8 @@ function getColorForNetwork(network) {
     
     // Airtel variants
     "IND airtel": "#EF4444",
+    "ind airtel": "#EF4444",
+    
     "IND Airtel": "#EF4444",
     "airtel": "#EF4444",
     "Airtel 5G": "#EF4444",
@@ -428,7 +430,7 @@ const NetworkPlannerMap = ({
             />
           );
         } catch (err) {
-          console.error(`❌ Error rendering sector:`, err);
+          console.error(` Error rendering sector:`, err);
           return null;
         }
       })}
