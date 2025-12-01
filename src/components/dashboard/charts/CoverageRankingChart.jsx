@@ -3,18 +3,18 @@ import { toast } from 'react-toastify';
 import { PieChart } from '@mui/x-charts/PieChart';
 import { Box, TextField, Typography, Grid } from '@mui/material';
 import ChartCard from '../ChartCard';
-import { useCoverageRanking } from '@/hooks/useDashboardData';
+import { useCoverageRanking } from '@/hooks/useDashboardData.js';
 import { formatNumber } from '@/utils/chartUtils';
 
 const CHART_COLORS = [
-  '#1976d2', // Blue
-  '#d32f2f', // Red
-  '#388e3c', // Green
-  '#f57c00', // Orange
-  '#7b1fa2', // Purple
-  '#0097a7', // Cyan
-  '#c2185b', // Pink
-  '#5d4037', // Brown
+  '#1976d2',
+  '#d32f2f',
+  '#388e3c',
+  '#f57c00',
+  '#7b1fa2',
+  '#0097a7',
+  '#c2185b',
+  '#5d4037',
 ];
 
 const CoverageRankingChart = () => {
@@ -23,7 +23,6 @@ const CoverageRankingChart = () => {
 
   const { data, isLoading } = useCoverageRanking(settings.rsrpMin, settings.rsrpMax);
 
-  // Transform data for MUI X Charts
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
     
@@ -117,14 +116,10 @@ const CoverageRankingChart = () => {
               outerRadius: 130,
               paddingAngle: 2,
               cornerRadius: 5,
-              // Arc labels (percentage on slices)
               arcLabel: (item) => `${item.percentage}%`,
               arcLabelMinAngle: 35,
               arcLabelRadius: '60%',
-              // Tooltip/value formatter
-              valueFormatter: (item) => {
-                return `${formatNumber(item.value)} (${item.percentage}%)`;
-              },
+              valueFormatter: (item) => `${formatNumber(item.value)} (${item.percentage}%)`,
             },
           ]}
           colors={CHART_COLORS}
@@ -135,20 +130,22 @@ const CoverageRankingChart = () => {
               direction: 'row',
               position: { vertical: 'bottom', horizontal: 'middle' },
               padding: 0,
-              itemMarkWidth: 14,
-              itemMarkHeight: 14,
-              markGap: 6,
-              itemGap: 12,
-              labelStyle: {
-                fontSize: 13,
-                fontWeight: 500,
-              },
             },
           }}
           sx={{
             '& .MuiPieArc-root': {
               stroke: '#fff',
               strokeWidth: 2,
+            },
+            '& .MuiChartsLegend-mark': {
+              width: 14,
+              height: 14,
+            },
+            '& .MuiChartsLegend-series': {
+              gap: '6px',
+            },
+            '& .MuiChartsLegend-root': {
+              gap: '12px',
             },
             '& .MuiChartsLegend-label': {
               fontSize: '13px !important',

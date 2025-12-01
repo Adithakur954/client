@@ -1,49 +1,55 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import { PieChart } from '@mui/x-charts/PieChart';
-import { Box, TextField, Typography, Grid, ToggleButton, ToggleButtonGroup, Divider, Button, ButtonGroup } from '@mui/material';
+import { 
+  Box, 
+  TextField, 
+  Typography, 
+  Grid, 
+  ToggleButton, 
+  ToggleButtonGroup, 
+  Divider, 
+  Button, 
+  ButtonGroup 
+} from '@mui/material';
 import { SignalCellularAlt, SignalCellular4Bar } from '@mui/icons-material';
 import ChartCard from '../ChartCard';
-import { useCoverageRanking, useQualityRanking } from '@/hooks/useDashboardData';
+import { useCoverageRanking, useQualityRanking } from '@/hooks/useDashboardData.js';
 import { formatNumber } from '@/utils/chartUtils';
 
 const CHART_COLORS = [
-  '#1976d2', // Blue
-  '#d32f2f', // Red
-  '#388e3c', // Green
-  '#f57c00', // Orange
-  '#7b1fa2', // Purple
-  '#0097a7', // Cyan
-  '#c2185b', // Pink
-  '#5d4037', // Brown
+  '#1976d2',
+  '#d32f2f',
+  '#388e3c',
+  '#f57c00',
+  '#7b1fa2',
+  '#0097a7',
+  '#c2185b',
+  '#5d4037',
 ];
 
 const OperatorRankingChart = () => {
-  const [chartType, setChartType] = useState('coverage'); // 'coverage' or 'quality'
+  const [chartType, setChartType] = useState('coverage');
   
-  // Separate settings for each chart type
   const [coverageSettings, setCoverageSettings] = useState({ rsrpMin: -95, rsrpMax: 0 });
   const [qualitySettings, setQualitySettings] = useState({ rsrqMin: -10, rsrqMax: 0 });
   
-  // Separate drafts for each chart type
   const [coverageDraft, setCoverageDraft] = useState({ rsrpMin: '-95', rsrpMax: '0' });
   const [qualityDraft, setQualityDraft] = useState({ rsrqMin: '-10', rsrqMax: '0' });
 
-  // Fetch both datasets
   const { data: coverageData, isLoading: coverageLoading } = useCoverageRanking(
     coverageSettings.rsrpMin, 
     coverageSettings.rsrpMax
   );
+  
   const { data: qualityData, isLoading: qualityLoading } = useQualityRanking(
     qualitySettings.rsrqMin, 
     qualitySettings.rsrqMax
   );
 
-  // Current data and loading state based on chart type
   const currentData = chartType === 'coverage' ? coverageData : qualityData;
   const isLoading = chartType === 'coverage' ? coverageLoading : qualityLoading;
 
-  // Transform data for MUI X Charts
   const chartData = useMemo(() => {
     if (!currentData || currentData.length === 0) return [];
     
@@ -58,7 +64,6 @@ const OperatorRankingChart = () => {
     }));
   }, [currentData]);
 
-  // Update coverage draft when settings change
   useEffect(() => {
     setCoverageDraft({ 
       rsrpMin: String(coverageSettings.rsrpMin), 
@@ -66,7 +71,6 @@ const OperatorRankingChart = () => {
     });
   }, [coverageSettings]);
 
-  // Update quality draft when settings change
   useEffect(() => {
     setQualityDraft({ 
       rsrqMin: String(qualitySettings.rsrqMin), 
@@ -104,7 +108,7 @@ const OperatorRankingChart = () => {
     setQualitySettings({ rsrqMin, rsrqMax });
   };
 
-  const handleChartTypeChange = (event, newType) => {
+  const handleChartTypeChange = (_, newType) => {
     if (newType !== null) {
       setChartType(newType);
     }
@@ -119,7 +123,6 @@ const OperatorRankingChart = () => {
 
   const renderSettings = () => (
     <Box sx={{ p: 2 }}>
-      {/* Chart Type Toggle */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="subtitle1" fontWeight="600" gutterBottom>
           Chart Type
@@ -132,18 +135,13 @@ const OperatorRankingChart = () => {
           size="small"
           color="primary"
         >
-          <ToggleButton value="coverage">
-            Coverage (RSRP)
-          </ToggleButton>
-          <ToggleButton value="quality">
-            Quality (RSRQ)
-          </ToggleButton>
+          <ToggleButton value="coverage">Coverage (RSRP)</ToggleButton>
+          <ToggleButton value="quality">Quality (RSRQ)</ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
       <Divider sx={{ my: 2 }} />
 
-      {/* Coverage Settings */}
       {chartType === 'coverage' && (
         <Box>
           <Typography variant="subtitle1" fontWeight="600" gutterBottom>
@@ -179,7 +177,6 @@ const OperatorRankingChart = () => {
         </Box>
       )}
 
-      {/* Quality Settings */}
       {chartType === 'quality' && (
         <Box>
           <Typography variant="subtitle1" fontWeight="600" gutterBottom>
@@ -217,7 +214,6 @@ const OperatorRankingChart = () => {
     </Box>
   );
 
-  // Custom action buttons for the chart card header
   const renderHeaderActions = () => (
     <ButtonGroup size="small" variant="outlined" sx={{ mr: 1 }}>
       <Button
@@ -265,9 +261,7 @@ const OperatorRankingChart = () => {
               arcLabel: (item) => `${item.percentage}%`,
               arcLabelMinAngle: 35,
               arcLabelRadius: '60%',
-              valueFormatter: (item) => {
-                return `${formatNumber(item.value)} (${item.percentage}%)`;
-              },
+              valueFormatter: (item) => `${formatNumber(item.value)} (${item.percentage}%)`,
             },
           ]}
           colors={CHART_COLORS}
@@ -278,20 +272,22 @@ const OperatorRankingChart = () => {
               direction: 'row',
               position: { vertical: 'bottom', horizontal: 'middle' },
               padding: 0,
-              itemMarkWidth: 14,
-              itemMarkHeight: 14,
-              markGap: 6,
-              itemGap: 12,
-              labelStyle: {
-                fontSize: 13,
-                fontWeight: 500,
-              },
             },
           }}
           sx={{
             '& .MuiPieArc-root': {
               stroke: '#fff',
               strokeWidth: 2,
+            },
+            '& .MuiChartsLegend-mark': {
+              width: 14,
+              height: 14,
+            },
+            '& .MuiChartsLegend-series': {
+              gap: '6px',
+            },
+            '& .MuiChartsLegend-root': {
+              gap: '12px',
             },
             '& .MuiChartsLegend-label': {
               fontSize: '13px !important',

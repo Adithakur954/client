@@ -12,7 +12,7 @@ import {
   ComposedChart,
 } from "recharts";
 import ChartCard from "../ChartCard";
-import { useAppData } from "@/hooks/useDashboardData";
+import { useAppData } from "@/hooks/useDashboardData.js";
 
 const METRIC_CONFIG = [
   { key: "avgDlTptMbps", label: "Download Mbps", color: "#3B82F6" },

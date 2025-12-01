@@ -1,6 +1,5 @@
 // src/pages/Dashboard.jsx
-
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { 
   BarChart2, RefreshCw, Users, Car, Waypoints, FileText, 
   Wifi, Radio, Layers, Home, MapPin 
@@ -21,64 +20,61 @@ import AppChart from '@/components/dashboard/charts/AppChart';
 import { 
   useTotals, 
   useOperatorsAndNetworks, 
-  useNetworkDistribution, 
-  useBandDistribution,
+  useBandCount,
   useIndoorCount,
-  useOutdoorCount
-} from '@/hooks/useDashboardData';
+  useOutdoorCount,
+  useClearDashboardCache
+} from '@/hooks/useDashboardData.js';
 
-import { usePersistedFilters, clearAllPersistedFilters } from '@/hooks/usePersistedFilters'; // ✅ Import
+import { usePersistedFilters, clearAllPersistedFilters } from '@/hooks/usePersistedFilters';
 
 const DashboardPage = () => {
-  // ✅ Use persisted filters for each chart
+  // Persisted filters for each chart
   const [monthlySamplesFilters, setMonthlySamplesFilters] = usePersistedFilters('monthlySamples');
   const [operatorSamplesFilters, setOperatorSamplesFilters] = usePersistedFilters('operatorSamples');
   const [metricFilters, setMetricFilters] = usePersistedFilters('metric');
   const [bandDistFilters, setBandDistFilters] = usePersistedFilters('bandDist');
 
-  // Fetch totals and available operators/networks
-  const { data: totalsData = {}, isLoading: isTotalsLoading } = useTotals();
-  const { operators = [], networks = [], operatorCount = 0 } = useOperatorsAndNetworks();
+  // Fetch data using hooks
+  const { data: totalsData, isLoading: isTotalsLoading } = useTotals();
+  const { operators, networks, operatorCount, isLoading: isOperatorsLoading } = useOperatorsAndNetworks();
+  const { data: bandCount, isLoading: isBandCountLoading } = useBandCount();
+  const { data: indoorCount, isLoading: isIndoorLoading } = useIndoorCount();
+  const { data: outdoorCount, isLoading: isOutdoorLoading } = useOutdoorCount();
   
-  // Fetch additional data for KPIs
-  const { data: networkDistData = [] } = useNetworkDistribution({});
-  const { data: bandDistData = [] } = useBandDistribution({});
-  
-  // Fetch indoor and outdoor counts
-  const { data: indoorData = {}, isLoading: isIndoorLoading } = useIndoorCount();
-  const { data: outdoorData = {}, isLoading: isOutdoorLoading } = useOutdoorCount();
+  // Cache clear function
+  const clearCache = useClearDashboardCache();
 
-  // Calculate normalized counts for Bands
-  const bandCount = useMemo(() => {
-    if (!bandDistData || bandDistData.length === 0) return 0;
-    return bandDistData.length;
-  }, [bandDistData]);
-
-  const totalLocationSamples = (Number(indoorData) || 0) + (Number(outdoorData) || 0);
+  // Calculate total samples
+  const totalLocationSamples = useMemo(() => {
+    return (Number(indoorCount) || 0) + (Number(outdoorCount) || 0);
+  }, [indoorCount, outdoorCount]);
 
   // Check if any KPI data is loading
-  const isKPILoading = isTotalsLoading || isIndoorLoading || isOutdoorLoading;
+  const isKPILoading = isTotalsLoading || isOperatorsLoading || isBandCountLoading || isIndoorLoading || isOutdoorLoading;
 
   // Stats for KPI cards
   const stats = useMemo(() => {
+    const totals = totalsData || {};
+    
     return [
       {
         title: "Total Users",
-        value: totalsData?.totalUsers ?? 0,
+        value: totals.totalUsers ?? totals.TotalUsers ?? 0,
         icon: Users,
         color: "bg-gradient-to-br from-purple-500 to-purple-600",
         description: "Registered users"
       },
       {
         title: "Drive Sessions",
-        value: totalsData?.totalSessions ?? 0,
+        value: totals.totalSessions ?? totals.TotalSessions ?? 0,
         icon: Car,
         color: "bg-gradient-to-br from-teal-500 to-teal-600",
         description: "Total drive sessions"
       },
       {
         title: "Online Sessions",
-        value: totalsData?.totalOnlineSessions ?? 0,
+        value: totals.totalOnlineSessions ?? totals.TotalOnlineSessions ?? 0,
         icon: Waypoints,
         color: "bg-gradient-to-br from-orange-500 to-orange-600",
         description: "Currently active"
@@ -92,38 +88,42 @@ const DashboardPage = () => {
       },
       {
         title: "Operators",
-        value: operatorCount,
+        value: operatorCount || 0,
         icon: Wifi,
         color: "bg-gradient-to-br from-sky-500 to-sky-600",
         description: "Unique network operators"
       },
       {
         title: "Bands",
-        value: bandCount,
+        value: bandCount || 0,
         icon: Layers,
         color: "bg-gradient-to-br from-indigo-500 to-indigo-600",
         description: "Frequency bands detected"
       },
       {
         title: "Indoor Samples",
-        value: indoorData,
+        value: indoorCount || 0,
         icon: Home,
         color: "bg-gradient-to-br from-green-500 to-green-600",
         description: "Indoor measurements"
       },
       {
         title: "Outdoor Samples",
-        value: outdoorData,
+        value: outdoorCount || 0,
         icon: MapPin,
         color: "bg-gradient-to-br from-blue-500 to-blue-600",
         description: "Outdoor measurements"
       },
     ];
-  }, [totalsData, operatorCount, bandCount, indoorData, outdoorData, totalLocationSamples]);
+  }, [totalsData, operatorCount, bandCount, indoorCount, outdoorCount, totalLocationSamples]);
 
-  // ✅ Handle refresh all - clear cache and filters
+  // Handle refresh all
   const handleRefreshAll = () => {
     // Clear SWR cache
+    clearCache();
+    
+    // Clear localStorage cache
+    localStorage.removeItem('swr-cache');
     localStorage.removeItem('app-swr-cache');
     
     // Clear all persisted filters
@@ -172,7 +172,7 @@ const DashboardPage = () => {
           )}
         </div>
 
-        {/* Charts Grid - ✅ Using persisted filters */}
+        {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <MonthlySamplesChart
             chartFilters={monthlySamplesFilters}

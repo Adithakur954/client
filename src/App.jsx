@@ -1,12 +1,13 @@
 // src/App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { SWRConfig } from 'swr'; // ✅ Add this import
+import { SWRConfig } from 'swr';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import AuthProvider, { useAuth } from './context/AuthContext';
-import { localStorageProvider } from './utils/localStorageProvider'; // ✅ Add this import
+import { localStorageProvider } from './utils/localStorageProvider';
+import Spinner from './components/common/Spinner'; // Ensure Spinner is imported
 
 // --- Page Imports ---
 import LoginPage from './pages/Login';
@@ -25,17 +26,29 @@ import PredictionMapPage from './pages/PredictionMap';
 import GetReportPage from './pages/GetReport';
 import ViewProjectsPage from './pages/ViewProjects';
 
-// --- Route Components ---
+// --- UPDATED Route Components ---
+
 const PrivateRoute = ({ children }) => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, loading } = useAuth(); // Destructure loading
+
+    if (loading) {
+        return <Spinner />; // Wait for auth check to finish
+    }
+
     if (!isAuthenticated()) {
         return <Navigate to="/" replace />;
     }
+
     return <AppLayout>{children}</AppLayout>;
 };
 
 const PublicRoute = ({ children }) => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, loading } = useAuth(); // Destructure loading
+
+    if (loading) {
+        return <Spinner />; // Wait for auth check to finish
+    }
+
     return isAuthenticated() ? <Navigate to="/dashboard" replace /> : children;
 };
 
@@ -70,7 +83,6 @@ function App() {
     return (
         <Router>
             <AuthProvider>
-                {/* ✅ Wrap everything with SWRConfig */}
                 <SWRConfig value={swrConfig}>
                     <ToastContainer position="top-right" autoClose={3000} theme="colored" />
                     <Routes>

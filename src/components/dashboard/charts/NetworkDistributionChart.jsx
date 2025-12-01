@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import ChartCard from '../ChartCard';
 import { TOOLTIP_STYLE, NETWORK_COLORS, CHART_COLORS } from '@/components/constants/dashboardConstants';
-import { useNetworkDistribution } from '@/hooks/useDashboardData';
+import { useNetworkDistribution } from '@/hooks/useDashboardData.js';
 import { applyTopN } from '@/utils/dashboardUtils';
 import { formatNumber } from '@/utils/chartUtils';
 

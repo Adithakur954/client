@@ -1,9 +1,11 @@
-// src/api/apiService.js - Cookie-based authentication
+// src/api/apiService.js
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL;
-const isDev = import.meta.env.DEV;
 
+// ============================================
+// STATE MANAGEMENT
+// ============================================
 let authErrorHandler = null;
 let isRedirecting = false;
 
@@ -11,19 +13,73 @@ export const setAuthErrorHandler = (handler) => {
   authErrorHandler = handler;
 };
 
-const logger = {
-  log: (...args) => isDev && console.log(...args),
-  error: (...args) => isDev && console.error(...args),
-  warn: (...args) => isDev && console.warn(...args),
+// ============================================
+// REQUEST QUEUE - Prevents overwhelming the server
+// ============================================
+class RequestQueue {
+  constructor(maxConcurrent = 4) {
+    this.maxConcurrent = maxConcurrent;
+    this.running = 0;
+    this.queue = [];
+  }
+
+  async add(fn, priority = 0) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ fn, resolve, reject, priority });
+      this.queue.sort((a, b) => b.priority - a.priority); // Higher priority first
+      this.process();
+    });
+  }
+
+  async process() {
+    if (this.running >= this.maxConcurrent || this.queue.length === 0) return;
+
+    const { fn, resolve, reject } = this.queue.shift();
+    this.running++;
+
+    try {
+      const result = await fn();
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    } finally {
+      this.running--;
+      this.process();
+    }
+  }
+
+  clear() {
+    this.queue = [];
+  }
+}
+
+const requestQueue = new RequestQueue(4); // Max 4 concurrent requests
+
+// ============================================
+// REQUEST CACHE - Prevents duplicate in-flight requests
+// ============================================
+const inFlightRequests = new Map();
+
+const dedupeRequest = async (key, fn) => {
+  if (inFlightRequests.has(key)) {
+    return inFlightRequests.get(key);
+  }
+
+  const promise = fn().finally(() => {
+    inFlightRequests.delete(key);
+  });
+
+  inFlightRequests.set(key, promise);
+  return promise;
 };
 
-/**
- * Axios instance - Cookie-based auth (no Bearer token needed)
- */
+// ============================================
+// AXIOS INSTANCE
+// ============================================
 const csharpAxios = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000,
-  withCredentials: true, // ⚠️ CRITICAL: This sends cookies with every request
+  timeout: 30000, // Reduced from 60s to 30s
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-store',
@@ -31,151 +87,188 @@ const csharpAxios = axios.create({
   },
 });
 
-/**
- * Request Interceptor
- */
+// ============================================
+// REQUEST INTERCEPTOR
+// ============================================
 csharpAxios.interceptors.request.use(
   (config) => {
-    logger.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    // Add request timestamp for performance tracking
+    config.metadata = { startTime: Date.now() };
     
-    // Handle FormData
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
     
-    // NO Bearer token needed - cookies are sent automatically with withCredentials: true
-    
     return config;
   },
-  (error) => {
-    logger.error('❌ Request Error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-/**
- * Response Interceptor
- */
+// ============================================
+// RESPONSE INTERCEPTOR
+// ============================================
 csharpAxios.interceptors.response.use(
   (response) => {
-    logger.log(`✅ API Response: ${response.config.url}`, response.status);
+    // Track response time
+    const duration = Date.now() - (response.config.metadata?.startTime || Date.now());
+    if (duration > 5000) {
+      console.warn(`Slow API: ${response.config.url} took ${duration}ms`);
+    }
     return response;
   },
   (error) => {
-    if (error.response) {
-      const { status, data, config } = error.response;
-      
-      // Handle 401 Unauthorized / 403 Forbidden
-      if (status === 401 || status === 403) {
-        logger.error('🔒 Unauthorized! Session expired or not authenticated.');
-        
-        // Clear local storage
-        sessionStorage.removeItem('user');
-        
-        // Prevent redirect loop
-        if (!isRedirecting && !config.url?.includes('/auth/status')) {
-          isRedirecting = true;
-          
-          if (authErrorHandler) {
-            try {
-              authErrorHandler();
-            } catch (e) {
-              logger.error('Auth handler error:', e);
-              fallbackRedirect();
-            }
-          } else {
-            fallbackRedirect();
-          }
-          
-          setTimeout(() => {
-            isRedirecting = false;
-          }, 1000);
-        }
-        
-        const authError = new Error('Session expired. Please login again.');
-        authError.isAuthError = true;
-        authError.status = status;
-        return Promise.reject(authError);
-      }
-      
-      // Other errors
-      const errorMessage = extractErrorMessage(data, error.message);
-      logger.error(`❌ API Error [${status}]:`, { url: config?.url, data });
-      
-      const apiError = new Error(`HTTP ${status}: ${errorMessage}`);
-      apiError.status = status;
-      apiError.data = data;
-      return Promise.reject(apiError);
-      
-    } else if (error.request) {
-      logger.error('❌ No Response:', error.request);
-      const networkError = new Error('No response from server. Please check your connection.');
-      networkError.isNetworkError = true;
-      return Promise.reject(networkError);
-    } else {
-      logger.error('❌ Request Setup Error:', error.message);
-      return Promise.reject(error);
+    if (axios.isCancel(error)) {
+      return Promise.reject(createError('Request cancelled', { isCancelled: true }));
     }
+
+    if (!error.response) {
+      return Promise.reject(
+        createError(
+          error.request 
+            ? 'No response from server. Please check your connection.' 
+            : error.message,
+          { isNetworkError: true }
+        )
+      );
+    }
+
+    const { status, data, config } = error.response;
+
+    if (status === 401 || status === 403) {
+      handleAuthError(config);
+      return Promise.reject(
+        createError('Session expired. Please login again.', { 
+          isAuthError: true, 
+          status 
+        })
+      );
+    }
+
+    return Promise.reject(
+      createError(`HTTP ${status}: ${extractErrorMessage(data)}`, { 
+        status, 
+        data 
+      })
+    );
   }
 );
 
-const extractErrorMessage = (data, fallback) => {
-  if (!data) return fallback || 'Unknown error';
-  if (typeof data === 'string') return data;
-  return data.message || data.Message || data.error || data.detail || data.title || fallback;
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+const createError = (message, props = {}) => {
+  const error = new Error(message);
+  Object.assign(error, props);
+  return error;
 };
 
-const fallbackRedirect = () => {
-  if (!window.location.pathname.includes('/login')) {
-    sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+const extractErrorMessage = (data) => {
+  if (!data) return 'Unknown error';
+  if (typeof data === 'string') return data;
+  return data.message || data.Message || data.error || data.detail || data.title || 'Request failed';
+};
+
+const handleAuthError = (config) => {
+  sessionStorage.removeItem('user');
+  
+  const isAuthEndpoint = config?.url?.includes('/auth/');
+  if (isRedirecting || isAuthEndpoint) return;
+  
+  isRedirecting = true;
+  
+  if (authErrorHandler) {
+    try {
+      authErrorHandler();
+    } catch {
+      redirectToLogin();
+    }
+  } else {
+    redirectToLogin();
+  }
+  
+  setTimeout(() => { isRedirecting = false; }, 1000);
+};
+
+const redirectToLogin = () => {
+  const currentPath = window.location.pathname;
+  if (currentPath !== '/login') {
+    sessionStorage.setItem('redirectAfterLogin', currentPath);
     window.location.href = '/login';
   }
 };
 
-/**
- * API Service
- */
+// ============================================
+// API SERVICE WITH QUEUE
+// ============================================
 const apiService = async (endpoint, options = {}) => {
-  try {
-    const response = await csharpAxios({
-      url: endpoint,
-      ...options,
-    });
+  const { priority = 0, dedupe = true, ...axiosOptions } = options;
+  
+  const makeRequest = async () => {
+    const response = await csharpAxios({ url: endpoint, ...axiosOptions });
+    return response.status === 204 ? null : response.data;
+  };
+
+  // Use queue for non-priority requests
+  if (priority === 0) {
+    const cacheKey = `${axiosOptions.method || 'GET'}:${endpoint}`;
     
-    if (response.status === 204) return null;
-    return response.data;
-  } catch (error) {
-    logger.error(`API call to ${endpoint} failed:`, error.message);
-    throw error;
+    if (dedupe) {
+      return dedupeRequest(cacheKey, () => requestQueue.add(makeRequest, priority));
+    }
+    
+    return requestQueue.add(makeRequest, priority);
   }
+
+  // High priority requests bypass the queue
+  return makeRequest();
 };
 
-/**
- * Exported API methods
- */
+// ============================================
+// EXPORTED API METHODS
+// ============================================
 export const api = {
   get: (endpoint, options = {}) =>
     apiService(endpoint, { ...options, method: 'GET' }),
-  
+
   post: (endpoint, body, options = {}) =>
     apiService(endpoint, { ...options, method: 'POST', data: body }),
-  
+
   put: (endpoint, body, options = {}) =>
     apiService(endpoint, { ...options, method: 'PUT', data: body }),
-  
+
   patch: (endpoint, body, options = {}) =>
     apiService(endpoint, { ...options, method: 'PATCH', data: body }),
-  
+
   delete: (endpoint, options = {}) =>
     apiService(endpoint, { ...options, method: 'DELETE' }),
-  
+
   upload: (endpoint, formData, options = {}) =>
-    apiService(endpoint, { ...options, method: 'POST', data: formData }),
+    apiService(endpoint, { 
+      ...options, 
+      method: 'POST', 
+      data: formData,
+      timeout: 120000,
+      priority: 1 // High priority
+    }),
+
+  // Priority request - bypasses queue
+  getPriority: (endpoint, options = {}) =>
+    apiService(endpoint, { ...options, method: 'GET', priority: 10 }),
 };
 
+// ============================================
+// UTILITY EXPORTS
+// ============================================
 export const CSHARP_BASE_URL = API_BASE_URL;
 export const csharpAxiosInstance = csharpAxios;
+
 export const isAuthError = (error) => error?.isAuthError === true;
 export const isNetworkError = (error) => error?.isNetworkError === true;
+export const isCancelledError = (error) => error?.isCancelled === true;
+
+export const cancelAllRequests = () => {
+  requestQueue.clear();
+  inFlightRequests.clear();
+};
 
 export default api;

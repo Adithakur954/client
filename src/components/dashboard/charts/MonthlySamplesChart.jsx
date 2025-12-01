@@ -2,7 +2,7 @@ import React from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import ChartCard from '../ChartCard';
 import { TOOLTIP_STYLE } from '@/components/constants/dashboardConstants';
-import { useMonthlySamples } from '@/hooks/useDashboardData';
+import { useMonthlySamples } from '@/hooks/useDashboardData.js';
 import { formatNumber } from '@/utils/chartUtils';
 
 const MonthlySamplesChart = ({ chartFilters, onChartFiltersChange, operators, networks }) => {

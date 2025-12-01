@@ -14,7 +14,7 @@ import {
 import { Check, ChevronDown, X } from 'lucide-react';
 import ChartCard from '../ChartCard';
 import { TOOLTIP_STYLE, CHART_COLORS } from '@/components/constants/dashboardConstants';
-import { useBandDistributionRaw } from '@/hooks/useDashboardData';
+import { useBandDistributionRaw } from '@/hooks/useDashboardData.js';
 import { canonicalOperatorName } from '@/utils/dashboardUtils';
 import { formatNumber } from '@/utils/chartUtils';
 

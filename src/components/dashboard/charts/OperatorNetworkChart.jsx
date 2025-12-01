@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { Settings, Download, Filter, Activity, TrendingUp, Radio } from 'lucide-react';
 import { TOOLTIP_STYLE, NETWORK_COLORS, CHART_COLORS } from '@/components/constants/dashboardConstants';
-import { useOperatorMetrics, useOperatorsAndNetworks } from '@/hooks/useDashboardData';
+import { useOperatorMetrics, useOperatorsAndNetworks } from '@/hooks/useDashboardData.js';
 import { formatNumber } from '@/utils/chartUtils';
 import Spinner from '@/components/common/Spinner';
 

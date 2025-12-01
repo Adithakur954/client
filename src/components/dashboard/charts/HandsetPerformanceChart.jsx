@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import ChartCard from '../ChartCard';
 import { TOOLTIP_STYLE } from '@/components/constants/dashboardConstants';
-import { useHandsetPerformance } from '@/hooks/useDashboardData';
+import { useHandsetPerformance } from '@/hooks/useDashboardData.js';
 import { getRSRPPointColor } from '@/utils/chartUtils';
 
 const HandsetPerformanceChart = () => {
