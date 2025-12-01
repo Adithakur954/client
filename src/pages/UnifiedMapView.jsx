@@ -1239,6 +1239,11 @@ const [gridSizeMeters, setGridSizeMeters] = useState(20);
           thresholds={effectiveThresholds}
           appSummary={appSummary}
           logArea={logArea}
+          dataFilters={dataFilters}
+    onFilteredDataChange={(filtered) => {
+      console.log('Analytics filtered data updated:', filtered.length);
+      
+    }}
           onClose={() => setShowAnalytics(false)}
         />
       )}

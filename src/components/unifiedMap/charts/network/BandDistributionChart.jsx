@@ -29,7 +29,7 @@ export const BandDistributionChart = React.forwardRef(({ locations }, ref) => {
 
       acc[band].count++;
       if (loc.rsrp != null) acc[band].avgRsrp.push(loc.rsrp);
-      if (loc.dl_thpt != null) acc[band].avgDl.push(parseFloat(loc.dl_thpt));
+      if (loc.dl_tpt != null) acc[band].avgDl.push(parseFloat(loc.dl_tpt));
       if (loc.pci != null) acc[band].pciList.add(`PCI ${loc.pci}`);
       if (loc.nodeb_id != null) acc[band].nodebList.add(`NodeB ${loc.nodeb_id}`);
 

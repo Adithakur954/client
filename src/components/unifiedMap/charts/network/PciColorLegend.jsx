@@ -20,6 +20,27 @@ import { EmptyState } from "../../common/EmptyState";
 import { PCI_COLOR_PALETTE } from "@/components/map/layers/MultiColorCirclesLayer";
 import { CHART_CONFIG } from "@/utils/constants";
 
+// Provider color mapping
+const PROVIDER_COLORS = {
+  "JIO": "#3B82F6",
+  "Jio": "#3B82F6",
+  "Jio True5G": "#3B82F6",
+  "JIO 4G": "#3B82F6",
+  "IND airtel": "#EF4444",
+  "IND Airtel": "#EF4444",
+  "Airtel": "#EF4444",
+  "airtel": "#EF4444",
+  "VI India": "#22C55E",
+  "Vi India": "#22C55E",
+  "Vodafone IN": "#22C55E",
+  "BSNL": "#F59E0B",
+  "Unknown": "#6B7280",
+};
+
+const getProviderColor = (provider) => {
+  return PROVIDER_COLORS[provider] || "#6B7280";
+};
+
 export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
   const [viewMode, setViewMode] = useState("color-map");
 
@@ -64,8 +85,8 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
       if (loc.rsrq != null) acc[pci].avgRsrq.push(loc.rsrq);
       if (loc.sinr != null) acc[pci].avgSinr.push(loc.sinr);
       if (loc.mos != null) acc[pci].avgMos.push(loc.mos);
-      if (loc.dl_thpt != null) acc[pci].avgDl.push(parseFloat(loc.dl_thpt));
-      if (loc.ul_thpt != null) acc[pci].avgUl.push(parseFloat(loc.ul_thpt));
+      if (loc.dl_tpt != null) acc[pci].avgDl.push(parseFloat(loc.dl_tpt));
+      if (loc.ul_tpt != null) acc[pci].avgUl.push(parseFloat(loc.ul_tpt));
 
       return acc;
     }, {});
@@ -107,6 +128,103 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
       .sort((a, b) => b.count - a.count);
   }, [locations]);
 
+  // ✅ NEW: Provider-wise PCI analysis
+  const providerPciData = useMemo(() => {
+    if (!locations?.length) return { providers: [], pciByProvider: {} };
+
+    const providerStats = {};
+
+    locations.forEach((loc) => {
+      const provider = loc.provider || "Unknown";
+      const pci = loc.pci || "Unknown";
+
+      if (!providerStats[provider]) {
+        providerStats[provider] = {
+          name: provider,
+          totalCount: 0,
+          pcis: {},
+          avgRsrp: [],
+          avgSinr: [],
+          avgMos: [],
+          avgDl: [],
+          avgUl: [],
+        };
+      }
+
+      providerStats[provider].totalCount++;
+
+      if (!providerStats[provider].pcis[pci]) {
+        providerStats[provider].pcis[pci] = {
+          pci,
+          count: 0,
+          avgRsrp: [],
+          avgSinr: [],
+          avgMos: [],
+        };
+      }
+
+      providerStats[provider].pcis[pci].count++;
+
+      // Collect metrics
+      if (loc.rsrp != null) {
+        providerStats[provider].avgRsrp.push(loc.rsrp);
+        providerStats[provider].pcis[pci].avgRsrp.push(loc.rsrp);
+      }
+      if (loc.sinr != null) {
+        providerStats[provider].avgSinr.push(loc.sinr);
+        providerStats[provider].pcis[pci].avgSinr.push(loc.sinr);
+      }
+      if (loc.mos != null) {
+        providerStats[provider].avgMos.push(loc.mos);
+        providerStats[provider].pcis[pci].avgMos.push(loc.mos);
+      }
+      if (loc.dl_tpt != null) providerStats[provider].avgDl.push(parseFloat(loc.dl_tpt));
+      if (loc.ul_tpt != null) providerStats[provider].avgUl.push(parseFloat(loc.ul_tpt));
+    });
+
+    // Calculate averages and format
+    const providers = Object.values(providerStats)
+      .map((p) => ({
+        name: p.name,
+        color: getProviderColor(p.name),
+        totalCount: p.totalCount,
+        pciCount: Object.keys(p.pcis).length,
+        pcis: Object.values(p.pcis)
+          .map((pci) => ({
+            pci: pci.pci,
+            count: pci.count,
+            avgRsrp: pci.avgRsrp.length > 0
+              ? (pci.avgRsrp.reduce((a, b) => a + b, 0) / pci.avgRsrp.length).toFixed(1)
+              : null,
+            avgSinr: pci.avgSinr.length > 0
+              ? (pci.avgSinr.reduce((a, b) => a + b, 0) / pci.avgSinr.length).toFixed(1)
+              : null,
+            avgMos: pci.avgMos.length > 0
+              ? (pci.avgMos.reduce((a, b) => a + b, 0) / pci.avgMos.length).toFixed(2)
+              : null,
+          }))
+          .sort((a, b) => b.count - a.count),
+        avgRsrp: p.avgRsrp.length > 0
+          ? (p.avgRsrp.reduce((a, b) => a + b, 0) / p.avgRsrp.length).toFixed(1)
+          : null,
+        avgSinr: p.avgSinr.length > 0
+          ? (p.avgSinr.reduce((a, b) => a + b, 0) / p.avgSinr.length).toFixed(1)
+          : null,
+        avgMos: p.avgMos.length > 0
+          ? (p.avgMos.reduce((a, b) => a + b, 0) / p.avgMos.length).toFixed(2)
+          : null,
+        avgDl: p.avgDl.length > 0
+          ? (p.avgDl.reduce((a, b) => a + b, 0) / p.avgDl.length).toFixed(1)
+          : null,
+        avgUl: p.avgUl.length > 0
+          ? (p.avgUl.reduce((a, b) => a + b, 0) / p.avgUl.length).toFixed(1)
+          : null,
+      }))
+      .sort((a, b) => b.totalCount - a.totalCount);
+
+    return { providers };
+  }, [locations]);
+
   if (!pciColorMap.length) {
     return (
       <ChartContainer ref={ref} title="PCI Analysis" icon={Antenna}>
@@ -131,7 +249,7 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
 
   return (
     <ChartContainer ref={ref} title={`PCI Analysis (${pciColorMap.length})`} icon={Antenna}>
-      {/* Minimal View Mode Buttons */}
+      {/* View Mode Buttons */}
       <div className="flex gap-1 mb-2">
         <ViewModeButton mode="color-map" icon={MapPin} label="Map" />
         <ViewModeButton mode="by-provider" icon={Globe} label="Provider" />
@@ -148,6 +266,11 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
         </div>
       )}
 
+      {/* ✅ NEW: Provider View */}
+      {viewMode === "by-provider" && (
+        <PCIByProviderView providerData={providerPciData.providers} />
+      )}
+
       {/* Performance View */}
       {viewMode === "performance" && (
         <PCIPerformanceView pciColorMap={pciColorMap.slice(0, 10)} />
@@ -161,7 +284,8 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
   );
 });
 
-// Minimal Sub-components
+// ==================== SUB-COMPONENTS ====================
+
 const PCIColorMapCard = ({ item }) => (
   <div className="flex items-center gap-2 p-1.5 bg-slate-800/50 rounded hover:bg-slate-800 transition-colors">
     <div
@@ -182,6 +306,197 @@ const PCIColorMapCard = ({ item }) => (
   </div>
 );
 
+// ✅ NEW: Provider View Component
+const PCIByProviderView = ({ providerData }) => {
+  const [expandedProvider, setExpandedProvider] = useState(null);
+
+  if (!providerData?.length) {
+    return (
+      <div className="text-center py-4 text-slate-400 text-sm">
+        No provider data available
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Provider Summary Chart */}
+      <div className="bg-slate-800/50 rounded-lg p-2">
+        <div className="text-[10px] text-slate-400 mb-2 font-medium">PCI Count by Provider</div>
+        <ResponsiveContainer width="100%" height={150}>
+          <BarChart data={providerData} margin={{ top: 5, right: 10, left: -15, bottom: 40 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <XAxis
+              dataKey="name"
+              angle={-45}
+              textAnchor="end"
+              height={50}
+              tick={{ fill: "#94A3B8", fontSize: 9 }}
+            />
+            <YAxis tick={{ fill: "#94A3B8", fontSize: 9 }} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#1e293b",
+                border: "1px solid #475569",
+                borderRadius: "8px",
+                color: "#fff",
+                fontSize: "10px",
+              }}
+              formatter={(value, name) => {
+                if (name === "pciCount") return [value, "Unique PCIs"];
+                if (name === "totalCount") return [value, "Samples"];
+                return [value, name];
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: "10px" }} />
+            <Bar dataKey="pciCount" fill="#3b82f6" name="Unique PCIs" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="totalCount" fill="#22c55e" name="Samples" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Provider Cards with PCIs */}
+      <div className="space-y-2 max-h-[280px] overflow-y-auto scrollbar-hide">
+        {providerData.map((provider, idx) => (
+          <div
+            key={idx}
+            className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden"
+          >
+            {/* Provider Header */}
+            <div
+              className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-800 transition-colors"
+              onClick={() => setExpandedProvider(expandedProvider === provider.name ? null : provider.name)}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: provider.color }}
+                />
+                <span className="font-semibold text-white text-xs">{provider.name}</span>
+                <span className="text-[10px] text-slate-400">
+                  ({provider.pciCount} PCIs)
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">
+                  {provider.totalCount} samples
+                </span>
+                <span className="text-slate-400 text-xs">
+                  {expandedProvider === provider.name ? "▲" : "▼"}
+                </span>
+              </div>
+            </div>
+
+            {/* Provider Metrics Summary */}
+            <div className="grid grid-cols-5 gap-1 px-2 pb-2">
+              <div className="bg-slate-900 rounded p-1 text-center">
+                <div className="text-[8px] text-slate-500">RSRP</div>
+                <div className={`text-[10px] font-semibold ${
+                  parseFloat(provider.avgRsrp) >= -90 ? "text-green-400" : 
+                  parseFloat(provider.avgRsrp) >= -105 ? "text-yellow-400" : "text-red-400"
+                }`}>
+                  {provider.avgRsrp || "N/A"}
+                </div>
+              </div>
+              <div className="bg-slate-900 rounded p-1 text-center">
+                <div className="text-[8px] text-slate-500">SINR</div>
+                <div className="text-[10px] font-semibold text-green-400">
+                  {provider.avgSinr || "N/A"}
+                </div>
+              </div>
+              <div className="bg-slate-900 rounded p-1 text-center">
+                <div className="text-[8px] text-slate-500">MOS</div>
+                <div className="text-[10px] font-semibold text-yellow-400">
+                  {provider.avgMos || "N/A"}
+                </div>
+              </div>
+              <div className="bg-slate-900 rounded p-1 text-center">
+                <div className="text-[8px] text-slate-500">DL</div>
+                <div className="text-[10px] font-semibold text-cyan-400">
+                  {provider.avgDl ? `${provider.avgDl}` : "N/A"}
+                </div>
+              </div>
+              <div className="bg-slate-900 rounded p-1 text-center">
+                <div className="text-[8px] text-slate-500">UL</div>
+                <div className="text-[10px] font-semibold text-orange-400">
+                  {provider.avgUl ? `${provider.avgUl}` : "N/A"}
+                </div>
+              </div>
+            </div>
+
+            {/* Expanded PCI List */}
+            {expandedProvider === provider.name && (
+              <div className="border-t border-slate-700 bg-slate-900/50 p-2">
+                <div className="text-[9px] text-slate-400 mb-1.5 font-medium">
+                  PCIs for {provider.name}
+                </div>
+                <div className="max-h-[150px] overflow-y-auto scrollbar-hide">
+                  <table className="w-full text-[9px]">
+                    <thead className="sticky top-0 bg-slate-900">
+                      <tr className="border-b border-slate-700">
+                        <th className="text-left p-1 text-slate-400">PCI</th>
+                        <th className="text-center p-1 text-slate-400">Count</th>
+                        <th className="text-center p-1 text-slate-400">RSRP</th>
+                        <th className="text-center p-1 text-slate-400">SINR</th>
+                        <th className="text-center p-1 text-slate-400">MOS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {provider.pcis.slice(0, 15).map((pci, pidx) => (
+                        <tr key={pidx} className="border-b border-slate-800 hover:bg-slate-800/30">
+                          <td className="p-1 font-medium text-white">PCI {pci.pci}</td>
+                          <td className="p-1 text-center text-slate-300">{pci.count}</td>
+                          <td className={`p-1 text-center font-medium ${
+                            parseFloat(pci.avgRsrp) >= -90 ? "text-green-400" : 
+                            parseFloat(pci.avgRsrp) >= -105 ? "text-yellow-400" : "text-red-400"
+                          }`}>
+                            {pci.avgRsrp || "-"}
+                          </td>
+                          <td className="p-1 text-center text-green-400">{pci.avgSinr || "-"}</td>
+                          <td className="p-1 text-center text-yellow-400">{pci.avgMos || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {provider.pcis.length > 15 && (
+                    <div className="text-center text-[9px] text-slate-500 mt-1">
+                      +{provider.pcis.length - 15} more PCIs
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-4 gap-1">
+        <StatCard 
+          label="Providers" 
+          value={providerData.length} 
+          color="blue" 
+        />
+        <StatCard 
+          label="Total PCIs" 
+          value={providerData.reduce((sum, p) => sum + p.pciCount, 0)} 
+          color="purple" 
+        />
+        <StatCard 
+          label="Total Samples" 
+          value={providerData.reduce((sum, p) => sum + p.totalCount, 0)} 
+          color="green" 
+        />
+        <StatCard 
+          label="Avg PCIs/Provider" 
+          value={(providerData.reduce((sum, p) => sum + p.pciCount, 0) / providerData.length).toFixed(1)} 
+          color="cyan" 
+        />
+      </div>
+    </div>
+  );
+};
+
 const PCIPerformanceView = ({ pciColorMap }) => (
   <div className="space-y-2">
     <ResponsiveContainer width="100%" height={200}>
@@ -197,8 +512,9 @@ const PCIPerformanceView = ({ pciColorMap }) => (
         <YAxis yAxisId="left" tick={{ fill: "#94A3B8", fontSize: 9 }} />
         <YAxis yAxisId="right" orientation="right" domain={[0, 5]} tick={{ fill: "#94A3B8", fontSize: 9 }} />
         <Tooltip contentStyle={{ ...CHART_CONFIG.tooltip, fontSize: '10px' }} />
-        <Bar yAxisId="left" dataKey="avgRsrp" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-        <Line yAxisId="right" type="monotone" dataKey="avgMos" stroke="#facc15" strokeWidth={1.5} dot={{ r: 2 }} />
+        <Legend wrapperStyle={{ fontSize: "10px" }} />
+        <Bar yAxisId="left" dataKey="avgRsrp" fill="#3b82f6" name="Avg RSRP" radius={[4, 4, 0, 0]} />
+        <Line yAxisId="right" type="monotone" dataKey="avgMos" stroke="#facc15" name="Avg MOS" strokeWidth={1.5} dot={{ r: 2 }} />
       </ComposedChart>
     </ResponsiveContainer>
 
@@ -225,7 +541,8 @@ const PCIPerformanceView = ({ pciColorMap }) => (
               </td>
               <td className="p-1 text-center text-orange-400">{item.nodebIds.length}</td>
               <td className={`p-1 text-center font-medium ${
-                item.avgRsrp >= -90 ? "text-green-400" : item.avgRsrp >= -105 ? "text-yellow-400" : "text-red-400"
+                parseFloat(item.avgRsrp) >= -90 ? "text-green-400" : 
+                parseFloat(item.avgRsrp) >= -105 ? "text-yellow-400" : "text-red-400"
               }`}>
                 {item.avgRsrp || "-"}
               </td>

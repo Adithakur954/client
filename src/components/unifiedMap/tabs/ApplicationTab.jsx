@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Activity, BarChart3, Signal, TrendingUp } from "lucide-react";
+import { Activity, BarChart3, Signal, TrendingUp, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -11,52 +11,407 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// ==================== APP NAME NORMALIZATION ====================
+const APP_NAME_MAPPINGS = {
+  // WhatsApp variations
+  "whatsapp": "WhatsApp",
+  "whats app": "WhatsApp",
+  "whatsapp messenger": "WhatsApp",
+  "whatsapp business": "WhatsApp Business",
+  
+  // YouTube variations
+  "youtube": "YouTube",
+  "youtube music": "YouTube Music",
+  "youtube kids": "YouTube Kids",
+  "yt music": "YouTube Music",
+  
+  // Instagram variations
+  "instagram": "Instagram",
+  "insta": "Instagram",
+  
+  // Facebook variations
+  "facebook": "Facebook",
+  "fb": "Facebook",
+  "facebook messenger": "Messenger",
+  "fb messenger": "Messenger",
+  "messenger": "Messenger",
+  
+  // Google variations
+  "google": "Google",
+  "google chrome": "Chrome",
+  "chrome": "Chrome",
+  "google maps": "Google Maps",
+  "maps": "Google Maps",
+  "gmail": "Gmail",
+  "google meet": "Google Meet",
+  
+  // Microsoft variations
+  "microsoft teams": "MS Teams",
+  "teams": "MS Teams",
+  "ms teams": "MS Teams",
+  "outlook": "Outlook",
+  "microsoft outlook": "Outlook",
+  
+  // Streaming
+  "netflix": "Netflix",
+  "amazon prime": "Prime Video",
+  "prime video": "Prime Video",
+  "hotstar": "Disney+ Hotstar",
+  "disney+ hotstar": "Disney+ Hotstar",
+  "disney hotstar": "Disney+ Hotstar",
+  "spotify": "Spotify",
+  
+  // Social
+  "twitter": "X (Twitter)",
+  "x": "X (Twitter)",
+  "snapchat": "Snapchat",
+  "snap": "Snapchat",
+  "telegram": "Telegram",
+  "linkedin": "LinkedIn",
+  "tiktok": "TikTok",
+  
+  // Gaming
+  "pubg": "PUBG",
+  "pubg mobile": "PUBG",
+  "call of duty": "Call of Duty",
+  "cod": "Call of Duty",
+  "cod mobile": "Call of Duty",
+  "freefire": "Free Fire",
+  "free fire": "Free Fire",
+  
+  // Communication
+  "zoom": "Zoom",
+  "zoom meeting": "Zoom",
+  "skype": "Skype",
+  "discord": "Discord",
+  
+  // Others
+  "jio": "Jio",
+  "jio tv": "JioTV",
+  "jiotv": "JioTV",
+  "jio cinema": "JioCinema",
+  "jiocinema": "JioCinema",
+  "airtel": "Airtel",
+  "airtel xstream": "Airtel Xstream",
+  "paytm": "Paytm",
+  "phonepe": "PhonePe",
+  "gpay": "Google Pay",
+  "google pay": "Google Pay",
+  "amazon": "Amazon",
+  "flipkart": "Flipkart",
+};
 
-export const ApplicationTab = ({ appSummary, expanded, chartRefs }) => {
-  const [appSubTab, setAppSubTab] = useState("details");
+// Normalize app name
+const normalizeAppName = (appName) => {
+  if (!appName) return "Unknown";
+  const normalized = appName.toLowerCase().trim();
+  return APP_NAME_MAPPINGS[normalized] || appName.trim();
+};
 
-  const chartData = useMemo(() => {
-  if (!appSummary || !Object.keys(appSummary).length) return [];
+// Get app category
+const getAppCategory = (appName) => {
+  const normalized = appName.toLowerCase();
+  
+  if (['whatsapp', 'telegram', 'messenger', 'discord', 'skype'].some(a => normalized.includes(a))) {
+    return 'Messaging';
+  }
+  if (['youtube', 'netflix', 'prime video', 'hotstar', 'spotify', 'jiotv', 'jiocinema'].some(a => normalized.includes(a))) {
+    return 'Streaming';
+  }
+  if (['instagram', 'facebook', 'twitter', 'x', 'snapchat', 'tiktok', 'linkedin'].some(a => normalized.includes(a))) {
+    return 'Social';
+  }
+  if (['pubg', 'call of duty', 'free fire', 'fortnite'].some(a => normalized.includes(a))) {
+    return 'Gaming';
+  }
+  if (['zoom', 'teams', 'meet', 'webex'].some(a => normalized.includes(a))) {
+    return 'Video Call';
+  }
+  if (['chrome', 'safari', 'firefox', 'edge', 'browser'].some(a => normalized.includes(a))) {
+    return 'Browser';
+  }
+  if (['paytm', 'phonepe', 'gpay', 'google pay', 'amazon', 'flipkart'].some(a => normalized.includes(a))) {
+    return 'Shopping/Payment';
+  }
+  
+  return 'Other';
+};
 
-  // Aggregate by app name
-  const appAggregates = {};
+// ==================== HELPER FUNCTIONS ====================
+const parseDuration = (durationStr) => {
+  if (!durationStr) return 0;
+  const parts = durationStr.split(':').map(Number);
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+  return parts[0] || 0;
+};
 
-  Object.entries(appSummary).forEach(([sessionId, apps]) => {
-    Object.entries(apps).forEach(([appName, metrics]) => {
-      const name = metrics.appName || appName;
+const formatDuration = (totalSeconds) => {
+  if (!totalSeconds || totalSeconds <= 0) return '00:00:00';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
+const formatValue = (value, decimals = 1) => {
+  if (value == null || isNaN(value)) return 'N/A';
+  return value.toFixed(decimals);
+};
+
+const calculateAverage = (values) => {
+  if (!values?.length) return null;
+  const validValues = values.filter(v => v != null && !isNaN(v));
+  if (!validValues.length) return null;
+  return validValues.reduce((a, b) => a + b, 0) / validValues.length;
+};
+
+const getSignalColor = (value, thresholds) => {
+  if (value == null) return "text-slate-400";
+  if (value >= thresholds[0]) return "text-green-400";
+  if (value >= thresholds[1]) return "text-yellow-400";
+  return "text-red-400";
+};
+
+const getMosColor = (value) => {
+  if (value == null) return "text-slate-400";
+  if (value >= 4) return "text-green-400";
+  if (value >= 3) return "text-yellow-400";
+  return "text-red-400";
+};
+
+const getLatencyColor = (value) => {
+  if (value == null) return "text-slate-400";
+  if (value < 50) return "text-green-400";
+  if (value < 100) return "text-yellow-400";
+  return "text-red-400";
+};
+
+const getPacketLossColor = (value) => {
+  if (value == null) return "text-slate-400";
+  if (value === 0) return "text-green-400";
+  if (value < 1) return "text-yellow-400";
+  return "text-red-400";
+};
+
+const getCategoryColor = (category) => {
+  const colors = {
+    'Messaging': 'bg-green-900/50 text-green-300 border border-green-700/30',
+    'Streaming': 'bg-red-900/50 text-red-300 border border-red-700/30',
+    'Social': 'bg-blue-900/50 text-blue-300 border border-blue-700/30',
+    'Gaming': 'bg-purple-900/50 text-purple-300 border border-purple-700/30',
+    'Video Call': 'bg-cyan-900/50 text-cyan-300 border border-cyan-700/30',
+    'Browser': 'bg-orange-900/50 text-orange-300 border border-orange-700/30',
+    'Shopping/Payment': 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/30',
+    'Other': 'bg-slate-700/50 text-slate-300 border border-slate-600/30',
+  };
+  return colors[category] || colors['Other'];
+};
+
+// ==================== MAIN COMPONENT ====================
+export const ApplicationTab = ({ 
+  appSummary, 
+  expanded, 
+  chartRefs,
+  dataFilters = { providers: [], bands: [], technologies: [] },
+}) => {
+  const [appSubTab, setAppSubTab] = useState("table");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [sortConfig, setSortConfig] = useState({ key: "totalSamples", direction: "desc" });
+
+  // Aggregate and normalize app data
+  // ✅ Duration: SUM | All other metrics: AVERAGE
+  const aggregatedAppData = useMemo(() => {
+    if (!appSummary || !Object.keys(appSummary).length) return [];
+
+    const appAggregates = {};
+
+    Object.entries(appSummary).forEach(([sessionId, apps]) => {
+      if (!apps || typeof apps !== 'object') return;
       
-      if (!appAggregates[name]) {
-        appAggregates[name] = {
-          name,
-          totalMos: 0,
-          totalDl: 0,
-          totalUl: 0,
-          totalLatency: 0,
-          count: 0,
-          sessionIds: [],
-        };
-      }
-      
-      appAggregates[name].totalMos += metrics.avgMos || 0;
-      appAggregates[name].totalDl += metrics.avgDlTptMbps || 0;
-      appAggregates[name].totalUl += metrics.avgUlTptMbps || 0;
-      appAggregates[name].totalLatency += metrics.avgLatency || 0;
-      appAggregates[name].count += 1;
-      appAggregates[name].sessionIds.push(sessionId);
+      Object.entries(apps).forEach(([appName, metrics]) => {
+        if (!metrics) return;
+        
+        // Normalize the app name
+        const normalizedName = normalizeAppName(metrics.appName || appName);
+        const category = getAppCategory(normalizedName);
+        
+        if (!appAggregates[normalizedName]) {
+          appAggregates[normalizedName] = {
+            name: normalizedName,
+            category,
+            sessions: new Set(),
+            
+            // ✅ SUM these values
+            totalDurationSeconds: 0,
+            totalSamples: 0,
+            
+            // ✅ Collect for AVERAGING
+            rsrpValues: [],
+            rsrqValues: [],
+            sinrValues: [],
+            dlValues: [],
+            ulValues: [],
+            mosValues: [],
+            latencyValues: [],
+            jitterValues: [],
+            packetLossValues: [],
+          };
+        }
+        
+        const agg = appAggregates[normalizedName];
+        agg.sessions.add(sessionId);
+        
+        // ✅ SUM: Duration and Samples
+        agg.totalDurationSeconds += parseDuration(metrics.durationHHMMSS);
+        agg.totalSamples += metrics.sampleCount || 0;
+        
+        // ✅ Collect values for AVERAGING (only add if value exists)
+        if (metrics.avgRsrp != null && !isNaN(metrics.avgRsrp)) {
+          agg.rsrpValues.push(parseFloat(metrics.avgRsrp));
+        }
+        if (metrics.avgRsrq != null && !isNaN(metrics.avgRsrq)) {
+          agg.rsrqValues.push(parseFloat(metrics.avgRsrq));
+        }
+        if (metrics.avgSinr != null && !isNaN(metrics.avgSinr)) {
+          agg.sinrValues.push(parseFloat(metrics.avgSinr));
+        }
+        if (metrics.avgDlTptMbps != null && !isNaN(metrics.avgDlTptMbps)) {
+          agg.dlValues.push(parseFloat(metrics.avgDlTptMbps));
+        }
+        if (metrics.avgUlTptMbps != null && !isNaN(metrics.avgUlTptMbps)) {
+          agg.ulValues.push(parseFloat(metrics.avgUlTptMbps));
+        }
+        if (metrics.avgMos != null && !isNaN(metrics.avgMos)) {
+          agg.mosValues.push(parseFloat(metrics.avgMos));
+        }
+        if (metrics.avgLatency != null && !isNaN(metrics.avgLatency)) {
+          agg.latencyValues.push(parseFloat(metrics.avgLatency));
+        }
+        if (metrics.avgJitter != null && !isNaN(metrics.avgJitter)) {
+          agg.jitterValues.push(parseFloat(metrics.avgJitter));
+        }
+        if (metrics.avgPacketLoss != null && !isNaN(metrics.avgPacketLoss)) {
+          agg.packetLossValues.push(parseFloat(metrics.avgPacketLoss));
+        }
+      });
     });
-  });
 
-  // Calculate averages
-  return Object.values(appAggregates).map((app) => ({
-    name: app.name,
-    mos: app.count > 0 ? app.totalMos / app.count : 0,
-    dl: app.count > 0 ? app.totalDl / app.count : 0,
-    ul: app.count > 0 ? app.totalUl / app.count : 0,
-    latency: app.count > 0 ? app.totalLatency / app.count : 0,
-    sessionCount: app.count,
-    sessionIds: app.sessionIds,
-  }));
-}, [appSummary]);
+    // Calculate final values
+    return Object.values(appAggregates).map((app) => ({
+      name: app.name,
+      category: app.category,
+      sessionCount: app.sessions.size,
+      
+      // ✅ SUM values
+      totalSamples: app.totalSamples,
+      totalDurationSeconds: app.totalDurationSeconds,
+      duration: formatDuration(app.totalDurationSeconds),
+      
+      // ✅ AVERAGE values
+      avgRsrp: calculateAverage(app.rsrpValues),
+      avgRsrq: calculateAverage(app.rsrqValues),
+      avgSinr: calculateAverage(app.sinrValues),
+      avgDl: calculateAverage(app.dlValues),
+      avgUl: calculateAverage(app.ulValues),
+      avgMos: calculateAverage(app.mosValues),
+      avgLatency: calculateAverage(app.latencyValues),
+      avgJitter: calculateAverage(app.jitterValues),
+      avgPacketLoss: calculateAverage(app.packetLossValues),
+    }));
+  }, [appSummary]);
+
+  // Get unique categories
+  const categories = useMemo(() => {
+    const cats = [...new Set(aggregatedAppData.map(app => app.category))].sort();
+    return ['all', ...cats];
+  }, [aggregatedAppData]);
+
+  // Filter and sort data
+  const filteredAndSortedData = useMemo(() => {
+    let filtered = [...aggregatedAppData];
+
+    // Apply search filter
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(app => 
+        app.name.toLowerCase().includes(search) ||
+        app.category.toLowerCase().includes(search)
+      );
+    }
+
+    // Apply category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(app => app.category === selectedCategory);
+    }
+
+    // Apply sorting
+    if (sortConfig.key) {
+      filtered.sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        
+        // Handle null values
+        if (aVal == null) aVal = -Infinity;
+        if (bVal == null) bVal = -Infinity;
+        
+        // Handle string comparison
+        if (typeof aVal === 'string') {
+          return sortConfig.direction === 'asc' 
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
+        }
+        
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      });
+    }
+
+    return filtered;
+  }, [aggregatedAppData, searchTerm, selectedCategory, sortConfig]);
+
+  // Chart data for comparison view
+  const chartData = useMemo(() => {
+    return filteredAndSortedData.map(app => ({
+      name: app.name,
+      mos: app.avgMos || 0,
+      dl: app.avgDl || 0,
+      ul: app.avgUl || 0,
+      latency: app.avgLatency || 0,
+      sessionCount: app.sessionCount,
+    }));
+  }, [filteredAndSortedData]);
+
+  // Handle sort
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
+
+  // Summary stats
+  const summaryStats = useMemo(() => {
+    const data = filteredAndSortedData;
+    const appsWithMos = data.filter(a => a.avgMos != null);
+    const appsWithDl = data.filter(a => a.avgDl != null);
+    
+    return {
+      totalApps: data.length,
+      totalSamples: data.reduce((sum, app) => sum + app.totalSamples, 0),
+      totalDuration: formatDuration(data.reduce((sum, app) => sum + app.totalDurationSeconds, 0)),
+      avgMos: appsWithMos.length > 0 
+        ? (appsWithMos.reduce((sum, app) => sum + app.avgMos, 0) / appsWithMos.length).toFixed(2)
+        : 'N/A',
+      avgDl: appsWithDl.length > 0
+        ? (appsWithDl.reduce((sum, app) => sum + app.avgDl, 0) / appsWithDl.length).toFixed(1)
+        : 'N/A',
+    };
+  }, [filteredAndSortedData]);
 
   if (!appSummary || Object.keys(appSummary).length === 0) {
     return (
@@ -74,19 +429,43 @@ export const ApplicationTab = ({ appSummary, expanded, chartRefs }) => {
 
   return (
     <div className="space-y-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-5 gap-2">
+        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
+          <div className="text-xs text-slate-400">Total Apps</div>
+          <div className="text-xl font-bold text-blue-400">{summaryStats.totalApps}</div>
+        </div>
+        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
+          <div className="text-xs text-slate-400">Total Samples</div>
+          <div className="text-xl font-bold text-green-400">{summaryStats.totalSamples.toLocaleString()}</div>
+        </div>
+        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
+          <div className="text-xs text-slate-400">Total Duration</div>
+          <div className="text-lg font-bold text-purple-400 font-mono">{summaryStats.totalDuration}</div>
+        </div>
+        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
+          <div className="text-xs text-slate-400">Avg MOS</div>
+          <div className="text-xl font-bold text-yellow-400">{summaryStats.avgMos}</div>
+        </div>
+        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
+          <div className="text-xs text-slate-400">Avg DL</div>
+          <div className="text-xl font-bold text-cyan-400">{summaryStats.avgDl} Mbps</div>
+        </div>
+      </div>
+
       {/* Sub-Tab Navigation */}
       <div className="flex gap-2 bg-slate-800 p-2 rounded-lg">
         <button
-          onClick={() => setAppSubTab("details")}
+          onClick={() => setAppSubTab("table")}
           className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
-            appSubTab === "details"
+            appSubTab === "table"
               ? "bg-blue-600 text-white shadow-md"
               : "bg-slate-700 text-slate-300 hover:bg-slate-600"
           }`}
         >
           <div className="flex items-center justify-center gap-2">
             <Activity className="h-4 w-4" />
-            App Details ({Object.keys(appSummary).length})
+            App Table ({filteredAndSortedData.length})
           </div>
         </button>
         <button
@@ -104,12 +483,48 @@ export const ApplicationTab = ({ appSummary, expanded, chartRefs }) => {
         </button>
       </div>
 
-      {/* Details Sub-Tab */}
-      {appSubTab === "details" && (
-        <AppDetailsView appSummary={appSummary} expanded={expanded} />
+      {/* Filters */}
+      <div className="flex gap-3 items-center flex-wrap">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search apps..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        {/* Category Filter */}
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-slate-400" />
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="bg-slate-800 border border-slate-700 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-blue-500"
+          >
+            {categories.map(cat => (
+              <option key={cat} value={cat}>
+                {cat === 'all' ? 'All Categories' : cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Table View */}
+      {appSubTab === "table" && (
+        <AppTableView 
+          data={filteredAndSortedData}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          expanded={expanded}
+        />
       )}
 
-      {/* Comparison Sub-Tab */}
+      {/* Comparison View */}
       {appSubTab === "comparison" && (
         <AppComparisonView chartData={chartData} chartRefs={chartRefs} />
       )}
@@ -117,162 +532,153 @@ export const ApplicationTab = ({ appSummary, expanded, chartRefs }) => {
   );
 };
 
-// App Details View
-const AppDetailsView = ({ appSummary, expanded }) => {
+// ==================== TABLE VIEW COMPONENT ====================
+const AppTableView = ({ data, sortConfig, onSort, expanded }) => {
+  if (!data?.length) {
+    return (
+      <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700">
+        <Activity className="h-12 w-12 text-slate-600 mx-auto mb-3" />
+        <p className="text-slate-400 text-sm">No apps match the current filters</p>
+      </div>
+    );
+  }
+
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey) {
+      return <ArrowUpDown className="h-3 w-3 text-slate-500" />;
+    }
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUp className="h-3 w-3 text-blue-400" />
+      : <ArrowDown className="h-3 w-3 text-blue-400" />;
+  };
+
+  const HeaderCell = ({ children, sortKey, className = "" }) => (
+    <th 
+      className={`p-2 text-slate-400 font-medium cursor-pointer hover:text-white hover:bg-slate-800 transition-colors ${className}`}
+      onClick={() => onSort(sortKey)}
+    >
+      <div className="flex items-center justify-center gap-1">
+        {children}
+        <SortIcon columnKey={sortKey} />
+      </div>
+    </th>
+  );
+
   return (
-    <div className={`grid ${expanded ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
-      {Object.entries(appSummary).flatMap(([sessionId, apps]) =>
-        Object.entries(apps).map(([appName, metrics]) => (
-          <AppPerformanceCard
-            key={`${sessionId}-${appName}`}
-            sessionId={sessionId}
-            appName={appName}
-            metrics={metrics}
-          />
-        ))
-      )}
+    <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-800 sticky top-0 z-10">
+            <tr className="border-b border-slate-700">
+              <HeaderCell sortKey="name" className="text-left min-w-[150px]">App Name</HeaderCell>
+              <HeaderCell sortKey="category" className="min-w-[100px]">Category</HeaderCell>
+              <HeaderCell sortKey="sessionCount" className="min-w-[80px]">Sessions</HeaderCell>
+              <HeaderCell sortKey="totalSamples" className="min-w-[80px]">Samples</HeaderCell>
+              <HeaderCell sortKey="totalDurationSeconds" className="min-w-[90px]">Duration </HeaderCell>
+              <HeaderCell sortKey="avgRsrp" className="min-w-[70px]">RSRP (Avg)</HeaderCell>
+              <HeaderCell sortKey="avgRsrq" className="min-w-[70px]">RSRQ (Avg)</HeaderCell>
+              <HeaderCell sortKey="avgSinr" className="min-w-[70px]">SINR (Avg)</HeaderCell>
+              <HeaderCell sortKey="avgDl" className="min-w-[80px]">DL (Avg)</HeaderCell>
+              <HeaderCell sortKey="avgUl" className="min-w-[80px]">UL (Avg)</HeaderCell>
+              <HeaderCell sortKey="avgMos" className="min-w-[70px]">MOS (Avg)</HeaderCell>
+              <HeaderCell sortKey="avgLatency" className="min-w-[80px]">Latency (Avg)</HeaderCell>
+              <HeaderCell sortKey="avgJitter" className="min-w-[70px]">Jitter (Avg)</HeaderCell>
+              <HeaderCell sortKey="avgPacketLoss" className="min-w-[80px]">Loss % (Avg)</HeaderCell>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((app, idx) => (
+              <tr
+                key={`${app.name}-${idx}`}
+                className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors"
+              >
+                {/* App Name */}
+                <td className="p-2 text-left">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="font-semibold text-white">{app.name}</span>
+                  </div>
+                </td>
+
+                {/* Category */}
+                <td className="p-2 text-center">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getCategoryColor(app.category)}`}>
+                    {app.category}
+                  </span>
+                </td>
+
+                {/* Sessions */}
+                <td className="p-2 text-center text-slate-300">{app.sessionCount}</td>
+
+                {/* Samples (SUM) */}
+                <td className="p-2 text-center text-slate-300 font-semibold">{app.totalSamples.toLocaleString()}</td>
+
+                {/* Duration (SUM) */}
+                <td className="p-2 text-center text-green-400 font-mono text-[10px] font-semibold">{app.duration}</td>
+
+                {/* RSRP (AVG) */}
+                <td className={`p-2 text-center font-semibold ${getSignalColor(app.avgRsrp, [-90, -105])}`}>
+                  {formatValue(app.avgRsrp, 1)}
+                </td>
+
+                {/* RSRQ (AVG) */}
+                <td className="p-2 text-center font-semibold text-purple-400">
+                  {formatValue(app.avgRsrq, 1)}
+                </td>
+
+                {/* SINR (AVG) */}
+                <td className="p-2 text-center font-semibold text-green-400">
+                  {formatValue(app.avgSinr, 1)}
+                </td>
+
+                {/* Download (AVG) */}
+                <td className="p-2 text-center font-semibold text-cyan-400">
+                  {app.avgDl != null ? `${app.avgDl.toFixed(1)} Mbps` : 'N/A'}
+                </td>
+
+                {/* Upload (AVG) */}
+                <td className="p-2 text-center font-semibold text-orange-400">
+                  {app.avgUl != null ? `${app.avgUl.toFixed(1)} Mbps` : 'N/A'}
+                </td>
+
+                {/* MOS (AVG) */}
+                <td className={`p-2 text-center font-semibold ${getMosColor(app.avgMos)}`}>
+                  {formatValue(app.avgMos, 2)}
+                </td>
+
+                {/* Latency (AVG) */}
+                <td className={`p-2 text-center font-semibold ${getLatencyColor(app.avgLatency)}`}>
+                  {app.avgLatency != null ? `${app.avgLatency.toFixed(1)} ms` : 'N/A'}
+                </td>
+
+                {/* Jitter (AVG) */}
+                <td className="p-2 text-center font-semibold text-indigo-400">
+                  {app.avgJitter != null ? `${app.avgJitter.toFixed(1)} ms` : 'N/A'}
+                </td>
+
+                {/* Packet Loss (AVG) */}
+                <td className={`p-2 text-center font-semibold ${getPacketLossColor(app.avgPacketLoss)}`}>
+                  {app.avgPacketLoss != null ? `${app.avgPacketLoss.toFixed(2)}%` : 'N/A'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Table Footer */}
+      <div className="bg-slate-800 px-3 py-2 text-xs text-slate-400 border-t border-slate-700 flex justify-between">
+        <span>Showing {data.length} apps</span>
+        <span>
+          Total Samples: {data.reduce((sum, app) => sum + app.totalSamples, 0).toLocaleString()} | 
+          Total Duration: {formatDuration(data.reduce((sum, app) => sum + app.totalDurationSeconds, 0))}
+        </span>
+      </div>
     </div>
   );
 };
 
-// App Performance Card
-const AppPerformanceCard = ({ sessionId, appName, metrics }) => (
-  <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-slate-600 transition-colors">
-    {/* Header */}
-    <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-700">
-      <div className="font-semibold text-white flex items-center gap-2">
-        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-        {metrics.appName || appName}
-      </div>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-slate-400">Session</span>
-        <span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded font-mono text-[10px]">
-          {sessionId}
-        </span>
-      </div>
-    </div>
-
-    {/* Duration, Samples, MOS */}
-    <div className="grid grid-cols-3 gap-2 text-xs mb-3">
-      <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-        <div className="text-slate-400 mb-1">Duration</div>
-        <div className="text-white font-semibold">{metrics.durationHHMMSS || "N/A"}</div>
-      </div>
-      <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-        <div className="text-slate-400 mb-1">Samples</div>
-        <div className="text-white font-semibold">{metrics.sampleCount || 0}</div>
-      </div>
-      <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-        <div className="text-slate-400 mb-1">MOS</div>
-        <div className="text-yellow-400 font-semibold text-lg">
-          {metrics.avgMos != null ? metrics.avgMos.toFixed(2) : "N/A"}
-        </div>
-      </div>
-    </div>
-
-    {/* Signal Quality */}
-    <div className="mb-3">
-      <div className="text-xs text-slate-400 mb-2 font-medium flex items-center gap-1">
-        <Signal className="h-3 w-3" />
-        Signal Quality
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-          <div className="text-slate-400 text-[10px]">RSRP (dBm)</div>
-          <div className={getSignalColor(metrics.avgRsrp, [-90, -105])}>
-            {metrics.avgRsrp != null ? metrics.avgRsrp.toFixed(1) : "N/A"}
-          </div>
-        </div>
-        <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-          <div className="text-slate-400 text-[10px]">RSRQ (dB)</div>
-          <div className="font-semibold text-purple-400">
-            {metrics.avgRsrq != null ? metrics.avgRsrq.toFixed(1) : "N/A"}
-          </div>
-        </div>
-        <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-          <div className="text-slate-400 text-[10px]">SINR (dB)</div>
-          <div className="font-semibold text-green-400">
-            {metrics.avgSinr != null ? metrics.avgSinr.toFixed(1) : "N/A"}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Throughput */}
-    <div className="mb-3">
-      <div className="text-xs text-slate-400 mb-2 font-medium flex items-center gap-1">
-        <TrendingUp className="h-3 w-3" />
-        Throughput
-      </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-          <div className="text-slate-400 text-[10px]">Download</div>
-          <div className="font-semibold text-cyan-400">
-            {metrics.avgDlTptMbps != null ? `${metrics.avgDlTptMbps.toFixed(1)} Mbps` : "N/A"}
-          </div>
-        </div>
-        <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-          <div className="text-slate-400 text-[10px]">Upload</div>
-          <div className="font-semibold text-orange-400">
-            {metrics.avgUlTptMbps != null ? `${metrics.avgUlTptMbps.toFixed(1)} Mbps` : "N/A"}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* QoE Metrics */}
-    <div>
-      <div className="text-xs text-slate-400 mb-2 font-medium flex items-center gap-1">
-        <Activity className="h-3 w-3" />
-        Quality of Experience
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-          <div className="text-slate-400 text-[10px]">Latency</div>
-          <div className={getLatencyColor(metrics.avgLatency)}>
-            {metrics.avgLatency != null ? `${metrics.avgLatency.toFixed(1)} ms` : "N/A"}
-          </div>
-        </div>
-        <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-          <div className="text-slate-400 text-[10px]">Jitter</div>
-          <div className="font-semibold text-indigo-400">
-            {metrics.avgJitter != null ? `${metrics.avgJitter.toFixed(1)} ms` : "N/A"}
-          </div>
-        </div>
-        <div className="bg-slate-900 p-2 rounded hover:bg-slate-850 transition-colors">
-          <div className="text-slate-400 text-[10px]">Loss</div>
-          <div className={getPacketLossColor(metrics.avgPacketLoss)}>
-            {metrics.avgPacketLoss != null ? `${metrics.avgPacketLoss.toFixed(1)}%` : "N/A"}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-// Helper functions for color classes
-const getSignalColor = (value, thresholds) => {
-  if (value == null) return "font-semibold text-slate-400";
-  if (value >= thresholds[0]) return "font-semibold text-green-400";
-  if (value >= thresholds[1]) return "font-semibold text-yellow-400";
-  return "font-semibold text-red-400";
-};
-
-const getLatencyColor = (value) => {
-  if (value == null) return "font-semibold text-slate-400";
-  if (value < 50) return "font-semibold text-green-400";
-  if (value < 100) return "font-semibold text-yellow-400";
-  return "font-semibold text-red-400";
-};
-
-const getPacketLossColor = (value) => {
-  if (value == null) return "font-semibold text-slate-400";
-  if (value === 0) return "font-semibold text-green-400";
-  if (value < 1) return "font-semibold text-yellow-400";
-  return "font-semibold text-red-400";
-};
-
-// App Comparison View
+// ==================== COMPARISON VIEW COMPONENT ====================
 const AppComparisonView = ({ chartData, chartRefs }) => {
   if (!chartData?.length) {
     return (
@@ -292,7 +698,7 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       >
         <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
           <BarChart3 className="h-4 w-4" />
-          MOS Score Comparison
+          MOS Score Comparison (Average)
         </h4>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
@@ -302,7 +708,7 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
               angle={-45} 
               textAnchor="end" 
               height={80} 
-              tick={{ fill: "#9CA3AF", fontSize: 11 }} 
+              tick={{ fill: "#9CA3AF", fontSize: 10 }} 
             />
             <YAxis domain={[0, 5]} tick={{ fill: "#9CA3AF", fontSize: 12 }} />
             <Tooltip 
@@ -312,9 +718,10 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
                 borderRadius: "8px",
                 color: "#fff",
               }}
+              formatter={(value) => [value.toFixed(2), 'Avg MOS Score']}
             />
             <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar dataKey="mos" fill="#fbbf24" name="MOS Score" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="mos" fill="#fbbf24" name="Avg MOS Score" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -326,7 +733,7 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       >
         <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
           <TrendingUp className="h-4 w-4" />
-          Throughput Comparison
+          Throughput Comparison (Average)
         </h4>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
@@ -336,7 +743,7 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
               angle={-45} 
               textAnchor="end" 
               height={80} 
-              tick={{ fill: "#9CA3AF", fontSize: 11 }} 
+              tick={{ fill: "#9CA3AF", fontSize: 10 }} 
             />
             <YAxis tick={{ fill: "#9CA3AF", fontSize: 12 }} />
             <Tooltip 
@@ -346,11 +753,46 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
                 borderRadius: "8px",
                 color: "#fff",
               }}
-              formatter={(value) => `${value.toFixed(2)} Mbps`} 
+              formatter={(value) => [`${value.toFixed(2)} Mbps`]} 
             />
             <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar dataKey="dl" fill="#06b6d4" name="Download (Mbps)" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="ul" fill="#fb923c" name="Upload (Mbps)" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="dl" fill="#06b6d4" name="Avg Download (Mbps)" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="ul" fill="#fb923c" name="Avg Upload (Mbps)" radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Latency Comparison */}
+      <div 
+        ref={chartRefs?.qoeChart}
+        className="bg-slate-900 rounded-lg p-4 border border-slate-700"
+      >
+        <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+          <Signal className="h-4 w-4" />
+          Latency Comparison (Average)
+        </h4>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45} 
+              textAnchor="end" 
+              height={80} 
+              tick={{ fill: "#9CA3AF", fontSize: 10 }} 
+            />
+            <YAxis tick={{ fill: "#9CA3AF", fontSize: 12 }} />
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: "#1e293b",
+                border: "1px solid #475569",
+                borderRadius: "8px",
+                color: "#fff",
+              }}
+              formatter={(value) => [`${value.toFixed(1)} ms`, 'Avg Latency']} 
+            />
+            <Legend wrapperStyle={{ fontSize: "12px" }} />
+            <Bar dataKey="latency" fill="#a855f7" name="Avg Latency (ms)" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

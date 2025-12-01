@@ -404,6 +404,16 @@ export const adminApi = {
     }
   },
 
+  getFilteredLocations: async (payload) => {
+    try {
+      const response = await api.get('/Admin/GetNetworkDurations', payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching filtered locations:', error);
+      throw error;
+    }
+  },
+
   getUsers: (params) => api.get("/Admin/GetUsers", { params }),
   getOnlineUsers: () => api.get("/Admin/GetOnlineUsers"),
   

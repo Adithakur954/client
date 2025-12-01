@@ -1,6 +1,6 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import useSWR from "swr";
-import { BarChart3, Download, Maximize2, Minimize2 } from "lucide-react";
+import { BarChart3, Download, Maximize2, Minimize2, Filter } from "lucide-react";
 import toast from "react-hot-toast";
 
 // Tabs
@@ -20,6 +20,12 @@ import { exportAnalytics } from "@/utils/exportService";
 import { TABS } from "@/utils/constants";
 import { adminApi } from "@/api/apiEndpoints";
 
+const DEFAULT_DATA_FILTERS = {
+  providers: [],
+  bands: [],
+  technologies: [],
+};
+
 export default function UnifiedDetailLogs({
   locations = [],
   totalLocations = 0,
@@ -37,10 +43,16 @@ export default function UnifiedDetailLogs({
   thresholds,
   logArea,
   onClose,
+  
+  // Filter props
+  dataFilters = DEFAULT_DATA_FILTERS,
+  onFilteredDataChange,
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [filteredLocations, setFilteredLocations] = useState(locations);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
 
   // All Chart refs
   const chartRefs = {
@@ -60,6 +72,87 @@ export default function UnifiedDetailLogs({
     qoeChart: useRef(null),
   };
 
+  // Check if filters are active
+  const hasActiveFilters = useMemo(() => {
+    return (
+      dataFilters.providers?.length > 0 ||
+      dataFilters.bands?.length > 0 ||
+      dataFilters.technologies?.length > 0
+    );
+  }, [dataFilters]);
+
+  // Fetch filtered data from API
+  const fetchFilteredData = useCallback(async (filters) => {
+    if (!projectId && !sessionIds?.length) {
+      console.warn("No projectId or sessionIds provided for filtering");
+      return locations;
+    }
+
+    try {
+      setIsFilterLoading(true);
+      
+      const payload = {
+        project_id: projectId,
+        session_ids: sessionIds,
+        filters: {
+          providers: filters.providers || [],
+          bands: filters.bands || [],
+          technologies: filters.technologies || [],
+        },
+      };
+
+      console.log("📡 Fetching filtered analytics data:", payload);
+
+      const response = await adminApi.getFilteredLocations(payload);
+      const filteredData = response?.Data || response?.data || [];
+      
+      console.log("✅ Filtered analytics data received:", filteredData.length, "locations");
+      
+      if (filteredData.length > 0) {
+        toast.success(`Analytics updated: ${filteredData.length} locations`, {
+          duration: 2000,
+          icon: '📊',
+        });
+      } else {
+        toast.warning("No data matches current filters", {
+          duration: 2000,
+        });
+      }
+      
+      return filteredData;
+    } catch (error) {
+      console.error("❌ Failed to fetch filtered analytics data:", error);
+      toast.error("Failed to apply filters to analytics");
+      return locations; // Fallback to original locations
+    } finally {
+      setIsFilterLoading(false);
+    }
+  }, [projectId, sessionIds, locations]);
+
+  // Apply filters when dataFilters change
+  useEffect(() => {
+    const applyFilters = async () => {
+      if (hasActiveFilters) {
+        const filtered = await fetchFilteredData(dataFilters);
+        setFilteredLocations(filtered);
+        onFilteredDataChange?.(filtered);
+      } else {
+        // No filters active - use original locations
+        setFilteredLocations(locations);
+        onFilteredDataChange?.(locations);
+      }
+    };
+
+    applyFilters();
+  }, [dataFilters, hasActiveFilters]); // Only re-run when filters change
+
+  // Update filtered locations when original locations change (but no filters)
+  useEffect(() => {
+    if (!hasActiveFilters) {
+      setFilteredLocations(locations);
+    }
+  }, [locations, hasActiveFilters]);
+
   // Fetch duration
   const fetchDuration = async () => {
     if (!sessionIds?.length) return null;
@@ -73,10 +166,10 @@ export default function UnifiedDetailLogs({
     { revalidateOnFocus: false, shouldRetryOnError: false }
   );
 
-  // Computed values
+  // Computed values - use filteredLocations
   const stats = useMemo(
-    () => calculateStats(locations, selectedMetric),
-    [locations, selectedMetric]
+    () => calculateStats(filteredLocations, selectedMetric),
+    [filteredLocations, selectedMetric]
   );
 
   const ioSummary = useMemo(
@@ -101,7 +194,7 @@ export default function UnifiedDetailLogs({
   // Export handler
   const handleExport = () => {
     exportAnalytics({
-      locations,
+      locations: filteredLocations,
       stats,
       duration,
       appSummary,
@@ -111,20 +204,24 @@ export default function UnifiedDetailLogs({
       chartRefs,
       selectedMetric,
       totalLocations,
-      filteredCount,
+      filteredCount: filteredLocations.length,
       polygonStats,
       siteData,
+      appliedFilters: dataFilters,
     });
   };
 
   // Debug logs
-  React.useEffect(() => {
-    console.log("📊 Analytics Data:", {
-      locations: locations?.length,
-      appSummary: appSummary ? Object.keys(appSummary).length : 0,
+  useEffect(() => {
+    console.log("📊 Analytics Component State:", {
+      originalLocations: locations?.length,
+      filteredLocations: filteredLocations?.length,
+      activeFilters: dataFilters,
+      hasActiveFilters,
+      isFilterLoading,
       activeTab,
     });
-  }, [locations, appSummary, activeTab]);
+  }, [locations, filteredLocations, dataFilters, hasActiveFilters, isFilterLoading, activeTab]);
 
   // Collapsed state
   if (collapsed) {
@@ -136,6 +233,11 @@ export default function UnifiedDetailLogs({
         >
           <BarChart3 className="h-4 w-4" />
           Show Analytics
+          {hasActiveFilters && (
+            <span className="ml-1 bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+              Filtered
+            </span>
+          )}
         </button>
         <button
           onClick={onClose}
@@ -164,13 +266,25 @@ export default function UnifiedDetailLogs({
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-blue-400" />
           <h3 className="font-semibold">Analytics Dashboard</h3>
+          {hasActiveFilters && (
+            <span className="bg-blue-500 text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1">
+              <Filter className="h-3 w-3" />
+              Filtered
+            </span>
+          )}
+          {isFilterLoading && (
+            <div className="flex items-center gap-1 text-xs text-blue-400">
+              <div className="animate-spin rounded-full h-3 w-3 border border-blue-400 border-t-transparent" />
+              <span>Applying...</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleExport}
-            disabled={!locations?.length}
-            className="flex items-center gap-2 text-slate-400 hover:text-green-400 transition-colors p-2 rounded hover:bg-slate-800 disabled:opacity-50"
+            disabled={!filteredLocations?.length}
+            className="flex items-center gap-2 text-slate-400 hover:text-green-400 transition-colors p-2 rounded hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Export Analytics"
           >
             <Download className="h-4 w-4" />
@@ -180,6 +294,7 @@ export default function UnifiedDetailLogs({
           <button
             onClick={() => setExpanded(!expanded)}
             className="text-slate-400 hover:text-blue-400 p-1 rounded hover:bg-slate-800"
+            title={expanded ? "Minimize" : "Maximize"}
           >
             {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
@@ -187,6 +302,7 @@ export default function UnifiedDetailLogs({
           <button
             onClick={() => setCollapsed(true)}
             className="text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-800 font-bold"
+            title="Collapse"
           >
             −
           </button>
@@ -194,11 +310,47 @@ export default function UnifiedDetailLogs({
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-red-400 px-2 py-1 rounded hover:bg-slate-800"
+            title="Close"
           >
             ✕
           </button>
         </div>
       </div>
+
+      {/* Filter Summary Bar */}
+      {hasActiveFilters && (
+        <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center gap-3 text-xs flex-wrap">
+          <span className="text-slate-400 font-medium flex items-center gap-1">
+            <Filter className="h-3 w-3" />
+            Active Filters:
+          </span>
+          
+          {dataFilters.providers?.length > 0 && (
+            <span className="bg-blue-900/50 text-blue-300 px-2 py-1 rounded border border-blue-700/30">
+              📡 Providers: {dataFilters.providers.join(", ")}
+            </span>
+          )}
+          
+          {dataFilters.bands?.length > 0 && (
+            <span className="bg-purple-900/50 text-purple-300 px-2 py-1 rounded border border-purple-700/30">
+              📶 Bands: {dataFilters.bands.join(", ")}
+            </span>
+          )}
+          
+          {dataFilters.technologies?.length > 0 && (
+            <span className="bg-green-900/50 text-green-300 px-2 py-1 rounded border border-green-700/30">
+              🔧 Tech: {dataFilters.technologies.join(", ")}
+            </span>
+          )}
+          
+          <span className="text-slate-400 ml-auto font-mono">
+            {filteredLocations.length.toLocaleString()} / {totalLocations.toLocaleString()} logs
+            <span className="text-blue-400 ml-2">
+              ({totalLocations > 0 ? ((filteredLocations.length / totalLocations) * 100).toFixed(1) : 0}%)
+            </span>
+          </span>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 p-3 bg-slate-900 border-b border-slate-700 overflow-x-auto scrollbar-hide">
@@ -218,12 +370,20 @@ export default function UnifiedDetailLogs({
         ${expanded ? "max-h-[calc(100vh-200px)]" : "max-h-[70vh]"} 
         overflow-y-auto scrollbar-hide p-4 space-y-4
       `}>
-        {isLoading && <LoadingSpinner />}
+        {(isLoading || isFilterLoading) && <LoadingSpinner />}
 
-        {activeTab === "overview" && (
+        {!isLoading && !isFilterLoading && filteredLocations.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+            <Filter className="h-16 w-16 mb-4 opacity-50" />
+            <p className="text-lg font-medium">No data matches the current filters</p>
+            <p className="text-sm mt-2">Try adjusting your filter criteria</p>
+          </div>
+        )}
+
+        {activeTab === "overview" && filteredLocations.length > 0 && (
           <OverviewTab
             totalLocations={totalLocations}
-            filteredCount={filteredCount}
+            filteredCount={filteredLocations.length}
             siteData={siteData}
             siteToggle={siteToggle}
             enableSiteToggle={enableSiteToggle}
@@ -233,14 +393,14 @@ export default function UnifiedDetailLogs({
             selectedMetric={selectedMetric}
             ioSummary={ioSummary}
             duration={duration}
-            locations={locations}
+            locations={filteredLocations}
             expanded={expanded}
           />
         )}
 
-        {activeTab === "signal" && (
+        {activeTab === "signal" && filteredLocations.length > 0 && (
           <SignalTab
-            locations={locations}
+            locations={filteredLocations}
             selectedMetric={selectedMetric}
             thresholds={thresholds}
             expanded={expanded}
@@ -248,17 +408,17 @@ export default function UnifiedDetailLogs({
           />
         )}
 
-        {activeTab === "network" && (
+        {activeTab === "network" && filteredLocations.length > 0 && (
           <NetworkTab
-            locations={locations}
+            locations={filteredLocations}
             expanded={expanded}
             chartRefs={chartRefs}
           />
         )}
 
-        {activeTab === "performance" && (
+        {activeTab === "performance" && filteredLocations.length > 0 && (
           <PerformanceTab
-            locations={locations}
+            locations={filteredLocations}
             expanded={expanded}
             chartRefs={chartRefs}
           />

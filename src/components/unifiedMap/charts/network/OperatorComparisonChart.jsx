@@ -19,10 +19,20 @@ import { filterValidData } from "@/utils/analyticsHelpers";
 
 export const OperatorComparisonChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
-    if (!locations?.length) return [];
+    console.log("📊 OperatorComparisonChart - Received locations:", locations?.length);
+    
+    if (!locations?.length) {
+      console.warn("⚠️ No locations data");
+      return [];
+    }
+
+    // Debug: Check first location structure
+    console.log("📍 Sample location:", locations[0]);
 
     const operatorStats = locations.reduce((acc, loc) => {
-      const operator = loc.operator || "Unknown";
+      // ✅ CHANGED: Use 'provider' instead of 'operator'
+      const operator = loc.provider || loc.operator || "Unknown";
+      
       if (!acc[operator]) {
         acc[operator] = {
           count: 0,
@@ -48,7 +58,9 @@ export const OperatorComparisonChart = React.forwardRef(({ locations }, ref) => 
       return acc;
     }, {});
 
-    return Object.entries(operatorStats)
+    console.log("📈 Operator stats:", operatorStats);
+
+    const result = Object.entries(operatorStats)
       .map(([name, data]) => ({
         name,
         count: data.count,
@@ -82,9 +94,14 @@ export const OperatorComparisonChart = React.forwardRef(({ locations }, ref) => 
             : 0,
       }))
       .sort((a, b) => b.count - a.count);
+
+    console.log("✅ Processed operator data:", result);
+    return result;
   }, [locations]);
 
   const validData = filterValidData(data, 'name');
+
+  console.log("🔍 Valid data for chart:", validData);
 
   if (!validData.length) {
     return (

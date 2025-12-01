@@ -226,7 +226,7 @@ const MapWithMultipleCircles = ({
   defaultZoom = 14,
   fitToLocations = true,
   onLoad: onLoadProp,
-  pointRadius = 3, // Small fixed radius (changed from radiusMeters = 8)
+  pointRadius = 5, // Small fixed radius (changed from radiusMeters = 8)
   children,
   projectId = null,
   polygonSource = "map",
