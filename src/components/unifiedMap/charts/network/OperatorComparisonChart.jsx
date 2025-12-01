@@ -41,8 +41,8 @@ export const OperatorComparisonChart = React.forwardRef(({ locations }, ref) => 
       if (loc.rsrq != null) acc[operator].avgRsrq.push(loc.rsrq);
       if (loc.sinr != null) acc[operator].avgSinr.push(loc.sinr);
       if (loc.mos != null) acc[operator].avgMos.push(loc.mos);
-      if (loc.dl_thpt != null) acc[operator].avgDl.push(parseFloat(loc.dl_thpt));
-      if (loc.ul_thpt != null) acc[operator].avgUl.push(parseFloat(loc.ul_thpt));
+      if (loc.dl_tpt != null) acc[operator].avgDl.push(parseFloat(loc.dl_tpt));
+      if (loc.ul_tpt != null) acc[operator].avgUl.push(parseFloat(loc.ul_tpt));
       if (loc.latency != null) acc[operator].avgLatency.push(loc.latency);
 
       return acc;

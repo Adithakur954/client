@@ -413,6 +413,8 @@ const UnifiedMapView = () => {
     DEFAULT_COVERAGE_FILTERS
   );
   const [dataFilters, setDataFilters] = useState(DEFAULT_DATA_FILTERS);
+  const [enableGrid, setEnableGrid] = useState(false);
+const [gridSizeMeters, setGridSizeMeters] = useState(20);
 
   // Additional data
   const [appSummary, setAppSummary] = useState({});
@@ -723,38 +725,87 @@ const UnifiedMapView = () => {
   }, [projectId, showPolygons, polygonSource]);
 
   const fetchAreaPolygons = useCallback(async () => {
-    if (!projectId || !areaEnabled) {
+  if (!projectId || !areaEnabled) {
+    setAreaData([]);
+    return;
+  }
+
+  console.log("📡 Fetching area polygons for project:", projectId);
+
+  try {
+    const res = await areaBreakdownApi.getAreaPolygons(projectId);
+    
+    console.log("📦 Area API Response:", res);
+
+    // Your API structure: res.data.grid_blocks
+    let zones = [];
+    
+    // Check all possible locations for zone data
+    if (res?.data?.grid_blocks?.length > 0) {
+      zones = res.data.grid_blocks;
+      console.log("✅ Found zones in grid_blocks");
+    } else if (res?.data?.ai_zones?.length > 0) {
+      zones = res.data.ai_zones;
+      console.log("✅ Found zones in ai_zones");
+    } else if (res?.data?.building_clusters?.length > 0) {
+      zones = res.data.building_clusters;
+      console.log("✅ Found zones in building_clusters");
+    } else if (Array.isArray(res?.data)) {
+      zones = res.data;
+    } else if (Array.isArray(res)) {
+      zones = res;
+    }
+
+    console.log("📍 Extracted zones:", zones.length, zones);
+
+    if (!zones || !zones.length) {
+      console.warn("⚠️ No zones found in response");
+      toast.warning("No area zones found for this project");
       setAreaData([]);
       return;
     }
 
-    try {
-      const res = await areaBreakdownApi.getAreaPolygons(projectId);
-      const zones = res?.ai_zones || res?.data?.ai_zones || [];
+    const parsed = zones
+      .map((zone, index) => {
+        const geometry = zone.geometry || zone.Geometry || zone.wkt || zone.Wkt;
 
-      const parsed = zones
-        .map((zone) => {
-          const poly = parseWKTToPolygons(zone.geometry)[0];
-          if (!poly) return null;
-          return {
-            id: zone.id,
-            zoneId: zone.zone_id,
-            name: `Zone ${zone.zone_id}`,
-            source: "area",
-            uid: `area-${zone.id}`,
-            paths: poly.paths,
-            bbox: computeBbox(poly.paths[0]),
-          };
-        })
-        .filter(Boolean);
+        if (!geometry) {
+          console.warn(`Zone ${index} has no geometry:`, zone);
+          return null;
+        }
 
-      setAreaData(parsed);
-      if (parsed.length) toast.success(`${parsed.length} area zone(s) loaded`);
-    } catch (err) {
-      console.error("Area polygon error:", err);
-      setAreaData([]);
+        const poly = parseWKTToPolygons(geometry)[0];
+        
+        if (!poly || !poly.paths?.[0]?.length) {
+          console.warn(`Failed to parse geometry for zone ${index}`);
+          return null;
+        }
+
+        return {
+          id: zone.id || zone.Id || index,
+          blockId: zone.block_id || zone.blockId,
+          name: zone.project_name || zone.name || `Block ${zone.block_id || index}`,
+          source: "area",
+          uid: `area-${zone.id || zone.Id || index}`,
+          paths: poly.paths,
+          bbox: computeBbox(poly.paths[0]),
+        };
+      })
+      .filter(Boolean);
+
+    console.log(`✅ Parsed ${parsed.length} area polygons`);
+    
+    setAreaData(parsed);
+    
+    if (parsed.length > 0) {
+      toast.success(`${parsed.length} area zone(s) loaded`);
     }
-  }, [projectId, areaEnabled]);
+  } catch (err) {
+    console.error("❌ Area polygon error:", err);
+    toast.error(`Failed to load area zones: ${err.message}`);
+    setAreaData([]);
+  }
+}, [projectId, areaEnabled]);
 
   // ==================== EFFECTS ====================
 
@@ -1234,6 +1285,10 @@ const UnifiedMapView = () => {
         neighborStats={neighborStats}
         areaEnabled={areaEnabled}
         setAreaEnabled={setAreaEnabled}
+        enableGrid={enableGrid}
+  setEnableGrid={setEnableGrid}
+  gridSizeMeters={gridSizeMeters}
+  setGridSizeMeters={setGridSizeMeters}
       />
 
       <div className="flex-grow relative overflow-hidden">
@@ -1343,6 +1398,9 @@ const UnifiedMapView = () => {
               polygonSource={polygonSource}
               enablePolygonFilter={true} 
               showPolygonBoundary={true}
+              enableGrid={enableGrid}
+  gridSizeMeters={gridSizeMeters}
+   areaEnabled={areaEnabled}
             >
               {/* Render polygons */}
               {showPolygons &&

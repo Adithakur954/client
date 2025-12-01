@@ -45,8 +45,8 @@ export const ProviderPerformanceChart = React.forwardRef(({ locations }, ref) =>
       if (loc.rsrq != null) acc[provider].avgRsrq.push(loc.rsrq);
       if (loc.sinr != null) acc[provider].avgSinr.push(loc.sinr);
       if (loc.mos != null) acc[provider].avgMos.push(loc.mos);
-      if (loc.dl_thpt != null) acc[provider].avgDl.push(parseFloat(loc.dl_thpt));
-      if (loc.ul_thpt != null) acc[provider].avgUl.push(parseFloat(loc.ul_thpt));
+      if (loc.dl_tpt != null) acc[provider].avgDl.push(parseFloat(loc.dl_tpt));
+      if (loc.ul_tpt != null) acc[provider].avgUl.push(parseFloat(loc.ul_tpt));
       if (loc.latency != null) acc[provider].avgLatency.push(loc.latency);
       if (loc.jitter != null) acc[provider].avgJitter.push(loc.jitter);
 

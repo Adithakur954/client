@@ -22,12 +22,12 @@ export const ThroughputTimelineChart = React.forwardRef(({ locations }, ref) => 
     if (!locations?.length) return [];
 
     return locations
-      .filter((loc) => loc.timestamp && (loc.dl_thpt != null || loc.ul_thpt != null))
+      .filter((loc) => loc.timestamp && (loc.dl_tpt != null || loc.ul_tpt != null))
       .map((loc, idx) => ({
         index: idx + 1,
         timestamp: loc.timestamp,
-        dl: parseFloat(loc.dl_thpt) || 0,
-        ul: parseFloat(loc.ul_thpt) || 0,
+        dl: parseFloat(loc.dl_tpt) || 0,
+        ul: parseFloat(loc.ul_tpt) || 0,
       }))
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   }, [locations]);

@@ -176,6 +176,10 @@ const UnifiedMapSidebar = ({
   neighborStats,
   areaEnabled,
   setAreaEnabled,
+  enableGrid,
+  setEnableGrid,
+  gridSizeMeters,
+  setGridSizeMeters,
 }) => {
   const sideClasses = useMemo(() => {
     const base =
@@ -363,13 +367,41 @@ const updateDataFilter = useCallback((filterType, value) => {
   />
   <div className="flex-1">
     <div className="text-sm">Area Zones</div>
-    {/* {areaEnabled && areaPolygonCount > 0 && (
-      <div className="text-xs text-purple-400">
-        {areaPolygonCount} zone{areaPolygonCount > 1 ? 's' : ''} loaded
-      </div>
-    )} */}
+    
   </div>
 </label>
+<label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
+  <input
+    type="checkbox"
+    checked={enableGrid}
+    onChange={(e) => setEnableGrid?.(e.target.checked)}
+    disabled={!enableDataToggle}
+    className="w-4 h-4"
+  />
+  <div className="flex-1">
+    <div className="text-sm">Grid View</div>
+    <div className="text-xs text-slate-400">Show data as grid cells</div>
+  </div>
+</label>
+
+{/* Grid Size Slider - only show when grid is enabled */}
+{enableGrid && (
+  <div className="p-2 bg-slate-800 rounded">
+    <div className="flex items-center justify-between mb-2">
+      <span className="text-xs text-slate-300">Cell Size</span>
+      <span className="text-xs font-semibold text-blue-400">{gridSizeMeters || 50}m</span>
+    </div>
+    <input
+      type="range"
+      min="5"
+      max="200"
+      step="10"
+      value={gridSizeMeters || 50}
+      onChange={(e) => setGridSizeMeters?.(parseInt(e.target.value))}
+      className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer accent-blue-500"
+    />
+  </div>
+)}
 
 
               <div>

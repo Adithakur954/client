@@ -3,7 +3,7 @@
 const DB_NAME = 'swr-cache-db';
 const STORE_NAME = 'cache';
 const DB_VERSION = 1;
-const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_EXPIRY = 7*24 * 60 * 60 * 1000; // 7 days
 
 class IndexedDBCache {
   constructor() {

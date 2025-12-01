@@ -290,7 +290,10 @@ export const cellSiteApi = {
 
 export const areaBreakdownApi = {
   getAreaBreakdown: (params) => 
-    pythonApi.post("/api/area-breakup/process", params),
+    {
+     const response = pythonApi.post("/api/area-breakup/process", params)
+     return response;
+    },
 
   getAreaPolygons: (projectId) => 
     pythonApi.get(`/api/area-breakup/fetch/${projectId}`),
