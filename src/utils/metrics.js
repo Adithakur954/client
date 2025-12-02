@@ -26,11 +26,7 @@ export const resolveMetricConfig = (key) => {
 };
 
 export const getColorForMetric = (metric, value, thresholds) => {
-  console.log('🎨 === getColorForMetric DEBUG ===');
-  console.log('  metric:', metric);
-  console.log('  value:', value);
-  console.log('  thresholds:', thresholds);
-  console.log('  thresholds keys:', Object.keys(thresholds || {}));
+  
 
   // PCI handling
   if (metric.toLowerCase() === 'pci') {
@@ -42,27 +38,27 @@ export const getColorForMetric = (metric, value, thresholds) => {
   }
 
   const config = resolveMetricConfig(metric);
-  console.log('  resolved config:', config);
+ 
   
   const { thresholdKey } = config;
-  console.log('  thresholdKey:', thresholdKey);
+ 
   
   const metricThresholds = thresholds?.[thresholdKey] || [];
-  console.log('  metricThresholds:', metricThresholds);
+ 
   
   const numValue = parseFloat(value);
-  console.log('  numValue:', numValue);
+  
   
   if (!Number.isFinite(numValue) || metricThresholds.length === 0) {
-    console.log('  ❌ Returning gray - invalid value or no thresholds');
+  
     return "#808080";
   }
   
   const match = metricThresholds.find((t) => numValue >= t.min && numValue <= t.max);
-  console.log('  match found:', match);
+ 
   
   const finalColor = match ? match.color : "#808080";
-  console.log('  final color:', finalColor);
+
   
   return finalColor;
 };

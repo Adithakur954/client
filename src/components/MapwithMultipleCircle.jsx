@@ -4,6 +4,7 @@ import { GoogleMap, PolygonF, RectangleF } from "@react-google-maps/api";
 import { getColorForMetric } from "../utils/metrics";
 import { mapViewApi } from "../api/apiEndpoints";
 import CanvasOverlay from "./maps/CanvasOverlay";
+import { ArrowDown, X } from "lucide-react";
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
@@ -76,11 +77,17 @@ const getPolygonBounds = (path) => {
   return { north: maxLat, south: minLat, east: maxLng, west: minLng };
 };
 
+// Optimized point-in-polygon check with bbox pre-filter
 const isPointInPolygon = (point, path, bbox) => {
-  if (bbox && (point.lat < bbox.south || point.lat > bbox.north || 
-               point.lng < bbox.west || point.lng > bbox.east)) {
-    return false;
+  // Quick bbox check first
+  if (bbox) {
+    if (point.lat < bbox.south || point.lat > bbox.north || 
+        point.lng < bbox.west || point.lng > bbox.east) {
+      return false;
+    }
   }
+  
+  // Ray casting algorithm
   let inside = false;
   for (let i = 0, j = path.length - 1; i < path.length; j = i++) {
     const xi = path[i].lng, yi = path[i].lat;
@@ -93,12 +100,27 @@ const isPointInPolygon = (point, path, bbox) => {
   return inside;
 };
 
+// Check if point is inside ANY polygon
 const isPointInsideAnyPolygon = (point, polygonData) => {
-  if (!polygonData?.length) return true;
+  if (!polygonData?.length) return true; // No polygons = all points valid
   return polygonData.some(({ path, bbox }) => isPointInPolygon(point, path, bbox));
 };
 
-// Grid generation with configurable aggregation
+// Batch filter locations for performance
+const filterLocationsInsidePolygons = (locations, polygonData) => {
+  if (!locations?.length) return [];
+  if (!polygonData?.length) return locations; // No polygons = return all
+  
+  return locations.filter(loc => {
+    // Validate coordinates
+    if (typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return false;
+    if (isNaN(loc.lat) || isNaN(loc.lng)) return false;
+    
+    return isPointInsideAnyPolygon(loc, polygonData);
+  });
+};
+
+// Grid generation
 const generateGridCells = (
   polygonData, 
   gridSizeMeters, 
@@ -107,7 +129,7 @@ const generateGridCells = (
   thresholds,
   aggregationMethod = 'median'
 ) => {
-  if (!polygonData?.length) return [];
+  if (!polygonData?.length || !locations?.length) return [];
 
   let globalBounds = null;
   for (const { bbox } of polygonData) {
@@ -131,7 +153,6 @@ const generateGridCells = (
 
   const cells = [];
   let cellId = 0;
-
   const aggregateFn = AGGREGATION_METHODS[aggregationMethod] || AGGREGATION_METHODS.median;
 
   for (let lat = globalBounds.south; lat < globalBounds.north; lat += cellHeight) {
@@ -146,6 +167,7 @@ const generateGridCells = (
       const centerLat = (cellBounds.north + cellBounds.south) / 2;
       const centerLng = (cellBounds.east + cellBounds.west) / 2;
 
+      // Check if cell intersects with any polygon
       const intersects = polygonData.some(({ path, bbox }) => {
         if (bbox && (cellBounds.west > bbox.east || cellBounds.east < bbox.west ||
                      cellBounds.south > bbox.north || cellBounds.north < bbox.south)) {
@@ -163,12 +185,12 @@ const generateGridCells = (
 
       if (!intersects) continue;
 
+      // Find locations in this cell
       const cellLocations = locations.filter(loc => 
         loc.lat >= cellBounds.south && 
         loc.lat < cellBounds.north &&
         loc.lng >= cellBounds.west && 
-        loc.lng < cellBounds.east &&
-        isPointInsideAnyPolygon(loc, polygonData)
+        loc.lng < cellBounds.east
       );
 
       const count = cellLocations.length;
@@ -226,7 +248,7 @@ const MapWithMultipleCircles = ({
   defaultZoom = 14,
   fitToLocations = true,
   onLoad: onLoadProp,
-  pointRadius = 5, // Small fixed radius (changed from radiusMeters = 8)
+  pointRadius = 5,
   children,
   projectId = null,
   polygonSource = "map",
@@ -247,51 +269,115 @@ const MapWithMultipleCircles = ({
   // Polygon state
   const [polygonData, setPolygonData] = useState([]);
   const [polygonsFetched, setPolygonsFetched] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+  const [dropButton, setDropButton] = useState(true);  
 
   // Fetch polygons
   useEffect(() => {
     const fetchPolygons = async () => {
+      // If no project ID or polygon filter disabled, skip fetch
       if (!projectId) {
+        console.log("📍 No projectId, skipping polygon fetch");
         setPolygonData([]);
         setPolygonsFetched(true);
         return;
       }
+
+      if (!enablePolygonFilter) {
+        console.log("📍 Polygon filter disabled, skipping fetch");
+        setPolygonData([]);
+        setPolygonsFetched(true);
+        return;
+      }
+
       try {
+        console.log(`📍 Fetching polygons for project ${projectId}, source: ${polygonSource}`);
         const res = await mapViewApi.getProjectPolygonsV2(projectId, polygonSource);
         const items = res?.Data || res?.data?.Data || (Array.isArray(res) ? res : []);
+        
         const allPaths = [];
         items.forEach(item => {
           const wkt = item.Wkt || item.wkt;
           if (wkt) {
             parseWKTToPolygons(wkt).forEach(path => {
               if (path.length >= 3) {
-                allPaths.push({ path, bbox: getPolygonBounds(path) });
+                allPaths.push({ 
+                  path, 
+                  bbox: getPolygonBounds(path),
+                  id: item.Id || item.id 
+                });
               }
             });
           }
         });
+        
+        console.log(`✅ Fetched ${allPaths.length} polygons`);
         setPolygonData(allPaths);
         setPolygonsFetched(true);
+        setFetchError(null);
       } catch (err) {
-        console.error("Failed to fetch polygons:", err);
+        console.error("❌ Polygon fetch error:", err);
         setPolygonData([]);
         setPolygonsFetched(true);
+        setFetchError(err.message);
       }
     };
+    
     fetchPolygons();
-  }, [projectId, polygonSource]);
+  }, [projectId, polygonSource, enablePolygonFilter]);
 
   // Filter locations inside polygons
   const locationsToRender = useMemo(() => {
-    if (!enablePolygonFilter || !polygonsFetched || polygonData.length === 0) {
-      return polygonsFetched ? locations : [];
+   
+
+    // No locations
+    if (!locations?.length) {
+      console.log("⚠️ No locations to filter");
+      console.groupEnd();
+      return [];
     }
-    return locations.filter(loc => isPointInsideAnyPolygon(loc, polygonData));
+
+    // Polygon filter disabled - return all
+    if (!enablePolygonFilter) {
+      console.log("✅ Filter disabled, returning all locations");
+      console.groupEnd();
+      return locations;
+    }
+
+    // Polygons not yet fetched - wait (return empty to avoid showing points outside)
+    if (!polygonsFetched) {
+      console.log("⏳ Waiting for polygons to load...");
+      console.groupEnd();
+      return []; // Return empty while loading
+    }
+
+    // No polygons defined - return all locations
+    if (polygonData.length === 0) {
+      console.log("⚠️ No polygons found, returning all locations");
+      console.groupEnd();
+      return locations;
+    }
+
+    // Filter locations inside polygons
+    const filtered = filterLocationsInsidePolygons(locations, polygonData);
+    console.log(`✅ Filtered: ${filtered.length} inside / ${locations.length} total`);
+    console.log(`📊 ${((filtered.length / locations.length) * 100).toFixed(1)}% of points inside polygon`);
+    
+    if (filtered.length === 0 && locations.length > 0) {
+      console.warn("⚠️ All points filtered out! Check if polygon covers the data area.");
+     
+    }
+    
+    console.groupEnd();
+    return filtered;
   }, [locations, polygonData, polygonsFetched, enablePolygonFilter]);
 
-  // Generate grid cells
+  // Generate grid cells (only for filtered locations)
   const gridCells = useMemo(() => {
-    if (!enableGrid || polygonData.length === 0) return [];
+    if (!enableGrid) return [];
+    if (polygonData.length === 0) return [];
+    if (locationsToRender.length === 0) return [];
+    
     return generateGridCells(
       polygonData, 
       gridSizeMeters, 
@@ -308,10 +394,14 @@ const MapWithMultipleCircles = ({
     return getColorForMetric(selectedMetric, loc?.[selectedMetric], thresholds);
   }, [colorBy, selectedMetric, thresholds]);
 
-  // Compute map center
+  // Compute map center from filtered locations
   const computedCenter = useMemo(() => {
-    const locs = locationsToRender.length > 0 ? locationsToRender : locations;
+    // Use filtered locations if available, otherwise original
+    const locs = locationsToRender.length > 0 ? locationsToRender : 
+                 locations.length > 0 ? locations : null;
+    
     if (!locs?.length) return center;
+    
     const sum = locs.reduce(
       (acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }), 
       { lat: 0, lng: 0 }
@@ -323,6 +413,7 @@ const MapWithMultipleCircles = ({
   const handleMapLoad = useCallback((mapInstance) => {
     setMap(mapInstance);
     
+    // Fit to filtered locations
     const locs = locationsToRender.length > 0 ? locationsToRender : locations;
     if (fitToLocations && locs?.length && window.google) {
       const bounds = new window.google.maps.LatLngBounds();
@@ -332,6 +423,7 @@ const MapWithMultipleCircles = ({
       mapInstance.setCenter(computedCenter);
       mapInstance.setZoom(defaultZoom);
     }
+    
     onLoadProp?.(mapInstance);
   }, [locationsToRender, locations, fitToLocations, computedCenter, defaultZoom, onLoadProp]);
 
@@ -349,7 +441,11 @@ const MapWithMultipleCircles = ({
   
   if (!isLoaded) return null;
 
+  // Determine if we should show points
   const showPoints = !enableGrid && !areaEnabled;
+  
+  // Show loading state while fetching polygons (if filter is enabled)
+  const isLoadingPolygons = enablePolygonFilter && !polygonsFetched && projectId;
 
   return (
     <div className="relative w-full h-full">
@@ -360,7 +456,7 @@ const MapWithMultipleCircles = ({
         center={computedCenter}
         zoom={defaultZoom}
       >
-        {/* Polygon boundaries - NO STROKE */}
+        {/* Polygon boundaries */}
         {showPolygonBoundary && polygonData.map(({ path }, idx) => (
           <PolygonF
             key={`polygon-${idx}`}
@@ -369,14 +465,14 @@ const MapWithMultipleCircles = ({
               fillColor: "transparent",
               fillOpacity: 0,
               strokeColor: "#2563eb",
-              strokeWeight: 0, // Zero stroke
-              strokeOpacity: 0,
+              strokeWeight: 2,
+              strokeOpacity: 0.8,
               zIndex: 1,
             }}
           />
         ))}
 
-        {/* Grid Cells - NO STROKE */}
+        {/* Grid Cells */}
         {enableGrid && gridCells.map((cell) => (
           <RectangleF
             key={`grid-${cell.id}`}
@@ -385,7 +481,7 @@ const MapWithMultipleCircles = ({
               fillColor: cell.fillColor,
               fillOpacity: cell.count > 0 ? 0.7 : 0.2,
               strokeColor: "transparent",
-              strokeWeight: 0, // Zero stroke
+              strokeWeight: 0,
               strokeOpacity: 0,
               zIndex: 2,
               clickable: true,
@@ -395,13 +491,13 @@ const MapWithMultipleCircles = ({
           />
         ))}
 
-        {/* Points with FIXED small radius */}
-        {showPoints && map && (
+        {/* Points - ONLY filtered locations inside polygon */}
+        {showPoints && map && locationsToRender.length > 0 && (
           <CanvasOverlay
             map={map}
             locations={locationsToRender}
             getColor={getLocationColor}
-            radius={pointRadius} // Fixed small radius, no zoom dependency
+            radius={pointRadius}
             opacity={opacity}
             selectedIndex={activeMarkerIndex}
             onClick={handleLocationClick}
@@ -410,6 +506,13 @@ const MapWithMultipleCircles = ({
 
         {children}
       </GoogleMap>
+
+      {/* Loading indicator for polygons */}
+      {isLoadingPolygons && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-20 text-sm">
+          <span className="animate-pulse">⏳ Loading polygon boundaries...</span>
+        </div>
+      )}
 
       {/* Grid Cell Tooltip */}
       {enableGrid && hoveredCell && (
@@ -433,23 +536,32 @@ const MapWithMultipleCircles = ({
       {/* Stats Badge */}
       {showStats && (
         <div className="absolute bottom-4 right-4 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs text-gray-600 z-10">
-          {enableGrid ? (
+          {isLoadingPolygons ? (
+            <span className="animate-pulse">⏳ Loading...</span>
+          ) : enableGrid ? (
             <span>🔲 {gridCells.filter(c => c.count > 0).length} cells with data</span>
           ) : (
-            <span>📍 {locationsToRender.length.toLocaleString()} points</span>
+            <div className="flex flex-col">
+              <span>📍 {locationsToRender.length.toLocaleString()} points inside polygon</span>
+              {enablePolygonFilter && locations.length !== locationsToRender.length && (
+                <span className="text-[10px] text-gray-400">
+                  ({locations.length - locationsToRender.length} filtered out)
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}
 
-      {/* Simplified Controls Panel */}
+      {/* Controls Panel */}
       {showControls && !enableGrid && (
-        <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 z-10 space-y-3">
-          {/* Opacity Control */}
-          {enableOpacityControl && (
-            <div>
+        <div className="absolute top-2 left-49 bg-white rounded-lg shadow-lg p-3 z-10 space-y-3">
+          {!dropButton ? (<div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-600 font-medium">Opacity</span>
+                <span className="text-xs text-gray-600 font-medium">Opacity </span>
                 <span className="text-xs font-semibold text-blue-600">{Math.round(opacity * 100)}%</span>
+                <button onClick={() => setDropButton(!dropButton)}> <X /> </button>
+
               </div>
               <input
                 type="range"
@@ -460,15 +572,13 @@ const MapWithMultipleCircles = ({
                 className="w-24 h-2 bg-gray-200 rounded-lg cursor-pointer accent-blue-600"
               />
             </div>
-          )}
+            
+          ):(<div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-600 font-medium">Opacity</span>
+            <button onClick={() => setDropButton(!dropButton)}> <ArrowDown /> </button>
+          </div>)}
           
-          {/* Point Info */}
-          <div className="border-t pt-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Point Size:</span>
-              <span className="font-medium">{pointRadius}px</span>
-            </div>
-          </div>
+          
         </div>
       )}
 
@@ -476,7 +586,6 @@ const MapWithMultipleCircles = ({
       {showControls && enableGrid && (
         <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 z-10 space-y-2 min-w-[140px]">
           <div className="text-xs font-semibold text-gray-700 mb-2">Grid Info</div>
-          
           <div className="text-xs space-y-1">
             <div className="flex justify-between">
               <span className="text-gray-500">Size:</span>
@@ -493,6 +602,8 @@ const MapWithMultipleCircles = ({
           </div>
         </div>
       )}
+
+     
     </div>
   );
 };
