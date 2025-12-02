@@ -396,13 +396,8 @@ const extractLogsFromResponse = (data) => {
   return [];
 };
 
-// ============================================
-// ZONE TOOLTIP COMPONENT
-// ============================================
-// ============================================
-// ZONE TOOLTIP COMPONENT (UPDATED)
-// ============================================
-const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
+
+const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCategory }) => {
   if (!polygon || !position) return null;
 
   const {
@@ -499,6 +494,37 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
     });
   }
 
+ 
+  const showProviders = !selectedCategory || selectedCategory === "provider";
+  const showBands = !selectedCategory || selectedCategory === "band";
+  const showTechnologies = !selectedCategory || selectedCategory === "technology";
+
+  // Get the category label for display
+  const getCategoryLabel = () => {
+    switch (selectedCategory) {
+      case "provider": return "Provider";
+      case "band": return "Band";
+      case "technology": return "Technology";
+      default: return "All Categories";
+    }
+  };
+
+  // Get best winner info based on selected category
+  const getBestWinner = () => {
+    switch (selectedCategory) {
+      case "provider":
+        return bestProvider ? { name: bestProvider, value: bestProviderValue, color: getProviderColor(bestProvider) } : null;
+      case "band":
+        return bestBand ? { name: `Band ${bestBand}`, value: bestBandValue, color: getBandColor(bestBand) } : null;
+      case "technology":
+        return bestTechnology ? { name: bestTechnology, value: bestTechnologyValue, color: getTechnologyColor(bestTechnology) } : null;
+      default:
+        return null;
+    }
+  };
+
+  const bestWinner = getBestWinner();
+
   // No data
   if (!pointCount || pointCount === 0) {
     return (
@@ -516,18 +542,16 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
     );
   }
 
-  const hasBestNetwork = !!polygon.bestProvider && providerBreakdown;
-
   return (
     <div
       className="fixed z-[1000] bg-white rounded-xl shadow-2xl border-2 overflow-hidden"
       style={{
-        left: Math.min(position.x + 15, window.innerWidth - 450),
-        top: Math.min(position.y - 10, window.innerHeight - 500),
+        left: Math.min(position.x + 15, window.innerWidth - 400),
+        top: Math.min(position.y - 10, window.innerHeight - 400),
         pointerEvents: "none",
         borderColor: fillColor || "#3B82F6",
-        minWidth: "400px",
-        maxWidth: "480px",
+        minWidth: "360px",
+        maxWidth: "420px",
       }}
     >
       {/* Header */}
@@ -535,19 +559,19 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
         className="px-4 py-3 flex items-center justify-between"
         style={{ backgroundColor: fillColor || "#3B82F6" }}
       >
+        
         <div className="flex items-center gap-2">
-          <span className="text-lg">📍</span>
-          <span className="font-bold text-white text-sm truncate max-w-[200px]">
-            {name || "Zone"}
+          <span className="text-xs text-white bg-white/20 px-2 py-0.5 rounded-full">
+            {getCategoryLabel()}
+          </span>
+          <span className="text-xs text-white bg-white/25 px-2.5 py-1 rounded-full font-medium">
+            {pointCount.toLocaleString()} samples
           </span>
         </div>
-        <span className="text-xs text-white bg-white/25 px-2.5 py-1 rounded-full font-medium">
-          {pointCount.toLocaleString()} samples
-        </span>
       </div>
 
       {/* Median Value Banner */}
-      {medianValue != null && (
+      {/* {medianValue != null && (
         <div className="bg-blue-50 px-4 py-2 border-b border-blue-200">
           <div className="flex items-center justify-between">
             <span className="text-xs text-blue-700 font-medium">
@@ -558,10 +582,29 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
             </span>
           </div>
         </div>
-      )}
+      )} */}
 
-      {/* Best Winners Summary */}
-      {(bestProvider || bestBand || bestTechnology) && (
+      {/* Best Winner for Selected Category */}
+      {/* {selectedCategory && bestWinner && (
+        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-2 border-b border-amber-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🏆</span>
+              <span className="text-xs text-amber-700 font-semibold">Best {getCategoryLabel()}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: bestWinner.color }} />
+              <span className="font-bold text-amber-800 text-sm">{bestWinner.name}</span>
+              <span className="text-xs text-amber-600">
+                ({bestWinner.value?.toFixed(1)} {unit})
+              </span>
+            </div>
+          </div>
+        </div>
+      )} */}
+
+      {/* Show all winners when no category selected */}
+      {!selectedCategory && (bestProvider || bestBand || bestTechnology) && (
         <div className="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-2 border-b border-amber-200">
           <div className="text-xs text-amber-700 font-semibold mb-1">🏆 Best by {selectedMetric.toUpperCase()}</div>
           <div className="grid grid-cols-3 gap-2 text-xs">
@@ -590,10 +633,10 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
         </div>
       )}
 
-      {/* Tabs for Provider/Band/Technology */}
+      {/* Data Tables - Show based on selectedCategory */}
       <div className="max-h-[280px] overflow-y-auto">
         {/* Providers Section */}
-        {providers.length > 0 && (
+        {showProviders && providers.length > 0 && (
           <div className="border-b">
             <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
               <span>📡</span> Providers
@@ -608,7 +651,7 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
                 </tr>
               </thead>
               <tbody>
-                {providers.slice(0, 5).map((item, index) => (
+                {providers.slice(0, selectedCategory === "provider" ? 10 : 5).map((item, index) => (
                   <tr
                     key={item.name}
                     className={`border-t border-gray-100 ${item.isWinner ? "bg-green-50" : index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
@@ -617,13 +660,13 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
                       <div className="flex items-center gap-1.5">
                         {item.isWinner && <span className="text-xs">🥇</span>}
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className={`text-xs ${item.isWinner ? "font-bold" : ""} truncate max-w-[80px]`}>
+                        <span className={`text-xs ${item.isWinner ? "font-bold" : ""} truncate max-w-[100px]`}>
                           {item.name}
                         </span>
                       </div>
                     </td>
                     <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.count}</td>
-                    <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.percentage}%</td>
+                    <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.percentage ?? "—"}%</td>
                     <td className="py-1.5 px-3 text-center">
                       <span className={`text-xs font-medium ${item.isWinner ? "text-green-600" : "text-gray-700"}`}>
                         {item.metricMedian?.toFixed(1) ?? "—"} {unit}
@@ -637,7 +680,7 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
         )}
 
         {/* Bands Section */}
-        {bands.length > 0 && (
+        {showBands && bands.length > 0 && (
           <div className="border-b">
             <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
               <span>📶</span> Bands
@@ -652,7 +695,7 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
                 </tr>
               </thead>
               <tbody>
-                {bands.slice(0, 5).map((item, index) => (
+                {bands.slice(0, selectedCategory === "band" ? 10 : 5).map((item, index) => (
                   <tr
                     key={item.name}
                     className={`border-t border-gray-100 ${item.isWinner ? "bg-green-50" : index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
@@ -681,7 +724,7 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
         )}
 
         {/* Technologies Section */}
-        {technologies.length > 0 && (
+        {showTechnologies && technologies.length > 0 && (
           <div>
             <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
               <span>🌐</span> Technologies
@@ -696,7 +739,7 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
                 </tr>
               </thead>
               <tbody>
-                {technologies.slice(0, 5).map((item, index) => (
+                {technologies.slice(0, selectedCategory === "technology" ? 10 : 5).map((item, index) => (
                   <tr
                     key={item.name}
                     className={`border-t border-gray-100 ${item.isWinner ? "bg-green-50" : index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
@@ -705,7 +748,7 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
                       <div className="flex items-center gap-1.5">
                         {item.isWinner && <span className="text-xs">🥇</span>}
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className={`text-xs ${item.isWinner ? "font-bold" : ""} truncate max-w-[80px]`}>
+                        <span className={`text-xs ${item.isWinner ? "font-bold" : ""} truncate max-w-[100px]`}>
                           {item.name}
                         </span>
                       </div>
@@ -723,14 +766,25 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric }) => {
             </table>
           </div>
         )}
+
+        {/* No data message for selected category */}
+        {selectedCategory === "provider" && providers.length === 0 && (
+          <div className="p-4 text-center text-gray-500 text-sm">No provider data available</div>
+        )}
+        {selectedCategory === "band" && bands.length === 0 && (
+          <div className="p-4 text-center text-gray-500 text-sm">No band data available</div>
+        )}
+        {selectedCategory === "technology" && technologies.length === 0 && (
+          <div className="p-4 text-center text-gray-500 text-sm">No technology data available</div>
+        )}
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 bg-gray-100 border-t">
+      {/* <div className="px-4 py-2 bg-gray-100 border-t">
         <div className="text-[10px] text-gray-500 text-center">
           Ranked by {selectedMetric.toUpperCase()} • {config.higherIsBetter ? "Higher is better" : "Lower is better"}
         </div>
-      </div>
+      </div> */}
     </div>
   );
 });
@@ -1682,7 +1736,7 @@ const UnifiedMapView = () => {
       </div>
 
       {hoveredPolygon && hoverPosition && (
-        <ZoneTooltip polygon={hoveredPolygon} position={hoverPosition} selectedMetric={selectedMetric} />
+        <ZoneTooltip polygon={hoveredPolygon} position={hoverPosition} selectedMetric={selectedMetric} selectedCategory={colorBy}/>
       )}
     </div>
   );
