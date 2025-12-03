@@ -383,6 +383,10 @@ const parseLogEntry = (log, sessionId) => {
     band: String(log.band ?? log.Band ?? "").trim(),
     pci: parseInt(log.pci ?? log.PCI ?? log.Pci) || null,
     session_id: sessionId,
+    nodeb_id:log.nodeb_id,
+    latency: parseFloat(log.latency ?? log.Latency ?? log.Lat) || null,
+    jitter: parseFloat(log.jitter ?? log.Jitter ?? log.Jit) || null,
+    speed: parseFloat(log.speed ?? log.Speed ?? log.Sp) || null,
   };
 };
 
@@ -896,6 +900,9 @@ const UnifiedMapView = () => {
   const [gridSizeMeters, setGridSizeMeters] = useState(20);
 
   const [appSummary, setAppSummary] = useState({});
+  const [InpSummary, setInpSummary] = useState({});
+const [tptVolume, setTptVolume] = useState({});
+
   const [logArea, setLogArea] = useState(null);
 
   const mapRef = useRef(null);
@@ -965,57 +972,104 @@ const UnifiedMapView = () => {
   }, []);
 
   // Fetch functions
-  const fetchSampleData = useCallback(async () => {
-    if (!sessionIds.length) {
-      toast.warn("No session IDs provided");
-      setLocations([]);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
+const fetchSampleData = useCallback(async () => {
+  if (!sessionIds.length) {
+    toast.warn("No session IDs provided");
     setLocations([]);
+    return;
+  }
 
-    const accumulatedLogs = [];
+  setLoading(true);
+  setError(null);
+  setLocations([]);
 
-    try {
-      const startTime = performance.now();
+  // ✅ Use local variables to accumulate
+  const accumulatedLogs = [];
+  const accumulatedAppSummary = {};
+  const accumulatedIoSummary = {};
+  let accumulatedTptVolume = { dl_kb: 0, ul_kb: 0 };
 
-      for (let i = 0; i < sessionIds.length; i++) {
-        const sessionId = sessionIds[i];
+  try {
+    const startTime = performance.now();
 
-        try {
-          const response = await mapViewApi.getNetworkLog({ session_id: sessionId });
-          const sessionLogs = extractLogsFromResponse(response);
+    for (let i = 0; i < sessionIds.length; i++) {
+      const sessionId = sessionIds[i];
 
-          sessionLogs.forEach((log) => {
-            const parsed = parseLogEntry(log, sessionId);
-            if (parsed) accumulatedLogs.push(parsed);
-          });
+      try {
+        const response = await mapViewApi.getNetworkLog({ session_id: sessionId });
 
-          setLocations([...accumulatedLogs]);
-        } catch (err) {
-          console.error(`Session ${sessionId} failed:`, err.message);
+        console.log("Response for session:", sessionId, response);
+
+        const appData = response?.data?.app_summary || response?.app_summary || {};
+        const ioData = response?.data?.io_summary || response?.io_summary || {};
+        const tptData = response?.data?.tpt_volume || response?.tpt_volume || {};
+
+        // ✅ KEY FIX: Store with sessionId as the key
+        if (Object.keys(appData).length > 0) {
+          accumulatedAppSummary[sessionId] = appData;
+        }
+        
+        if (Object.keys(ioData).length > 0) {
+          accumulatedIoSummary[sessionId] = ioData;
         }
 
-        if (i < sessionIds.length - 1) await delay(100);
+        // Accumulate TPT volume
+        accumulatedTptVolume = {
+          dl_kb: accumulatedTptVolume.dl_kb + (tptData.dl_kb || 0),
+          ul_kb: accumulatedTptVolume.ul_kb + (tptData.ul_kb || 0)
+        };
+
+        // Extract logs
+        const sessionLogs = extractLogsFromResponse(response.data || response);
+        sessionLogs.forEach((log) => {
+          const parsed = parseLogEntry(log, sessionId);
+          if (parsed) accumulatedLogs.push(parsed);
+        });
+
+      } catch (err) {
+        console.error(`Session ${sessionId} failed:`, err.message);
       }
 
-      const fetchTime = ((performance.now() - startTime) / 1000).toFixed(2);
-
-      if (accumulatedLogs.length > 0) {
-        toast.success(`✅ ${accumulatedLogs.length} points loaded in ${fetchTime}s`);
-      } else {
-        toast.warn("No valid log data found");
-      }
-    } catch (err) {
-      console.error("Critical error:", err);
-      toast.error(err.message);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      if (i < sessionIds.length - 1) await delay(100);
     }
-  }, [sessionIds]);
+
+    // ✅ Set all states at once after loop completes
+    console.log("Final accumulatedAppSummary:", accumulatedAppSummary);
+    
+    setAppSummary(accumulatedAppSummary);
+    setInpSummary(accumulatedIoSummary);
+    setTptVolume(accumulatedTptVolume);
+    setLocations(accumulatedLogs);
+
+    const fetchTime = ((performance.now() - startTime) / 1000).toFixed(2);
+
+    if (accumulatedLogs.length > 0) {
+      toast.success(`✅ ${accumulatedLogs.length} points loaded in ${fetchTime}s`);
+    } else {
+      toast.warn("No valid log data found");
+    }
+
+  } catch (err) {
+    console.error("Critical error:", err);
+    toast.error(err.message);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+}, [sessionIds]);
+
+  // Add this useEffect to debug/verify state updates
+useEffect(() => {
+  console.log("appSummary updated:", appSummary);
+}, [appSummary]);
+
+useEffect(() => {
+  console.log("inpSummary updated:", InpSummary);
+}, [InpSummary]);
+
+useEffect(() => {
+  console.log("tptVolume updated:", tptVolume);
+}, [tptVolume]);
 
   const fetchPredictionData = useCallback(async () => {
     if (!projectId) {
@@ -1422,7 +1476,7 @@ const UnifiedMapView = () => {
   }, [showPolygons, polygonsWithColors, viewport]);
 
   const mapCenter = useMemo(() => {
-    if (!locations.length) return DEFAULT_CENTER;
+    // if (!locations.length) return DEFAULT_CENTER;
     const sum = locations.reduce((acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }), { lat: 0, lng: 0 });
     return { lat: sum.lat / locations.length, lng: sum.lng / locations.length };
   }, [locations]);
@@ -1531,6 +1585,8 @@ const UnifiedMapView = () => {
           isLoading={isLoading}
           thresholds={effectiveThresholds}
           appSummary={appSummary}
+          InpSummary={InpSummary}
+          tptVolume={tptVolume}
           logArea={logArea}
           dataFilters={dataFilters}
           bestNetworkEnabled={bestNetworkEnabled}

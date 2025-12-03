@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { SignalTab } from "./tabs/SignalTab";
 import { NetworkTab } from "./tabs/NetworkTab";
-import { PerformanceTab } from "./tabs/PerformanceTab";
+// import { PerformanceTab } from "./tabs/PerformanceTab";
 import { ApplicationTab } from "./tabs/ApplicationTab";
 
 // Common
@@ -43,6 +43,9 @@ export default function UnifiedDetailLogs({
   thresholds,
   logArea,
   onClose,
+  tptVolume,
+  InpSummary,
+  
   
   // Filter props
   dataFilters = DEFAULT_DATA_FILTERS,
@@ -137,21 +140,25 @@ export default function UnifiedDetailLogs({
         setFilteredLocations(filtered);
         onFilteredDataChange?.(filtered);
       } else {
-        // No filters active - use original locations
+        
         setFilteredLocations(locations);
         onFilteredDataChange?.(locations);
       }
     };
 
     applyFilters();
-  }, [dataFilters, hasActiveFilters]); // Only re-run when filters change
+  }, [dataFilters, hasActiveFilters]); 
 
-  // Update filtered locations when original locations change (but no filters)
+  
   useEffect(() => {
     if (!hasActiveFilters) {
       setFilteredLocations(locations);
     }
   }, [locations, hasActiveFilters]);
+
+  useEffect(() => {
+    console.log(appSummary,"In detail logs getting appSummary")
+  }, [locations]);
 
   // Fetch duration
   const fetchDuration = async () => {
@@ -166,7 +173,7 @@ export default function UnifiedDetailLogs({
     { revalidateOnFocus: false, shouldRetryOnError: false }
   );
 
-  // Computed values - use filteredLocations
+ 
   const stats = useMemo(
     () => calculateStats(filteredLocations, selectedMetric),
     [filteredLocations, selectedMetric]
@@ -416,13 +423,13 @@ export default function UnifiedDetailLogs({
           />
         )}
 
-        {activeTab === "performance" && filteredLocations.length > 0 && (
+        {/* {activeTab === "performance" && filteredLocations.length > 0 && (
           <PerformanceTab
             locations={filteredLocations}
             expanded={expanded}
             chartRefs={chartRefs}
           />
-        )}
+        )} */}
 
         {activeTab === "Application" && (
           <ApplicationTab

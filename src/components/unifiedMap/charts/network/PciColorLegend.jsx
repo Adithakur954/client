@@ -299,7 +299,7 @@ const PCIColorMapCard = ({ item }) => (
     {item.nodebIds?.length > 0 && (
       <div className="flex items-center gap-1">
         <span className="text-[9px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
-          {item.nodebIds.length} Cell{item.nodebIds.length > 1 ? 's' : ''}
+          {item.nodebIds} Cell{item.nodebIds.length > 1 ? 's' : ''}
         </span>
       </div>
     )}

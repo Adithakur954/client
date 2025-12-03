@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo,useEffect } from "react";
 import { Activity, BarChart3, Signal, TrendingUp, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
   BarChart,
@@ -231,6 +231,8 @@ export const ApplicationTab = ({
 
     const appAggregates = {};
 
+    console.log(appSummary,"while creating in appa greation")
+
     Object.entries(appSummary).forEach(([sessionId, apps]) => {
       if (!apps || typeof apps !== 'object') return;
       
@@ -325,6 +327,11 @@ export const ApplicationTab = ({
       avgPacketLoss: calculateAverage(app.packetLossValues),
     }));
   }, [appSummary]);
+
+
+  useEffect(() => { 
+    console.log(aggregatedAppData, "Aggregated App Data in ApplicationTab");
+  }, [aggregatedAppData]);
 
   // Get unique categories
   const categories = useMemo(() => {
@@ -430,28 +437,7 @@ export const ApplicationTab = ({
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-5 gap-2">
-        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
-          <div className="text-xs text-slate-400">Total Apps</div>
-          <div className="text-xl font-bold text-blue-400">{summaryStats.totalApps}</div>
-        </div>
-        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
-          <div className="text-xs text-slate-400">Total Samples</div>
-          <div className="text-xl font-bold text-green-400">{summaryStats.totalSamples.toLocaleString()}</div>
-        </div>
-        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
-          <div className="text-xs text-slate-400">Total Duration</div>
-          <div className="text-lg font-bold text-purple-400 font-mono">{summaryStats.totalDuration}</div>
-        </div>
-        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
-          <div className="text-xs text-slate-400">Avg MOS</div>
-          <div className="text-xl font-bold text-yellow-400">{summaryStats.avgMos}</div>
-        </div>
-        <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700">
-          <div className="text-xs text-slate-400">Avg DL</div>
-          <div className="text-xl font-bold text-cyan-400">{summaryStats.avgDl} Mbps</div>
-        </div>
-      </div>
+     
 
       {/* Sub-Tab Navigation */}
       <div className="flex gap-2 bg-slate-800 p-2 rounded-lg">
