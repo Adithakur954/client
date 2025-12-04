@@ -107,22 +107,46 @@ const TECHNOLOGY_COLORS = {
 // METRIC CONFIGURATION & COLOR HELPERS
 // ============================================
 const METRIC_CONFIG = {
-  rsrp: { higherIsBetter: true, unit: "dBm", label: "RSRP", min: -140, max: -44 },
+  rsrp: {
+    higherIsBetter: true,
+    unit: "dBm",
+    label: "RSRP",
+    min: -140,
+    max: -44,
+  },
   rsrq: { higherIsBetter: true, unit: "dB", label: "RSRQ", min: -20, max: -3 },
   sinr: { higherIsBetter: true, unit: "dB", label: "SINR", min: -10, max: 30 },
-  dl_tpt: { higherIsBetter: true, unit: "Mbps", label: "DL Throughput", min: 0, max: 300 },
-  ul_tpt: { higherIsBetter: true, unit: "Mbps", label: "UL Throughput", min: 0, max: 100 },
+  dl_tpt: {
+    higherIsBetter: true,
+    unit: "Mbps",
+    label: "DL Throughput",
+    min: 0,
+    max: 300,
+  },
+  ul_tpt: {
+    higherIsBetter: true,
+    unit: "Mbps",
+    label: "UL Throughput",
+    min: 0,
+    max: 100,
+  },
   mos: { higherIsBetter: true, unit: "", label: "MOS", min: 1, max: 5 },
-  lte_bler: { higherIsBetter: false, unit: "%", label: "BLER", min: 0, max: 100 },
+  lte_bler: {
+    higherIsBetter: false,
+    unit: "%",
+    label: "BLER",
+    min: 0,
+    max: 100,
+  },
 };
 
 // Color gradient (normalized 0-1, higher = better after inversion for BLER)
 const COLOR_GRADIENT = [
-  { min: 0.8, color: "#22C55E" },   // Excellent - Green
-  { min: 0.6, color: "#84CC16" },   // Good - Lime  
-  { min: 0.4, color: "#EAB308" },   // Fair - Yellow
-  { min: 0.2, color: "#F97316" },   // Poor - Orange
-  { min: 0.0, color: "#EF4444" },   // Bad - Red
+  { min: 0.8, color: "#22C55E" }, // Excellent - Green
+  { min: 0.6, color: "#84CC16" }, // Good - Lime
+  { min: 0.4, color: "#EAB308" }, // Fair - Yellow
+  { min: 0.2, color: "#F97316" }, // Poor - Orange
+  { min: 0.0, color: "#EF4444" }, // Bad - Red
 ];
 
 const normalizeMetricValue = (value, metric) => {
@@ -154,16 +178,18 @@ const getColorFromNormalizedValue = (normalizedValue) => {
 const getBandColor = (band) => {
   if (!band) return "#6B7280";
   if (BAND_COLORS[band]) return BAND_COLORS[band];
-  
+
   const bandStr = String(band).trim();
   if (BAND_COLORS[bandStr]) return BAND_COLORS[bandStr];
   if (BAND_COLORS[`n${bandStr}`]) return BAND_COLORS[`n${bandStr}`];
-  
-  const bandNum = parseInt(bandStr.replace(/[^0-9]/g, ''));
+
+  const bandNum = parseInt(bandStr.replace(/[^0-9]/g, ""));
   if (!isNaN(bandNum) && BAND_COLORS[bandNum]) return BAND_COLORS[bandNum];
-  
+
   // Generate consistent color
-  const hash = bandStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hash = bandStr
+    .split("")
+    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const hue = hash % 360;
   return `hsl(${hue}, 70%, 50%)`;
 };
@@ -171,17 +197,29 @@ const getBandColor = (band) => {
 const getTechnologyColor = (technology) => {
   if (!technology) return "#6B7280";
   if (TECHNOLOGY_COLORS[technology]) return TECHNOLOGY_COLORS[technology];
-  
+
   const techStr = String(technology).trim().toUpperCase();
-  
-  if (techStr.includes('5G') || techStr.includes('NR')) {
-    if (techStr.includes('SA') && !techStr.includes('NSA')) return "#D946EF";
+
+  if (techStr.includes("5G") || techStr.includes("NR")) {
+    if (techStr.includes("SA") && !techStr.includes("NSA")) return "#D946EF";
     return "#EC4899";
   }
-  if (techStr.includes('LTE') || techStr.includes('4G')) return "#8B5CF6";
-  if (techStr.includes('HSPA') || techStr.includes('WCDMA') || techStr.includes('3G') || techStr.includes('UMTS')) return "#22C55E";
-  if (techStr.includes('GSM') || techStr.includes('EDGE') || techStr.includes('2G') || techStr.includes('GPRS')) return "#6B7280";
-  
+  if (techStr.includes("LTE") || techStr.includes("4G")) return "#8B5CF6";
+  if (
+    techStr.includes("HSPA") ||
+    techStr.includes("WCDMA") ||
+    techStr.includes("3G") ||
+    techStr.includes("UMTS")
+  )
+    return "#22C55E";
+  if (
+    techStr.includes("GSM") ||
+    techStr.includes("EDGE") ||
+    techStr.includes("2G") ||
+    techStr.includes("GPRS")
+  )
+    return "#6B7280";
+
   return "#F59E0B";
 };
 
@@ -190,16 +228,33 @@ const getColorForMetricValue = (value, metric) => {
   return getColorFromNormalizedValue(normalized);
 };
 
-// Try thresholds first, fall back to normalized
 const getColorFromValueOrMetric = (value, thresholds, metric) => {
   if (value == null || isNaN(value)) return "#999999";
-  
+
   // Try thresholds first
   if (thresholds?.length > 0) {
-    const threshold = thresholds.find((t) => value >= t.min && value <= t.max);
+    // Find threshold where value falls within range
+    const threshold = thresholds.find((t) => {
+      const min = parseFloat(t.min);
+      const max = parseFloat(t.max);
+      // Handle inclusive ranges properly
+      return value >= min && value <= max;
+    });
+
     if (threshold?.color) {
       return threshold.color;
     }
+
+    // If no exact match, find closest range
+    const sorted = [...thresholds].sort((a, b) => a.min - b.min);
+    for (let i = 0; i < sorted.length; i++) {
+      if (value <= sorted[i].max) {
+        return sorted[i].color;
+      }
+    }
+
+    // Return last threshold color if value exceeds all ranges
+    return sorted[sorted.length - 1]?.color || "#999999";
   }
 
   // Fall back to metric-based color
@@ -223,13 +278,13 @@ const getThresholdKey = (metric) => {
 const getProviderColor = (provider) => {
   if (!provider) return "#6B7280";
   if (PROVIDER_COLORS[provider]) return PROVIDER_COLORS[provider];
-  
+
   const lower = provider.toLowerCase();
-  if (lower.includes('jio')) return "#3B82F6";
-  if (lower.includes('airtel')) return "#EF4444";
-  if (lower.includes('vi') || lower.includes('vodafone')) return "#22C55E";
-  if (lower.includes('bsnl')) return "#F59E0B";
-  
+  if (lower.includes("jio")) return "#3B82F6";
+  if (lower.includes("airtel")) return "#EF4444";
+  if (lower.includes("vi") || lower.includes("vodafone")) return "#22C55E";
+  if (lower.includes("bsnl")) return "#F59E0B";
+
   return "#6B7280";
 };
 
@@ -310,9 +365,9 @@ const isPointInPolygon = (point, polygon) => {
 
 const calculateMedian = (values) => {
   if (!values?.length) return null;
-  const validValues = values.filter(v => v != null && !isNaN(v));
+  const validValues = values.filter((v) => v != null && !isNaN(v));
   if (!validValues.length) return null;
-  
+
   const sorted = [...validValues].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
@@ -334,28 +389,42 @@ const calculateCategoryStats = (points, category, metric) => {
     .map(([name, { count, values }]) => {
       const sortedValues = [...values].sort((a, b) => a - b);
       const mid = Math.floor(sortedValues.length / 2);
-      const medianValue = sortedValues.length > 0
-        ? (sortedValues.length % 2 ? sortedValues[mid] : (sortedValues[mid - 1] + sortedValues[mid]) / 2)
-        : null;
+      const medianValue =
+        sortedValues.length > 0
+          ? sortedValues.length % 2
+            ? sortedValues[mid]
+            : (sortedValues[mid - 1] + sortedValues[mid]) / 2
+          : null;
 
       return {
         name,
         count,
         percentage: ((count / points.length) * 100).toFixed(1),
-        avgValue: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null,
+        avgValue: values.length
+          ? values.reduce((a, b) => a + b, 0) / values.length
+          : null,
         medianValue,
         minValue: values.length ? Math.min(...values) : null,
         maxValue: values.length ? Math.max(...values) : null,
       };
     })
-    .sort((a, b) => b.count - a.count); // Sort by count (dominant first)
+    .sort((a, b) => b.count - a.count); 
 
   return { stats, dominant: stats[0], total: points.length };
 };
 
 const parseLogEntry = (log, sessionId) => {
-  const latValue = log.lat ?? log.Lat ?? log.latitude ?? log.Latitude ?? log.LAT;
-  const lngValue = log.lon ?? log.lng ?? log.Lng ?? log.longitude ?? log.Longitude ?? log.LON ?? log.long ?? log.Long;
+  const latValue =
+    log.lat ?? log.Lat ?? log.latitude ?? log.Latitude ?? log.LAT;
+  const lngValue =
+    log.lon ??
+    log.lng ??
+    log.Lng ??
+    log.longitude ??
+    log.Longitude ??
+    log.LON ??
+    log.long ??
+    log.Long;
 
   const lat = parseFloat(latValue);
   const lng = parseFloat(lngValue);
@@ -370,23 +439,35 @@ const parseLogEntry = (log, sessionId) => {
     latitude: lat,
     longitude: lng,
     radius: 18,
-    timestamp: log.timestamp ?? log.time ?? log.created_at ?? log.Timestamp ?? log.Time,
+    timestamp:
+      log.timestamp ?? log.time ?? log.created_at ?? log.Timestamp ?? log.Time,
     rsrp: parseFloat(log.rsrp ?? log.RSRP ?? log.rsrp_dbm ?? log.Rsrp) || null,
     rsrq: parseFloat(log.rsrq ?? log.RSRQ ?? log.Rsrq) || null,
     sinr: parseFloat(log.sinr ?? log.SINR ?? log.Sinr) || null,
-    dl_tpt: parseFloat(log.dl_tpt ?? log.dl_thpt ?? log.DL ?? log.dl_throughput ?? log.DlThpt) || null,
-    ul_tpt: parseFloat(log.ul_tpt ?? log.ul_thpt ?? log.UL ?? log.ul_throughput ?? log.UlThpt) || null,
+    dl_tpt:
+      parseFloat(
+        log.dl_tpt ?? log.dl_thpt ?? log.DL ?? log.dl_throughput ?? log.DlThpt
+      ) || null,
+    ul_tpt:
+      parseFloat(
+        log.ul_tpt ?? log.ul_thpt ?? log.UL ?? log.ul_throughput ?? log.UlThpt
+      ) || null,
     mos: parseFloat(log.mos ?? log.MOS ?? log.Mos) || null,
     lte_bler: parseFloat(log.lte_bler ?? log.LTE_BLER ?? log.LteBler) || null,
-    provider: String(log.provider ?? log.Provider ?? log.operator ?? log.Operator ?? "").trim(),
-    technology: String(log.network ?? log.technology ?? log.Network ?? log.Technology ?? "").trim(),
+    provider: String(
+      log.provider ?? log.Provider ?? log.operator ?? log.Operator ?? ""
+    ).trim(),
+    technology: String(
+      log.network ?? log.technology ?? log.Network ?? log.Technology ?? ""
+    ).trim(),
     band: String(log.band ?? log.Band ?? "").trim(),
     pci: parseInt(log.pci ?? log.PCI ?? log.Pci) || null,
     session_id: sessionId,
-    nodeb_id:log.nodeb_id,
+    nodeb_id: log.nodeb_id,
     latency: parseFloat(log.latency ?? log.Latency ?? log.Lat) || null,
     jitter: parseFloat(log.jitter ?? log.Jitter ?? log.Jit) || null,
     speed: parseFloat(log.speed ?? log.Speed ?? log.Sp) || null,
+    cell_id: parseFloat(log.cell_id ?? log.CellId ?? log.Cell_ID ?? log.Cell_Id) || null,
   };
 };
 
@@ -395,222 +476,216 @@ const extractLogsFromResponse = (data) => {
   if (data?.data && Array.isArray(data.data)) return data.data;
   if (data?.Data && Array.isArray(data.Data)) return data.Data;
   if (data?.logs && Array.isArray(data.logs)) return data.logs;
-  if (data?.networkLogs && Array.isArray(data.networkLogs)) return data.networkLogs;
+  if (data?.networkLogs && Array.isArray(data.networkLogs))
+    return data.networkLogs;
   if (data?.result && Array.isArray(data.result)) return data.result;
   return [];
 };
 
+const ZoneTooltip = React.memo(
+  ({ polygon, position, selectedMetric, selectedCategory }) => {
+    if (!selectedCategory) return null;
+    if (!polygon || !position) return null;
 
-const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCategory }) => {
-  if (!polygon || !position) return null;
+    const {
+      name,
+      pointCount,
+      fillColor,
+      bestProvider,
+      bestProviderValue,
+      bestBand,
+      bestBandValue,
+      bestTechnology,
+      bestTechnologyValue,
+      bestScore,
+      providerBreakdown,
+      categoryStats,
+      medianValue,
+    } = polygon;
 
-  const {
-    name,
-    pointCount,
-    fillColor,
-    bestProvider,
-    bestProviderValue,
-    bestBand,
-    bestBandValue,
-    bestTechnology,
-    bestTechnologyValue,
-    bestScore,
-    providerBreakdown,
-    categoryStats,
-    medianValue,
-  } = polygon;
+    const config = METRIC_CONFIG[selectedMetric] || {
+      unit: "",
+      higherIsBetter: true,
+    };
+    const unit = config.unit || "";
 
-  const config = METRIC_CONFIG[selectedMetric] || { unit: "", higherIsBetter: true };
-  const unit = config.unit || "";
+    let providers = [];
 
-  // Get provider data from either source
-  let providers = [];
+    if (providerBreakdown && Object.keys(providerBreakdown).length > 0) {
+      // Best Network mode
+      providers = Object.entries(providerBreakdown)
+        .filter(([_, data]) => data && data.count > 0)
+        .map(([providerName, data]) => ({
+          name: providerName,
+          count: data.count,
+          color: data.color || getProviderColor(providerName),
+          medianScore: data.medianScore,
+          metricMedian: data.metrics?.[selectedMetric]?.median,
+          isWinner: providerName === bestProvider,
+        }))
+        .sort(
+          (a, b) => (b.medianScore ?? -Infinity) - (a.medianScore ?? -Infinity)
+        );
+    } else if (categoryStats?.provider?.stats?.length > 0) {
+      // Area mode
+      providers = categoryStats.provider.stats.map((stat) => ({
+        name: stat.name,
+        count: stat.count,
+        percentage: stat.percentage,
+        color: getProviderColor(stat.name),
+        avgValue: stat.avgValue,
+        medianValue: stat.medianValue,
+        metricMedian: stat.medianValue ?? stat.avgValue,
+        isWinner: stat.name === bestProvider,
+      }));
 
-  if (providerBreakdown && Object.keys(providerBreakdown).length > 0) {
-    // Best Network mode
-    providers = Object.entries(providerBreakdown)
-      .filter(([_, data]) => data && data.count > 0)
-      .map(([providerName, data]) => ({
-        name: providerName,
-        count: data.count,
-        color: data.color || getProviderColor(providerName),
-        medianScore: data.medianScore,
-        metricMedian: data.metrics?.[selectedMetric]?.median,
-        isWinner: providerName === bestProvider,
-      }))
-      .sort((a, b) => (b.medianScore ?? -Infinity) - (a.medianScore ?? -Infinity));
-  } else if (categoryStats?.provider?.stats?.length > 0) {
-    // Area mode
-    providers = categoryStats.provider.stats.map((stat) => ({
-      name: stat.name,
-      count: stat.count,
-      percentage: stat.percentage,
-      color: getProviderColor(stat.name),
-      avgValue: stat.avgValue,
-      medianValue: stat.medianValue,
-      metricMedian: stat.medianValue ?? stat.avgValue,
-      isWinner: stat.name === bestProvider,
-    }));
-    
-    // Sort by metric value (best first)
-    providers.sort((a, b) => {
-      const aVal = a.metricMedian ?? -Infinity;
-      const bVal = b.metricMedian ?? -Infinity;
-      return config.higherIsBetter ? bVal - aVal : aVal - bVal;
-    });
-  }
-
-  // Get bands data
-  let bands = [];
-  if (categoryStats?.band?.stats?.length > 0) {
-    bands = categoryStats.band.stats.map((stat) => ({
-      name: stat.name,
-      count: stat.count,
-      percentage: stat.percentage,
-      color: getBandColor(stat.name),
-      metricMedian: stat.medianValue ?? stat.avgValue,
-      isWinner: stat.name === bestBand,
-    }));
-    
-    bands.sort((a, b) => {
-      const aVal = a.metricMedian ?? -Infinity;
-      const bVal = b.metricMedian ?? -Infinity;
-      return config.higherIsBetter ? bVal - aVal : aVal - bVal;
-    });
-  }
-
-  // Get technology data
-  let technologies = [];
-  if (categoryStats?.technology?.stats?.length > 0) {
-    technologies = categoryStats.technology.stats.map((stat) => ({
-      name: stat.name,
-      count: stat.count,
-      percentage: stat.percentage,
-      color: getTechnologyColor(stat.name),
-      metricMedian: stat.medianValue ?? stat.avgValue,
-      isWinner: stat.name === bestTechnology,
-    }));
-    
-    technologies.sort((a, b) => {
-      const aVal = a.metricMedian ?? -Infinity;
-      const bVal = b.metricMedian ?? -Infinity;
-      return config.higherIsBetter ? bVal - aVal : aVal - bVal;
-    });
-  }
-
- 
-  const showProviders = !selectedCategory || selectedCategory === "provider";
-  const showBands = !selectedCategory || selectedCategory === "band";
-  const showTechnologies = !selectedCategory || selectedCategory === "technology";
-
-  // Get the category label for display
-  const getCategoryLabel = () => {
-    switch (selectedCategory) {
-      case "provider": return "Provider";
-      case "band": return "Band";
-      case "technology": return "Technology";
-      default: return "All Categories";
+      // Sort by metric value (best first)
+      providers.sort((a, b) => {
+        const aVal = a.metricMedian ?? -Infinity;
+        const bVal = b.metricMedian ?? -Infinity;
+        return config.higherIsBetter ? bVal - aVal : aVal - bVal;
+      });
     }
-  };
 
-  // Get best winner info based on selected category
-  const getBestWinner = () => {
-    switch (selectedCategory) {
-      case "provider":
-        return bestProvider ? { name: bestProvider, value: bestProviderValue, color: getProviderColor(bestProvider) } : null;
-      case "band":
-        return bestBand ? { name: `Band ${bestBand}`, value: bestBandValue, color: getBandColor(bestBand) } : null;
-      case "technology":
-        return bestTechnology ? { name: bestTechnology, value: bestTechnologyValue, color: getTechnologyColor(bestTechnology) } : null;
-      default:
-        return null;
+    // Get bands data
+    let bands = [];
+    if (categoryStats?.band?.stats?.length > 0) {
+      bands = categoryStats.band.stats.map((stat) => ({
+        name: stat.name,
+        count: stat.count,
+        percentage: stat.percentage,
+        color: getBandColor(stat.name),
+        metricMedian: stat.medianValue ?? stat.avgValue,
+        isWinner: stat.name === bestBand,
+      }));
+
+      bands.sort((a, b) => {
+        const aVal = a.metricMedian ?? -Infinity;
+        const bVal = b.metricMedian ?? -Infinity;
+        return config.higherIsBetter ? bVal - aVal : aVal - bVal;
+      });
     }
-  };
 
-  const bestWinner = getBestWinner();
+    // Get technology data
+    let technologies = [];
+    if (categoryStats?.technology?.stats?.length > 0) {
+      technologies = categoryStats.technology.stats.map((stat) => ({
+        name: stat.name,
+        count: stat.count,
+        percentage: stat.percentage,
+        color: getTechnologyColor(stat.name),
+        metricMedian: stat.medianValue ?? stat.avgValue,
+        isWinner: stat.name === bestTechnology,
+      }));
 
-  // No data
-  if (!pointCount || pointCount === 0) {
+      technologies.sort((a, b) => {
+        const aVal = a.metricMedian ?? -Infinity;
+        const bVal = b.metricMedian ?? -Infinity;
+        return config.higherIsBetter ? bVal - aVal : aVal - bVal;
+      });
+    }
+
+    const showProviders = !selectedCategory || selectedCategory === "provider";
+    const showBands = !selectedCategory || selectedCategory === "band";
+    const showTechnologies =
+      !selectedCategory || selectedCategory === "technology";
+
+    // Get the category label for display
+    const getCategoryLabel = () => {
+      switch (selectedCategory) {
+        case "provider":
+          return "Provider";
+        case "band":
+          return "Band";
+        case "technology":
+          return "Technology";
+        default:
+          return "All Categories";
+      }
+    };
+
+    const getBestWinner = () => {
+      switch (selectedCategory) {
+        case "provider":
+          return bestProvider
+            ? {
+                name: bestProvider,
+                value: bestProviderValue,
+                color: getProviderColor(bestProvider),
+              }
+            : null;
+        case "band":
+          return bestBand
+            ? {
+                name: `Band ${bestBand}`,
+                value: bestBandValue,
+                color: getBandColor(bestBand),
+              }
+            : null;
+        case "technology":
+          return bestTechnology
+            ? {
+                name: bestTechnology,
+                value: bestTechnologyValue,
+                color: getTechnologyColor(bestTechnology),
+              }
+            : null;
+        default:
+          return null;
+      }
+    };
+
+    const bestWinner = getBestWinner();
+
+    // No data
+    if (!pointCount || pointCount === 0) {
+      return (
+        <div
+          className="fixed z-[1000] bg-white rounded-lg shadow-xl border border-gray-300 p-4"
+          style={{
+            left: Math.min(position.x + 15, window.innerWidth - 220),
+            top: Math.min(position.y - 10, window.innerHeight - 100),
+            pointerEvents: "none",
+          }}
+        >
+          <div className="font-semibold text-gray-800 mb-1">
+            {name || "Zone"}
+          </div>
+          <div className="text-sm text-gray-500">No data available</div>
+        </div>
+      );
+    }
+
     return (
       <div
-        className="fixed z-[1000] bg-white rounded-lg shadow-xl border border-gray-300 p-4"
+        className="fixed z-[1000] bg-white rounded-xl shadow-2xl border-2 overflow-hidden"
         style={{
-          left: Math.min(position.x + 15, window.innerWidth - 220),
-          top: Math.min(position.y - 10, window.innerHeight - 100),
+          left: Math.min(position.x + 15, window.innerWidth - 400),
+          top: Math.min(position.y - 10, window.innerHeight - 400),
           pointerEvents: "none",
+          borderColor: fillColor || "#3B82F6",
+          minWidth: "360px",
+          maxWidth: "420px",
         }}
       >
-        <div className="font-semibold text-gray-800 mb-1">{name || "Zone"}</div>
-        <div className="text-sm text-gray-500">No data available</div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="fixed z-[1000] bg-white rounded-xl shadow-2xl border-2 overflow-hidden"
-      style={{
-        left: Math.min(position.x + 15, window.innerWidth - 400),
-        top: Math.min(position.y - 10, window.innerHeight - 400),
-        pointerEvents: "none",
-        borderColor: fillColor || "#3B82F6",
-        minWidth: "360px",
-        maxWidth: "420px",
-      }}
-    >
-      {/* Header */}
-      <div
-        className="px-4 py-3 flex items-center justify-between"
-        style={{ backgroundColor: fillColor || "#3B82F6" }}
-      >
-        
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-white bg-white/20 px-2 py-0.5 rounded-full">
-            {getCategoryLabel()}
-          </span>
-          <span className="text-xs text-white bg-white/25 px-2.5 py-1 rounded-full font-medium">
-            {pointCount.toLocaleString()} samples
-          </span>
-        </div>
-      </div>
-
-      {/* Median Value Banner */}
-      {/* {medianValue != null && (
-        <div className="bg-blue-50 px-4 py-2 border-b border-blue-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-blue-700 font-medium">
-              Median {selectedMetric.toUpperCase()}
+        <div
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ backgroundColor: fillColor || "#3B82F6" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white bg-white/20 px-2 py-0.5 rounded-full">
+              {getCategoryLabel()}
             </span>
-            <span className="text-sm font-bold text-blue-800">
-              {medianValue.toFixed(1)} {unit}
+            <span className="text-xs text-white bg-white/25 px-2.5 py-1 rounded-full font-medium">
+              {pointCount.toLocaleString()} samples
             </span>
           </div>
         </div>
-      )} */}
 
-      {/* Best Winner for Selected Category */}
-      {/* {selectedCategory && bestWinner && (
+        {/* Show all winners when no category selected */}
+        {/* {!selectedCategory && (bestProvider || bestBand || bestTechnology) && (
         <div className="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-2 border-b border-amber-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">🏆</span>
-              <span className="text-xs text-amber-700 font-semibold">Best {getCategoryLabel()}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: bestWinner.color }} />
-              <span className="font-bold text-amber-800 text-sm">{bestWinner.name}</span>
-              <span className="text-xs text-amber-600">
-                ({bestWinner.value?.toFixed(1)} {unit})
-              </span>
-            </div>
-          </div>
-        </div>
-      )} */}
-
-      {/* Show all winners when no category selected */}
-      {!selectedCategory && (bestProvider || bestBand || bestTechnology) && (
-        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-2 border-b border-amber-200">
-          <div className="text-xs text-amber-700 font-semibold mb-1">🏆 Best by {selectedMetric.toUpperCase()}</div>
+          <div className="text-xs text-amber-700 font-semibold mb-1"> Best by {selectedMetric.toUpperCase()}</div>
           <div className="grid grid-cols-3 gap-2 text-xs">
             {bestProvider && (
               <div className="flex items-center gap-1">
@@ -635,169 +710,265 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
             )}
           </div>
         </div>
-      )}
+      )} */}
 
-      {/* Data Tables - Show based on selectedCategory */}
-      <div className="max-h-[280px] overflow-y-auto">
-        {/* Providers Section */}
-        {showProviders && providers.length > 0 && (
-          <div className="border-b">
-            <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
-              <span>📡</span> Providers
-            </div>
-            <table className="w-full">
-              <thead className="bg-gray-50 text-[10px]">
-                <tr>
-                  <th className="text-left py-1.5 px-3 font-semibold text-gray-500">Name</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">Samples</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">Share</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">{selectedMetric.toUpperCase()}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {providers.slice(0, selectedCategory === "provider" ? 10 : 5).map((item, index) => (
-                  <tr
-                    key={item.name}
-                    className={`border-t border-gray-100 ${item.isWinner ? "bg-green-50" : index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                  >
-                    <td className="py-1.5 px-3">
-                      <div className="flex items-center gap-1.5">
-                        {item.isWinner && <span className="text-xs">🥇</span>}
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className={`text-xs ${item.isWinner ? "font-bold" : ""} truncate max-w-[100px]`}>
-                          {item.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.count}</td>
-                    <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.percentage ?? "—"}%</td>
-                    <td className="py-1.5 px-3 text-center">
-                      <span className={`text-xs font-medium ${item.isWinner ? "text-green-600" : "text-gray-700"}`}>
-                        {item.metricMedian?.toFixed(1) ?? "—"} {unit}
-                      </span>
-                    </td>
+        {/* Data Tables - Show based on selectedCategory */}
+        <div className="max-h-[400px] overflow-y-auto scrollbar-hide ">
+          {/* Providers Section */}
+          {showProviders && providers.length > 0 && (
+            <div className="border-b">
+              <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
+                <span>📡</span> Providers
+              </div>
+              <table className="w-full">
+                <thead className="bg-gray-50 text-[10px]">
+                  <tr>
+                    <th className="text-left py-1.5 px-3 font-semibold text-gray-500">
+                      Name
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      Samples
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      Share
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      {selectedMetric.toUpperCase()}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Bands Section */}
-        {showBands && bands.length > 0 && (
-          <div className="border-b">
-            <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
-              <span>📶</span> Bands
+                </thead>
+                <tbody>
+                  {providers
+                    .slice(0, selectedCategory === "provider" ? 10 : 5)
+                    .map((item, index) => (
+                      <tr
+                        key={item.name}
+                        className={`border-t border-gray-100 ${
+                          item.isWinner
+                            ? "bg-green-50"
+                            : index % 2 === 0
+                            ? "bg-white"
+                            : "bg-gray-50/50"
+                        }`}
+                      >
+                        <td className="py-1.5 px-3">
+                          <div className="flex items-center gap-1.5">
+                            {item.isWinner && (
+                              <span className="text-xs">🥇</span>
+                            )}
+                            <div
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span
+                              className={`text-xs ${
+                                item.isWinner ? "font-bold" : ""
+                              } truncate max-w-[100px]`}
+                            >
+                              {item.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-1.5 px-3 text-center text-xs text-gray-600">
+                          {item.count}
+                        </td>
+                        <td className="py-1.5 px-3 text-center text-xs text-gray-600">
+                          {item.percentage ?? "—"}%
+                        </td>
+                        <td className="py-1.5 px-3 text-center">
+                          <span
+                            className={`text-xs font-medium ${
+                              item.isWinner ? "text-green-600" : "text-gray-700"
+                            }`}
+                          >
+                            {item.metricMedian?.toFixed(1) ?? "—"} {unit}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
-            <table className="w-full">
-              <thead className="bg-gray-50 text-[10px]">
-                <tr>
-                  <th className="text-left py-1.5 px-3 font-semibold text-gray-500">Band</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">Samples</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">Share</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">{selectedMetric.toUpperCase()}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bands.slice(0, selectedCategory === "band" ? 10 : 5).map((item, index) => (
-                  <tr
-                    key={item.name}
-                    className={`border-t border-gray-100 ${item.isWinner ? "bg-green-50" : index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                  >
-                    <td className="py-1.5 px-3">
-                      <div className="flex items-center gap-1.5">
-                        {item.isWinner && <span className="text-xs">🥇</span>}
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className={`text-xs ${item.isWinner ? "font-bold" : ""}`}>
-                          Band {item.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.count}</td>
-                    <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.percentage}%</td>
-                    <td className="py-1.5 px-3 text-center">
-                      <span className={`text-xs font-medium ${item.isWinner ? "text-green-600" : "text-gray-700"}`}>
-                        {item.metricMedian?.toFixed(1) ?? "—"} {unit}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          )}
 
-        {/* Technologies Section */}
-        {showTechnologies && technologies.length > 0 && (
-          <div>
-            <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
-              <span>🌐</span> Technologies
+          {/* Bands Section */}
+          {showBands && bands.length > 0 && (
+            <div className="border-b">
+              <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
+                <span>📶</span> Bands
+              </div>
+              <table className="w-full">
+                <thead className="bg-gray-50 text-[10px]">
+                  <tr>
+                    <th className="text-left py-1.5 px-3 font-semibold text-gray-500">
+                      Band
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      Samples
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      Share
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      {selectedMetric.toUpperCase()}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bands
+                    .slice(0, selectedCategory === "band" ? 10 : 5)
+                    .map((item, index) => (
+                      <tr
+                        key={item.name}
+                        className={`border-t border-gray-100 ${
+                          item.isWinner
+                            ? "bg-green-50"
+                            : index % 2 === 0
+                            ? "bg-white"
+                            : "bg-gray-50/50"
+                        }`}
+                      >
+                        <td className="py-1.5 px-3">
+                          <div className="flex items-center gap-1.5">
+                            {item.isWinner && (
+                              <span className="text-xs">🥇</span>
+                            )}
+                            <div
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span
+                              className={`text-xs ${
+                                item.isWinner ? "font-bold" : ""
+                              }`}
+                            >
+                              Band {item.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-1.5 px-3 text-center text-xs text-gray-600">
+                          {item.count}
+                        </td>
+                        <td className="py-1.5 px-3 text-center text-xs text-gray-600">
+                          {item.percentage}%
+                        </td>
+                        <td className="py-1.5 px-3 text-center">
+                          <span
+                            className={`text-xs font-medium ${
+                              item.isWinner ? "text-green-600" : "text-gray-700"
+                            }`}
+                          >
+                            {item.metricMedian?.toFixed(1) ?? "—"} {unit}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
-            <table className="w-full">
-              <thead className="bg-gray-50 text-[10px]">
-                <tr>
-                  <th className="text-left py-1.5 px-3 font-semibold text-gray-500">Technology</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">Samples</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">Share</th>
-                  <th className="text-center py-1.5 px-3 font-semibold text-gray-500">{selectedMetric.toUpperCase()}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {technologies.slice(0, selectedCategory === "technology" ? 10 : 5).map((item, index) => (
-                  <tr
-                    key={item.name}
-                    className={`border-t border-gray-100 ${item.isWinner ? "bg-green-50" : index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                  >
-                    <td className="py-1.5 px-3">
-                      <div className="flex items-center gap-1.5">
-                        {item.isWinner && <span className="text-xs">🥇</span>}
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className={`text-xs ${item.isWinner ? "font-bold" : ""} truncate max-w-[100px]`}>
-                          {item.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.count}</td>
-                    <td className="py-1.5 px-3 text-center text-xs text-gray-600">{item.percentage}%</td>
-                    <td className="py-1.5 px-3 text-center">
-                      <span className={`text-xs font-medium ${item.isWinner ? "text-green-600" : "text-gray-700"}`}>
-                        {item.metricMedian?.toFixed(1) ?? "—"} {unit}
-                      </span>
-                    </td>
+          )}
+
+          {/* Technologies Section */}
+          {showTechnologies && technologies.length > 0 && (
+            <div>
+              <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 flex items-center gap-1">
+                <span>🌐</span> Technologies
+              </div>
+              <table className="w-full">
+                <thead className="bg-gray-50 text-[10px]">
+                  <tr>
+                    <th className="text-left py-1.5 px-3 font-semibold text-gray-500">
+                      Technology
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      Samples
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      Share
+                    </th>
+                    <th className="text-center py-1.5 px-3 font-semibold text-gray-500">
+                      {selectedMetric.toUpperCase()}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {technologies
+                    .slice(0, selectedCategory === "technology" ? 10 : 5)
+                    .map((item, index) => (
+                      <tr
+                        key={item.name}
+                        className={`border-t border-gray-100 ${
+                          item.isWinner
+                            ? "bg-green-50"
+                            : index % 2 === 0
+                            ? "bg-white"
+                            : "bg-gray-50/50"
+                        }`}
+                      >
+                        <td className="py-1.5 px-3">
+                          <div className="flex items-center gap-1.5">
+                            {item.isWinner && (
+                              <span className="text-xs">🥇</span>
+                            )}
+                            <div
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span
+                              className={`text-xs ${
+                                item.isWinner ? "font-bold" : ""
+                              } truncate max-w-[100px]`}
+                            >
+                              {item.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-1.5 px-3 text-center text-xs text-gray-600">
+                          {item.count}
+                        </td>
+                        <td className="py-1.5 px-3 text-center text-xs text-gray-600">
+                          {item.percentage}%
+                        </td>
+                        <td className="py-1.5 px-3 text-center">
+                          <span
+                            className={`text-xs font-medium ${
+                              item.isWinner ? "text-green-600" : "text-gray-700"
+                            }`}
+                          >
+                            {item.metricMedian?.toFixed(1) ?? "—"} {unit}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        {/* No data message for selected category */}
-        {selectedCategory === "provider" && providers.length === 0 && (
-          <div className="p-4 text-center text-gray-500 text-sm">No provider data available</div>
-        )}
-        {selectedCategory === "band" && bands.length === 0 && (
-          <div className="p-4 text-center text-gray-500 text-sm">No band data available</div>
-        )}
-        {selectedCategory === "technology" && technologies.length === 0 && (
-          <div className="p-4 text-center text-gray-500 text-sm">No technology data available</div>
-        )}
-      </div>
-
-      {/* Footer */}
-      {/* <div className="px-4 py-2 bg-gray-100 border-t">
-        <div className="text-[10px] text-gray-500 text-center">
-          Ranked by {selectedMetric.toUpperCase()} • {config.higherIsBetter ? "Higher is better" : "Lower is better"}
+          {/* No data message for selected category */}
+          {selectedCategory === "provider" && providers.length === 0 && (
+            <div className="p-4 text-center text-gray-500 text-sm">
+              No provider data available
+            </div>
+          )}
+          {selectedCategory === "band" && bands.length === 0 && (
+            <div className="p-4 text-center text-gray-500 text-sm">
+              No band data available
+            </div>
+          )}
+          {selectedCategory === "technology" && technologies.length === 0 && (
+            <div className="p-4 text-center text-gray-500 text-sm">
+              No technology data available
+            </div>
+          )}
         </div>
-      </div> */}
-    </div>
-  );
-});
+      </div>
+    );
+  }
+);
 
 ZoneTooltip.displayName = "ZoneTooltip";
 
-// ============================================
-// BEST NETWORK LEGEND
-// ============================================
 const BestNetworkLegend = React.memo(({ stats, providerColors, enabled }) => {
   if (!enabled || !stats || Object.keys(stats).length === 0) return null;
 
@@ -805,7 +976,10 @@ const BestNetworkLegend = React.memo(({ stats, providerColors, enabled }) => {
     (a, b) => b[1].locationsWon - a[1].locationsWon
   );
 
-  const totalZones = sortedProviders.reduce((sum, [_, d]) => sum + d.locationsWon, 0);
+  const totalZones = sortedProviders.reduce(
+    (sum, [_, d]) => sum + d.locationsWon,
+    0
+  );
 
   return (
     <div className="absolute bottom-4 left-4 z-[500] bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 min-w-[220px] max-w-[280px]">
@@ -813,20 +987,37 @@ const BestNetworkLegend = React.memo(({ stats, providerColors, enabled }) => {
         <span>🏆</span>
         <span>Best Network by Zone</span>
       </div>
-      
+
       <div className="space-y-1.5">
         {sortedProviders.map(([provider, data], index) => (
           <div key={provider} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xs w-4">{index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : ""}</span>
+              <span className="text-xs w-4">
+                {index === 0
+                  ? "🥇"
+                  : index === 1
+                  ? "🥈"
+                  : index === 2
+                  ? "🥉"
+                  : ""}
+              </span>
               <div
                 className="w-3 h-3 rounded"
-                style={{ backgroundColor: data.color || providerColors?.[provider] || getProviderColor(provider) }}
+                style={{
+                  backgroundColor:
+                    data.color ||
+                    providerColors?.[provider] ||
+                    getProviderColor(provider),
+                }}
               />
-              <span className="text-sm font-medium text-gray-700">{provider}</span>
+              <span className="text-sm font-medium text-gray-700">
+                {provider}
+              </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">{data.locationsWon}/{totalZones}</span>
+              <span className="text-xs text-gray-500">
+                {data.locationsWon}/{totalZones}
+              </span>
               <span className="text-xs font-bold text-gray-800 min-w-[40px] text-right">
                 {data.percentage?.toFixed(0) || 0}%
               </span>
@@ -834,7 +1025,7 @@ const BestNetworkLegend = React.memo(({ stats, providerColors, enabled }) => {
           </div>
         ))}
       </div>
-      
+
       <div className="mt-2 pt-2 border-t text-[10px] text-gray-400 text-center">
         Based on weighted composite score
       </div>
@@ -894,14 +1085,17 @@ const UnifiedMapView = () => {
     outlierMultiplier: 1.5,
   });
 
-  const [coverageHoleFilters, setCoverageHoleFilters] = useState(DEFAULT_COVERAGE_FILTERS);
+  const [coverageHoleFilters, setCoverageHoleFilters] = useState(
+    DEFAULT_COVERAGE_FILTERS
+  );
   const [dataFilters, setDataFilters] = useState(DEFAULT_DATA_FILTERS);
   const [enableGrid, setEnableGrid] = useState(false);
   const [gridSizeMeters, setGridSizeMeters] = useState(20);
 
   const [appSummary, setAppSummary] = useState({});
   const [InpSummary, setInpSummary] = useState({});
-const [tptVolume, setTptVolume] = useState({});
+  const [tptVolume, setTptVolume] = useState({});
+  
 
   const [logArea, setLogArea] = useState(null);
 
@@ -915,12 +1109,20 @@ const [tptVolume, setTptVolume] = useState({});
   const sessionIds = useMemo(() => {
     const param = searchParams.get("sessionId") ?? searchParams.get("session");
     if (!param) return [];
-    return param.split(",").map((s) => s.trim()).filter(Boolean);
+    return param
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }, [searchParams]);
 
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
-  const { siteData, loading: siteLoading, error: siteError, refetch: refetchSites } = useSiteData({
+  const {
+    siteData,
+    loading: siteLoading,
+    error: siteError,
+    refetch: refetchSites,
+  } = useSiteData({
     enableSiteToggle,
     siteToggle,
     projectId,
@@ -928,7 +1130,12 @@ const [tptVolume, setTptVolume] = useState({});
     autoFetch: true,
   });
 
-  const { allNeighbors, stats: neighborStats, loading: neighborLoading, refetch: refetchNeighbors } = useNeighborCollisions({
+  const {
+    allNeighbors,
+    stats: neighborStats,
+    loading: neighborLoading,
+    refetch: refetchNeighbors,
+  } = useNeighborCollisions({
     sessionIds,
     enabled: showNeighbors,
   });
@@ -952,6 +1159,9 @@ const [tptVolume, setTptVolume] = useState({});
     const load = async () => {
       try {
         const res = await settingApi.getThresholdSettings();
+
+        console.log("📦 Raw API Response:", res);
+        console.log("📦 Response.Data:", res?.Data);
         const d = res?.Data;
         if (d) {
           setThresholds({
@@ -972,104 +1182,115 @@ const [tptVolume, setTptVolume] = useState({});
   }, []);
 
   // Fetch functions
-const fetchSampleData = useCallback(async () => {
-  if (!sessionIds.length) {
-    toast.warn("No session IDs provided");
+  const fetchSampleData = useCallback(async () => {
+    if (!sessionIds.length) {
+      toast.warn("No session IDs provided");
+      setLocations([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
     setLocations([]);
-    return;
-  }
 
-  setLoading(true);
-  setError(null);
-  setLocations([]);
+    // ✅ Use local variables to accumulate
+    const accumulatedLogs = [];
+    const accumulatedAppSummary = {};
+    const accumulatedIoSummary = {};
+    const accumulatedTptVolume = {};
 
-  // ✅ Use local variables to accumulate
-  const accumulatedLogs = [];
-  const accumulatedAppSummary = {};
-  const accumulatedIoSummary = {};
-  let accumulatedTptVolume = { dl_kb: 0, ul_kb: 0 };
+    try {
+      const startTime = performance.now();
 
-  try {
-    const startTime = performance.now();
+      for (let i = 0; i < sessionIds.length; i++) {
+        const sessionId = sessionIds[i];
 
-    for (let i = 0; i < sessionIds.length; i++) {
-      const sessionId = sessionIds[i];
+        try {
+          const response = await mapViewApi.getNetworkLog({
+            session_id: sessionId,
+          });
 
-      try {
-        const response = await mapViewApi.getNetworkLog({ session_id: sessionId });
+          console.log("Response for session:", sessionId, response);
 
-        console.log("Response for session:", sessionId, response);
+          const appData =
+            response?.data?.app_summary || response?.app_summary || {};
+          const ioData =
+            response?.data?.io_summary || response?.io_summary || {};
+          const tptData =
+            response?.data?.tpt_volume || response?.tpt_volume || {};
 
-        const appData = response?.data?.app_summary || response?.app_summary || {};
-        const ioData = response?.data?.io_summary || response?.io_summary || {};
-        const tptData = response?.data?.tpt_volume || response?.tpt_volume || {};
+          // ✅ KEY FIX: Store with sessionId as the key
+          if (Object.keys(appData).length > 0) {
+            accumulatedAppSummary[sessionId] = appData;
+          }
 
-        // ✅ KEY FIX: Store with sessionId as the key
-        if (Object.keys(appData).length > 0) {
-          accumulatedAppSummary[sessionId] = appData;
+          if (Object.keys(ioData).length > 0) {
+            accumulatedIoSummary[sessionId] = ioData;
+          }
+
+          if (Object.keys(tptData).length > 0) {
+            accumulatedTptVolume[sessionId] = tptData;
+          }
+
+          // Extract logs
+          const sessionLogs = extractLogsFromResponse(
+            response.data || response
+          );
+          sessionLogs.forEach((log) => {
+            const parsed = parseLogEntry(log, sessionId);
+            if (parsed) accumulatedLogs.push(parsed);
+          });
+        } catch (err) {
+          console.error(`Session ${sessionId} failed:`, err.message);
         }
-        
-        if (Object.keys(ioData).length > 0) {
-          accumulatedIoSummary[sessionId] = ioData;
-        }
 
-        // Accumulate TPT volume
-        accumulatedTptVolume = {
-          dl_kb: accumulatedTptVolume.dl_kb + (tptData.dl_kb || 0),
-          ul_kb: accumulatedTptVolume.ul_kb + (tptData.ul_kb || 0)
-        };
-
-        // Extract logs
-        const sessionLogs = extractLogsFromResponse(response.data || response);
-        sessionLogs.forEach((log) => {
-          const parsed = parseLogEntry(log, sessionId);
-          if (parsed) accumulatedLogs.push(parsed);
-        });
-
-      } catch (err) {
-        console.error(`Session ${sessionId} failed:`, err.message);
+        if (i < sessionIds.length - 1) await delay(100);
       }
 
-      if (i < sessionIds.length - 1) await delay(100);
+      // ✅ Set all states at once after loop completes
+      console.log("Final accumulatedAppSummary:", accumulatedAppSummary);
+
+      setAppSummary(accumulatedAppSummary);
+      setInpSummary(accumulatedIoSummary);
+      setTptVolume(accumulatedTptVolume);
+      setLocations(accumulatedLogs);
+
+      const fetchTime = ((performance.now() - startTime) / 1000).toFixed(2);
+
+      if (accumulatedLogs.length > 0) {
+        toast.success(
+          `✅ ${accumulatedLogs.length} points loaded in ${fetchTime}s`
+        );
+      } else {
+        toast.warn("No valid log data found");
+      }
+    } catch (err) {
+      console.error("Critical error:", err);
+      toast.error(err.message);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
+  }, [sessionIds]);
 
-    // ✅ Set all states at once after loop completes
-    console.log("Final accumulatedAppSummary:", accumulatedAppSummary);
-    
-    setAppSummary(accumulatedAppSummary);
-    setInpSummary(accumulatedIoSummary);
-    setTptVolume(accumulatedTptVolume);
-    setLocations(accumulatedLogs);
 
-    const fetchTime = ((performance.now() - startTime) / 1000).toFixed(2);
+  
 
-    if (accumulatedLogs.length > 0) {
-      toast.success(`✅ ${accumulatedLogs.length} points loaded in ${fetchTime}s`);
-    } else {
-      toast.warn("No valid log data found");
-    }
 
-  } catch (err) {
-    console.error("Critical error:", err);
-    toast.error(err.message);
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-}, [sessionIds]);
+
 
   // Add this useEffect to debug/verify state updates
-useEffect(() => {
-  console.log("appSummary updated:", appSummary);
-}, [appSummary]);
+  useEffect(() => {
+    console.log("appSummary updated:", appSummary);
+  }, [appSummary]);
 
-useEffect(() => {
-  console.log("inpSummary updated:", InpSummary);
-}, [InpSummary]);
+  useEffect(() => {
+    console.log("inpSummary updated:", InpSummary);
+  }, [InpSummary]);
 
-useEffect(() => {
-  console.log("tptVolume updated:", tptVolume);
-}, [tptVolume]);
+  useEffect(() => {
+    console.log("tptVolume updated:", tptVolume);
+  }, [tptVolume]);
 
   const fetchPredictionData = useCallback(async () => {
     if (!projectId) {
@@ -1095,7 +1316,14 @@ useEffect(() => {
             const lat = parseFloat(pt.lat);
             const lng = parseFloat(pt.lon);
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-            return { lat, lng, latitude: lat, longitude: lng, [selectedMetric]: pt.prm, isPrediction: true };
+            return {
+              lat,
+              lng,
+              latitude: lat,
+              longitude: lng,
+              [selectedMetric]: pt.prm,
+              isPrediction: true,
+            };
           })
           .filter(Boolean);
 
@@ -1122,8 +1350,12 @@ useEffect(() => {
     }
 
     try {
-      const res = await mapViewApi.getProjectPolygonsV2(projectId, polygonSource);
-      const items = res?.Data || res?.data?.Data || (Array.isArray(res) ? res : []);
+      const res = await mapViewApi.getProjectPolygonsV2(
+        projectId,
+        polygonSource
+      );
+      const items =
+        res?.Data || res?.data?.Data || (Array.isArray(res) ? res : []);
 
       const parsed = items.flatMap((item) => {
         const wkt = item.Wkt || item.wkt;
@@ -1168,7 +1400,8 @@ useEffect(() => {
 
       const parsed = zones
         .map((zone, index) => {
-          const geometry = zone.geometry || zone.Geometry || zone.wkt || zone.Wkt;
+          const geometry =
+            zone.geometry || zone.Geometry || zone.wkt || zone.Wkt;
           if (!geometry) return null;
 
           const poly = parseWKTToPolygons(geometry)[0];
@@ -1177,7 +1410,10 @@ useEffect(() => {
           return {
             id: zone.id || zone.Id || index,
             blockId: zone.block_id || zone.blockId,
-            name: zone.project_name || zone.name || `Block ${zone.block_id || index}`,
+            name:
+              zone.project_name ||
+              zone.name ||
+              `Block ${zone.block_id || index}`,
             source: "area",
             uid: `area-${zone.id || zone.Id || index}`,
             paths: poly.paths,
@@ -1187,7 +1423,8 @@ useEffect(() => {
         .filter(Boolean);
 
       setAreaData(parsed);
-      if (parsed.length > 0) toast.success(`${parsed.length} area zone(s) loaded`);
+      if (parsed.length > 0)
+        toast.success(`${parsed.length} area zone(s) loaded`);
     } catch (err) {
       console.error("Area polygon error:", err);
       toast.error(`Failed to load area zones: ${err.message}`);
@@ -1207,15 +1444,26 @@ useEffect(() => {
     } else if (enableSiteToggle && siteToggle === "sites-prediction") {
       fetchPredictionData();
     }
-  }, [enableDataToggle, enableSiteToggle, dataToggle, siteToggle, fetchSampleData, fetchPredictionData]);
+  }, [
+    enableDataToggle,
+    enableSiteToggle,
+    dataToggle,
+    siteToggle,
+    fetchSampleData,
+    fetchPredictionData,
+  ]);
 
-  useEffect(() => { fetchPolygons(); }, [fetchPolygons]);
-  useEffect(() => { fetchAreaPolygons(); }, [fetchAreaPolygons]);
+  useEffect(() => {
+    fetchPolygons();
+  }, [fetchPolygons]);
+  useEffect(() => {
+    fetchAreaPolygons();
+  }, [fetchAreaPolygons]);
 
   // Memoized values
   const effectiveThresholds = useMemo(() => {
     if (predictionColorSettings.length && dataToggle === "prediction") {
-      return {
+      const effective = {
         ...thresholds,
         [selectedMetric]: predictionColorSettings.map((s) => ({
           min: parseFloat(s.min),
@@ -1223,7 +1471,10 @@ useEffect(() => {
           color: s.color,
         })),
       };
+      console.log("🎨 Effective Thresholds (prediction mode):", effective);
+      return effective;
     }
+    console.log("🎨 Effective Thresholds (normal mode):", thresholds);
     return thresholds;
   }, [thresholds, predictionColorSettings, selectedMetric, dataToggle]);
 
@@ -1248,7 +1499,11 @@ useEffect(() => {
   const filteredLocations = useMemo(() => {
     let result = [...locations];
 
-    const activeCoverageFilters = Object.entries(coverageHoleFilters).filter(([, config]) => config.enabled);
+    console.log(result,"in this we are checking for location")
+
+    const activeCoverageFilters = Object.entries(coverageHoleFilters).filter(
+      ([, config]) => config.enabled
+    );
 
     if (activeCoverageFilters.length > 0) {
       result = result.filter((loc) =>
@@ -1260,9 +1515,11 @@ useEffect(() => {
     }
 
     const { providers, bands, technologies } = dataFilters;
-    if (providers.length) result = result.filter((l) => providers.includes(l.provider));
+    if (providers.length)
+      result = result.filter((l) => providers.includes(l.provider));
     if (bands.length) result = result.filter((l) => bands.includes(l.band));
-    if (technologies.length) result = result.filter((l) => technologies.includes(l.technology));
+    if (technologies.length)
+      result = result.filter((l) => technologies.includes(l.technology));
 
     return result;
   }, [locations, coverageHoleFilters, dataFilters]);
@@ -1284,14 +1541,25 @@ useEffect(() => {
 
     return polygons.map((poly) => {
       const pointsInside = locations.filter((pt) => isPointInPolygon(pt, poly));
-      const values = pointsInside.map((p) => parseFloat(p[selectedMetric])).filter((v) => !isNaN(v));
+      const values = pointsInside
+        .map((p) => parseFloat(p[selectedMetric]))
+        .filter((v) => !isNaN(v));
 
       if (!values.length) {
-        return { ...poly, fillColor: "#ccc", fillOpacity: 0.3, pointCount: pointsInside.length };
+        return {
+          ...poly,
+          fillColor: "#ccc",
+          fillOpacity: 0.3,
+          pointCount: pointsInside.length,
+        };
       }
 
       const median = calculateMedian(values);
-      const fillColor = getColorFromValueOrMetric(median, currentThresholds, selectedMetric);
+      const fillColor = getColorFromValueOrMetric(
+        median,
+        currentThresholds,
+        selectedMetric
+      );
 
       return {
         ...poly,
@@ -1301,157 +1569,220 @@ useEffect(() => {
         medianValue: median,
       };
     });
-  }, [showPolygons, polygons, onlyInsidePolygons, locations, selectedMetric, effectiveThresholds]);
+  }, [
+    showPolygons,
+    polygons,
+    onlyInsidePolygons,
+    locations,
+    selectedMetric,
+    effectiveThresholds,
+  ]);
 
   // FIXED: Area polygons with proper color calculation
   const areaPolygonsWithColors = useMemo(() => {
-  if (!areaEnabled || !areaData.length) return [];
+    if (!areaEnabled || !areaData.length) return [];
 
-  if (!filteredLocations.length) {
-    return areaData.map((p) => ({
-      ...p,
-      fillColor: "#9333ea",
-      fillOpacity: 0.25,
-      pointCount: 0,
-      medianValue: null,
-      categoryStats: null,
-      bestProvider: null,
-      bestBand: null,
-      bestTechnology: null,
-    }));
-  }
-
-  const thresholdKey = getThresholdKey(selectedMetric);
-  const currentThresholds = thresholds[thresholdKey] || [];
-  const useCategorical = colorBy && ["provider", "band", "technology"].includes(colorBy);
-  const metricConfig = METRIC_CONFIG[selectedMetric] || { higherIsBetter: true };
-
-  return areaData.map((poly) => {
-    const pointsInside = filteredLocations.filter((pt) => isPointInPolygon(pt, poly));
-
-    if (!pointsInside.length) {
-      return {
-        ...poly,
-        fillColor: "#ccc",
-        fillOpacity: 0.3,
+    if (!filteredLocations.length) {
+      return areaData.map((p) => ({
+        ...p,
+        fillColor: "#9333ea",
+        fillOpacity: 0.25,
         pointCount: 0,
         medianValue: null,
         categoryStats: null,
         bestProvider: null,
         bestBand: null,
         bestTechnology: null,
-      };
+      }));
     }
 
-    // Calculate category stats with median values
-    const providerStats = calculateCategoryStats(pointsInside, "provider", selectedMetric);
-    const bandStats = calculateCategoryStats(pointsInside, "band", selectedMetric);
-    const technologyStats = calculateCategoryStats(pointsInside, "technology", selectedMetric);
-
-    // Get overall median
-    const values = pointsInside
-      .map((p) => parseFloat(p[selectedMetric]))
-      .filter((v) => !isNaN(v) && v != null);
-    const medianValue = calculateMedian(values);
-
-    // Helper function to find best category by metric value
-    const findBestByMetric = (stats) => {
-      if (!stats?.stats?.length) return { best: null, value: null };
-      
-      let best = null;
-      let bestValue = metricConfig.higherIsBetter ? -Infinity : Infinity;
-      
-      stats.stats.forEach((stat) => {
-        const median = stat.medianValue ?? stat.avgValue;
-        if (median != null) {
-          const isBetter = metricConfig.higherIsBetter 
-            ? median > bestValue
-            : median < bestValue;
-          
-          if (isBetter) {
-            bestValue = median;
-            best = stat.name;
-          }
-        }
-      });
-      
-      return { best, value: bestValue === -Infinity || bestValue === Infinity ? null : bestValue };
+    const thresholdKey = getThresholdKey(selectedMetric);
+    const currentThresholds = thresholds[thresholdKey] || [];
+    const useCategorical =
+      colorBy && ["provider", "band", "technology"].includes(colorBy);
+    const metricConfig = METRIC_CONFIG[selectedMetric] || {
+      higherIsBetter: true,
     };
 
-    // Find best for each category by metric value
-    const { best: bestProvider, value: bestProviderValue } = findBestByMetric(providerStats);
-    const { best: bestBand, value: bestBandValue } = findBestByMetric(bandStats);
-    const { best: bestTechnology, value: bestTechnologyValue } = findBestByMetric(technologyStats);
+    return areaData.map((poly) => {
+      const pointsInside = filteredLocations.filter((pt) =>
+        isPointInPolygon(pt, poly)
+      );
 
-    // Determine fill color based on colorBy
-    let fillColor;
-    
-    if (useCategorical) {
-      switch (colorBy) {
-        case "provider":
-          if (bestProvider) {
-            fillColor = getProviderColor(bestProvider);
-            console.log(`Zone "${poly.name}": Best provider by ${selectedMetric} = ${bestProvider} (${bestProviderValue?.toFixed(1)})`);
-          } else {
-            fillColor = providerStats?.dominant 
-              ? getProviderColor(providerStats.dominant.name) 
-              : "#ccc";
-          }
-          break;
-          
-        case "band":
-          if (bestBand) {
-            fillColor = getBandColor(bestBand);
-            console.log(`Zone "${poly.name}": Best band by ${selectedMetric} = ${bestBand} (${bestBandValue?.toFixed(1)})`);
-          } else {
-            fillColor = bandStats?.dominant 
-              ? getBandColor(bandStats.dominant.name) 
-              : "#ccc";
-          }
-          break;
-          
-        case "technology":
-          if (bestTechnology) {
-            fillColor = getTechnologyColor(bestTechnology);
-            console.log(`Zone "${poly.name}": Best technology by ${selectedMetric} = ${bestTechnology} (${bestTechnologyValue?.toFixed(1)})`);
-          } else {
-            fillColor = technologyStats?.dominant 
-              ? getTechnologyColor(technologyStats.dominant.name) 
-              : "#ccc";
-          }
-          break;
-          
-        default:
-          fillColor = "#ccc";
+      if (!pointsInside.length) {
+        return {
+          ...poly,
+          fillColor: "#ccc",
+          fillOpacity: 0.3,
+          pointCount: 0,
+          medianValue: null,
+          categoryStats: null,
+          bestProvider: null,
+          bestBand: null,
+          bestTechnology: null,
+        };
       }
-    } else {
-      // Quality-based coloring (no colorBy selected)
-      fillColor = medianValue !== null 
-        ? getColorFromValueOrMetric(medianValue, currentThresholds, selectedMetric)
-        : "#ccc";
-    }
 
-    return {
-      ...poly,
-      fillColor,
-      fillOpacity: 0.7,
-      strokeWeight: 2.5,
-      pointCount: pointsInside.length,
-      medianValue,
-      bestProvider,
-      bestProviderValue,
-      bestBand,
-      bestBandValue,
-      bestTechnology,
-      bestTechnologyValue,
-      categoryStats: { 
-        provider: providerStats, 
-        band: bandStats, 
-        technology: technologyStats 
-      },
-    };
-  });
-}, [areaEnabled, areaData, filteredLocations, selectedMetric, thresholds, colorBy]);
+      // Calculate category stats with median values
+      const providerStats = calculateCategoryStats(
+        pointsInside,
+        "provider",
+        selectedMetric
+      );
+      const bandStats = calculateCategoryStats(
+        pointsInside,
+        "band",
+        selectedMetric
+      );
+      const technologyStats = calculateCategoryStats(
+        pointsInside,
+        "technology",
+        selectedMetric
+      );
+
+      // Get overall median
+      const values = pointsInside
+        .map((p) => parseFloat(p[selectedMetric]))
+        .filter((v) => !isNaN(v) && v != null);
+      const medianValue = calculateMedian(values);
+
+      // Helper function to find best category by metric value
+      const findBestByMetric = (stats) => {
+        if (!stats?.stats?.length) return { best: null, value: null };
+
+        let best = null;
+        let bestValue = metricConfig.higherIsBetter ? -Infinity : Infinity;
+
+        stats.stats.forEach((stat) => {
+          const median = stat.medianValue ?? stat.avgValue;
+          if (median != null) {
+            const isBetter = metricConfig.higherIsBetter
+              ? median > bestValue
+              : median < bestValue;
+
+            if (isBetter) {
+              bestValue = median;
+              best = stat.name;
+            }
+          }
+        });
+
+        return {
+          best,
+          value:
+            bestValue === -Infinity || bestValue === Infinity
+              ? null
+              : bestValue,
+        };
+      };
+
+      // Find best for each category by metric value
+      const { best: bestProvider, value: bestProviderValue } =
+        findBestByMetric(providerStats);
+      const { best: bestBand, value: bestBandValue } =
+        findBestByMetric(bandStats);
+      const { best: bestTechnology, value: bestTechnologyValue } =
+        findBestByMetric(technologyStats);
+
+      // Determine fill color based on colorBy
+      let fillColor;
+
+      if (useCategorical) {
+        switch (colorBy) {
+          case "provider":
+            if (bestProvider) {
+              fillColor = getProviderColor(bestProvider);
+              console.log(
+                `Zone "${
+                  poly.name
+                }": Best provider by ${selectedMetric} = ${bestProvider} (${bestProviderValue?.toFixed(
+                  1
+                )})`
+              );
+            } else {
+              fillColor = providerStats?.dominant
+                ? getProviderColor(providerStats.dominant.name)
+                : "#ccc";
+            }
+            break;
+
+          case "band":
+            if (bestBand) {
+              fillColor = getBandColor(bestBand);
+              console.log(
+                `Zone "${
+                  poly.name
+                }": Best band by ${selectedMetric} = ${bestBand} (${bestBandValue?.toFixed(
+                  1
+                )})`
+              );
+            } else {
+              fillColor = bandStats?.dominant
+                ? getBandColor(bandStats.dominant.name)
+                : "#ccc";
+            }
+            break;
+
+          case "technology":
+            if (bestTechnology) {
+              fillColor = getTechnologyColor(bestTechnology);
+              console.log(
+                `Zone "${
+                  poly.name
+                }": Best technology by ${selectedMetric} = ${bestTechnology} (${bestTechnologyValue?.toFixed(
+                  1
+                )})`
+              );
+            } else {
+              fillColor = technologyStats?.dominant
+                ? getTechnologyColor(technologyStats.dominant.name)
+                : "#ccc";
+            }
+            break;
+
+          default:
+            fillColor = "#ccc";
+        }
+      } else {
+        // Quality-based coloring (no colorBy selected)
+        fillColor =
+          medianValue !== null
+            ? getColorFromValueOrMetric(
+                medianValue,
+                currentThresholds,
+                selectedMetric
+              )
+            : "#ccc";
+      }
+
+      return {
+        ...poly,
+        fillColor,
+        fillOpacity: 0.7,
+        strokeWeight: 2.5,
+        pointCount: pointsInside.length,
+        medianValue,
+        bestProvider,
+        bestProviderValue,
+        bestBand,
+        bestBandValue,
+        bestTechnology,
+        bestTechnologyValue,
+        categoryStats: {
+          provider: providerStats,
+          band: bandStats,
+          technology: technologyStats,
+        },
+      };
+    });
+  }, [
+    areaEnabled,
+    areaData,
+    filteredLocations,
+    selectedMetric,
+    thresholds,
+    colorBy,
+  ]);
 
   const allBestNetworkPolygons = useMemo(() => {
     if (bestNetworkEnabled && bestNetworkPolygons?.length > 0) {
@@ -1477,43 +1808,63 @@ useEffect(() => {
 
   const mapCenter = useMemo(() => {
     // if (!locations.length) return DEFAULT_CENTER;
-    const sum = locations.reduce((acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }), { lat: 0, lng: 0 });
+    const sum = locations.reduce(
+      (acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }),
+      { lat: 0, lng: 0 }
+    );
     return { lat: sum.lat / locations.length, lng: sum.lng / locations.length };
   }, [locations]);
 
-  const showDataCircles = enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction");
-  const shouldShowLegend = enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction");
+  const showDataCircles =
+    enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction");
+  const shouldShowLegend =
+    enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction");
 
   const locationsToDisplay = useMemo(() => {
     if (!showDataCircles) return [];
 
-    const hasCoverageFilters = Object.values(coverageHoleFilters).some((f) => f.enabled);
-    const hasDataFilters = dataFilters.providers.length > 0 || dataFilters.bands.length > 0 || dataFilters.technologies.length > 0;
+    const hasCoverageFilters = Object.values(coverageHoleFilters).some(
+      (f) => f.enabled
+    );
+    const hasDataFilters =
+      dataFilters.providers.length > 0 ||
+      dataFilters.bands.length > 0 ||
+      dataFilters.technologies.length > 0;
 
     if (hasCoverageFilters || hasDataFilters || onlyInsidePolygons) {
       return filteredLocations;
     }
 
     return locations;
-  }, [showDataCircles, coverageHoleFilters, dataFilters, filteredLocations, locations, onlyInsidePolygons]);
+  }, [
+    showDataCircles,
+    coverageHoleFilters,
+    dataFilters,
+    filteredLocations,
+    locations,
+    onlyInsidePolygons,
+  ]);
 
   const debouncedSetViewport = useMemo(() => debounce(setViewport, 150), []);
 
-  const handleMapLoad = useCallback((map) => {
-    mapRef.current = map;
-    const updateViewport = () => {
-      const bounds = map.getBounds();
-      if (!bounds) return;
-      debouncedSetViewport({
-        north: bounds.getNorthEast().lat(),
-        south: bounds.getSouthWest().lat(),
-        east: bounds.getNorthEast().lng(),
-        west: bounds.getSouthWest().lng(),
-      });
-    };
-    map.addListener("idle", updateViewport);
-    updateViewport();
-  }, [debouncedSetViewport]);
+  const handleMapLoad = useCallback(
+    (map) => {
+      mapRef.current = map;
+      const updateViewport = () => {
+        const bounds = map.getBounds();
+        if (!bounds) return;
+        debouncedSetViewport({
+          north: bounds.getNorthEast().lat(),
+          south: bounds.getSouthWest().lat(),
+          east: bounds.getNorthEast().lng(),
+          west: bounds.getSouthWest().lng(),
+        });
+      };
+      map.addListener("idle", updateViewport);
+      updateViewport();
+    },
+    [debouncedSetViewport]
+  );
 
   const reloadData = useCallback(() => {
     if (enableSiteToggle) refetchSites();
@@ -1523,7 +1874,20 @@ useEffect(() => {
     if (showPolygons) fetchPolygons();
     if (areaEnabled) fetchAreaPolygons();
     if (showNeighbors) refetchNeighbors();
-  }, [enableDataToggle, enableSiteToggle, dataToggle, showPolygons, areaEnabled, showNeighbors, fetchSampleData, fetchPredictionData, fetchPolygons, fetchAreaPolygons, refetchSites, refetchNeighbors]);
+  }, [
+    enableDataToggle,
+    enableSiteToggle,
+    dataToggle,
+    showPolygons,
+    areaEnabled,
+    showNeighbors,
+    fetchSampleData,
+    fetchPredictionData,
+    fetchPolygons,
+    fetchAreaPolygons,
+    refetchSites,
+    refetchNeighbors,
+  ]);
 
   // Hover handlers
   const handlePolygonMouseOver = useCallback((poly, e) => {
@@ -1541,11 +1905,19 @@ useEffect(() => {
   }, []);
 
   if (!isLoaded) {
-    return <div className="flex items-center justify-center h-screen"><Spinner /></div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Spinner />
+      </div>
+    );
   }
 
   if (loadError) {
-    return <div className="flex items-center justify-center h-screen text-red-500">Map loading error: {loadError.message}</div>;
+    return (
+      <div className="flex items-center justify-center h-screen text-red-500">
+        Map loading error: {loadError.message}
+      </div>
+    );
   }
 
   return (
@@ -1679,7 +2051,11 @@ useEffect(() => {
             <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700">
               <div className="text-center space-y-2">
                 {error && <p className="text-red-500">Data Error: {error}</p>}
-                {siteError && <p className="text-red-500">Site Error: {siteError.message}</p>}
+                {siteError && (
+                  <p className="text-red-500">
+                    Site Error: {siteError.message}
+                  </p>
+                )}
               </div>
             </div>
           ) : (
@@ -1706,62 +2082,73 @@ useEffect(() => {
               gridSizeMeters={gridSizeMeters}
               areaEnabled={areaEnabled}
             >
-              {showPolygons && visiblePolygons.map((poly) => (
-                <Polygon
-                  key={poly.uid}
-                  paths={poly.paths[0]}
-                  options={{
-                    fillColor: poly.fillColor || "#4285F4",
-                    fillOpacity: poly.fillOpacity || 0.35,
-                    strokeColor: onlyInsidePolygons ? poly.fillColor : "#2563eb",
-                    strokeWeight: 2,
-                    strokeOpacity: 0.9,
-                    clickable: true,
-                    zIndex: 50,
-                  }}
-                />
-              ))}
+              {showPolygons &&
+                visiblePolygons.map((poly) => (
+                  <Polygon
+                    key={poly.uid}
+                    paths={poly.paths[0]}
+                    options={{
+                      fillColor: poly.fillColor || "#4285F4",
+                      fillOpacity: poly.fillOpacity || 0.35,
+                      strokeColor: onlyInsidePolygons
+                        ? poly.fillColor
+                        : "#2563eb",
+                      strokeWeight: 2,
+                      strokeOpacity: 0.9,
+                      clickable: true,
+                      zIndex: 50,
+                    }}
+                  />
+                ))}
 
-              {areaEnabled && !bestNetworkEnabled && areaPolygonsWithColors.map((poly) => (
-                <Polygon
-                  key={poly.uid}
-                  paths={poly.paths[0]}
-                  options={{
-                    fillColor: poly.fillColor || "#9333ea",
-                    fillOpacity: poly.fillOpacity || 0.7,
-                    strokeColor: poly.fillColor || "#7c3aed",
-                    strokeWeight: 2.5,
-                    strokeOpacity: 0.9,
-                    clickable: true,
-                    zIndex: 60,
-                  }}
-                  onMouseOver={(e) => handlePolygonMouseOver(poly, e)}
-                  onMouseMove={handlePolygonMouseMove}
-                  onMouseOut={handlePolygonMouseOut}
-                />
-              ))}
+              {areaEnabled &&
+                !bestNetworkEnabled &&
+                areaPolygonsWithColors.map((poly) => (
+                  <Polygon
+                    key={poly.uid}
+                    paths={poly.paths[0]}
+                    options={{
+                      fillColor: poly.fillColor || "#9333ea",
+                      fillOpacity: poly.fillOpacity || 0.7,
+                      strokeColor: poly.fillColor || "#7c3aed",
+                      strokeWeight: 2.5,
+                      strokeOpacity: 0.9,
+                      clickable: true,
+                      zIndex: 60,
+                    }}
+                    onMouseOver={(e) => handlePolygonMouseOver(poly, e)}
+                    onMouseMove={handlePolygonMouseMove}
+                    onMouseOut={handlePolygonMouseOut}
+                  />
+                ))}
 
-              {bestNetworkEnabled && allBestNetworkPolygons.map((poly) => (
-                <Polygon
-                  key={poly.uid}
-                  paths={poly.paths[0]}
-                  options={{
-                    fillColor: poly.fillColor || "#3B82F6",
-                    fillOpacity: poly.fillOpacity || 0.65,
-                    strokeColor: poly.fillColor || "#1E40AF",
-                    strokeWeight: poly.strokeWeight || 2,
-                    strokeOpacity: 0.95,
-                    clickable: true,
-                    zIndex: 70,
-                  }}
-                  onMouseOver={(e) => handlePolygonMouseOver(poly, e)}
-                  onMouseMove={handlePolygonMouseMove}
-                  onMouseOut={handlePolygonMouseOut}
-                />
-              ))}
+              {bestNetworkEnabled &&
+                allBestNetworkPolygons.map((poly) => (
+                  <Polygon
+                    key={poly.uid}
+                    paths={poly.paths[0]}
+                    options={{
+                      fillColor: poly.fillColor || "#3B82F6",
+                      fillOpacity: poly.fillOpacity || 0.65,
+                      strokeColor: poly.fillColor || "#1E40AF",
+                      strokeWeight: poly.strokeWeight || 2,
+                      strokeOpacity: 0.95,
+                      clickable: true,
+                      zIndex: 70,
+                    }}
+                    onMouseOver={(e) => handlePolygonMouseOver(poly, e)}
+                    onMouseMove={handlePolygonMouseMove}
+                    onMouseOut={handlePolygonMouseOut}
+                  />
+                ))}
 
               {enableSiteToggle && showSiteMarkers && (
-                <SiteMarkers sites={siteData} showMarkers={showSiteMarkers} circleRadius={0} viewport={viewport} />
+                <SiteMarkers
+                  sites={siteData}
+                  showMarkers={showSiteMarkers}
+                  circleRadius={0}
+                  viewport={viewport}
+                />
               )}
 
               {showNeighbors && allNeighbors.length > 0 && (
@@ -1792,7 +2179,12 @@ useEffect(() => {
       </div>
 
       {hoveredPolygon && hoverPosition && (
-        <ZoneTooltip polygon={hoveredPolygon} position={hoverPosition} selectedMetric={selectedMetric} selectedCategory={colorBy}/>
+        <ZoneTooltip
+          polygon={hoveredPolygon}
+          position={hoverPosition}
+          selectedMetric={selectedMetric}
+          selectedCategory={colorBy}
+        />
       )}
     </div>
   );

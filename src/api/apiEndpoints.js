@@ -564,7 +564,8 @@ export const mapViewApi = {
     api.get("/api/MapView/GetNeighboursForPrimary", { 
       params: { sessionId: session } 
     }),
-
+  getproviderVolume: (params) => 
+    api.get("/api/MapView/GetProviderWiseVolume", { params }),
   // ==================== Filter Options ====================
   getProviders: () => api.get("/api/MapView/GetProviders"),
   getTechnologies: () => api.get("/api/MapView/GetTechnologies"),

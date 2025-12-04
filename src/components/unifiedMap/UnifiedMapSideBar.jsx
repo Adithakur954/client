@@ -183,7 +183,7 @@ const UnifiedMapSidebar = ({
 }) => {
   const sideClasses = useMemo(() => {
     const base =
-      "fixed top-0 left-0 h-full z-50 w-[90vw] sm:w-[420px] bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out overflow-hidden";
+      "fixed top-0 left-0 h-full z-50 w-[90vw] sm:w-[390px] bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out overflow-hidden";
     return open ? `${base} translate-x-0` : `${base} -translate-x-full`;
   }, [open]);
 
@@ -307,7 +307,7 @@ const updateDataFilter = useCallback((filterType, value) => {
     <>
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0  bg-black/40 "
           onClick={() => onOpenChange?.(false)}
         />
       )}

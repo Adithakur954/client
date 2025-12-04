@@ -20,7 +20,7 @@ export const resolveMetricConfig = (key) => {
     "lte-bler": { field: "bler", thresholdKey: "lte_bler", label: "LTE BLER", unit: "%" },
     "lte_bler": { field: "bler", thresholdKey: "lte_bler", label: "LTE BLER", unit: "%" },
     // --- ADD THIS LINE ---
-    pci: { field: "pci", thresholdKey: "pci", label: "PCI", unit: "" },
+    
   };
   return map[key?.toLowerCase()] || map.rsrp;
 };

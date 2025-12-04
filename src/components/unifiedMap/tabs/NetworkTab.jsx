@@ -7,14 +7,14 @@ import { ProviderPerformanceChart } from "../charts/network/ProviderPerformanceC
 export const NetworkTab = ({ locations, expanded, chartRefs }) => {
   return (
     <div className={`grid ${expanded ? "grid-cols-2" : "grid-cols-1"} gap-4`}>
-      <BandDistributionChart 
+      {/* <BandDistributionChart 
         ref={chartRefs.band}
         locations={locations} 
-      />
-      <OperatorComparisonChart 
+      /> */}
+      {/* <OperatorComparisonChart 
         ref={chartRefs.operator}
         locations={locations} 
-      />
+      /> */}
       <PciColorLegend 
         ref={chartRefs.pciColorLegend}
         locations={locations} 

@@ -131,12 +131,14 @@ export default function UnifiedDetailLogs({
       setIsFilterLoading(false);
     }
   }, [projectId, sessionIds, locations]);
-
+      // yaha pe filtered loations hai isme sab data hai 
   // Apply filters when dataFilters change
   useEffect(() => {
     const applyFilters = async () => {
       if (hasActiveFilters) {
         const filtered = await fetchFilteredData(dataFilters);
+
+       
         setFilteredLocations(filtered);
         onFilteredDataChange?.(filtered);
       } else {
@@ -148,6 +150,8 @@ export default function UnifiedDetailLogs({
 
     applyFilters();
   }, [dataFilters, hasActiveFilters]); 
+
+  
 
   
   useEffect(() => {
@@ -259,11 +263,11 @@ export default function UnifiedDetailLogs({
   return (
     <div
       className={`
-        fixed z-40 bg-slate-950 text-white rounded-lg 
+        fixed z-40 bg-slate-950 text-white  
         shadow-2xl border border-slate-700 transition-all duration-300
         ${expanded 
-          ? "top-20 left-1/2 -translate-x-1/2 w-[95vw] max-w-[1400px]" 
-          : "bottom-4 right-4 w-[480px]"
+          ? "top-14 left-1/2 -translate-x-1/2 w-[95vw] max-w-[1400px]" 
+          : "bottom-4 right-0 w-[480px]"
         }
         h-[calc(100%-72px)]
       `}
@@ -402,6 +406,7 @@ export default function UnifiedDetailLogs({
             duration={duration}
             locations={filteredLocations}
             expanded={expanded}
+            tptVolume={tptVolume}
           />
         )}
 
