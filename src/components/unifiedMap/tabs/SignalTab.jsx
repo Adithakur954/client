@@ -1,6 +1,7 @@
 import React from "react";
 import { SignalDistributionChart } from "../charts/signal/SignalDistributionChart";
 import { TechnologyBreakdown } from "../charts/signal/TechnologyBreakdown";
+import { OperatorComparisonChart } from "../charts/signal/OperatorComparisonChart";
 
 export const SignalTab = ({ 
   locations, 
@@ -20,6 +21,13 @@ export const SignalTab = ({
       <TechnologyBreakdown 
         ref={chartRefs.tech}
         locations={locations} 
+      />
+
+      <OperatorComparisonChart
+        ref={chartRefs.comparison}
+        locations={locations}
+        metric={selectedMetric}
+        thresholds={thresholds}
       />
     </div>
   );

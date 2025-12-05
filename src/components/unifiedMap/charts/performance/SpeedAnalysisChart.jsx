@@ -102,30 +102,7 @@ export const SpeedAnalysisChart = React.forwardRef(({ locations }, ref) => {
         </div>
       )}
 
-      {/* Speed Timeline */}
-      <div className="mb-3">
-        <div className="text-xs text-slate-400 mb-2 font-medium">Speed Over Time</div>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={data} margin={CHART_CONFIG.margin}>
-            <CartesianGrid {...CHART_CONFIG.grid} />
-            <XAxis
-              dataKey="index"
-              tick={{ fill: "#9CA3AF", fontSize: 11 }}
-              label={{ value: "Sample Number", position: "insideBottom", offset: -10, fill: "#9CA3AF" }}
-            />
-            <YAxis
-              tick={{ fill: "#9CA3AF", fontSize: 11 }}
-              label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fill: "#9CA3AF" }}
-            />
-            <Tooltip
-              contentStyle={CHART_CONFIG.tooltip}
-              formatter={(value) => [`${value.toFixed(1)} km/h`, "Speed"]}
-              labelFormatter={(label) => `Sample #${label}`}
-            />
-            <Line type="monotone" dataKey="speed" stroke="#3b82f6" strokeWidth={2} dot={false} name="Speed" />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      
 
       {/* Speed Distribution */}
       <div>
@@ -142,14 +119,14 @@ export const SpeedAnalysisChart = React.forwardRef(({ locations }, ref) => {
               tick={{ fill: "#9CA3AF", fontSize: 11 }}
               label={{ value: "Count", angle: -90, position: "insideLeft", fill: "#9CA3AF" }}
             />
-            <Tooltip
+            <Tooltip className="text-sm text-white"
               contentStyle={CHART_CONFIG.tooltip}
               formatter={(value, name, props) => [
                 `${value} samples (${((value / data.length) * 100).toFixed(1)}%)`,
                 `${props.payload.range} km/h`,
               ]}
             />
-            <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+            <Bar dataKey="count" className="text-white" radius={[8, 8, 0, 0]}>
               {speedDistribution.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}

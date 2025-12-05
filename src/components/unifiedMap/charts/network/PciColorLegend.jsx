@@ -12,7 +12,12 @@ import {
   Activity,
   ChevronDown,
   ChevronUp,
-  Filter
+  Filter,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  SortAsc,
+  SortDesc
 } from "lucide-react";
 import {
   BarChart,
@@ -98,6 +103,48 @@ const BAND_COLORS = {
   "Unknown": "#6B7280",
 };
 
+// Sort options configuration
+const SORT_OPTIONS = {
+  count: { label: "Samples", key: "count", getValue: (item) => item.count || 0 },
+  pci: { label: "PCI", key: "pci", getValue: (item) => item.pciNum || parseInt(item.pci) || 0 },
+  rsrp: { label: "RSRP", key: "rsrp", getValue: (item) => parseFloat(item.avgRsrp?.avg) || -999 },
+  rsrq: { label: "RSRQ", key: "rsrq", getValue: (item) => parseFloat(item.avgRsrq?.avg) || -999 },
+  sinr: { label: "SINR", key: "sinr", getValue: (item) => parseFloat(item.avgSinr?.avg) || -999 },
+  mos: { label: "MOS", key: "mos", getValue: (item) => parseFloat(item.avgMos?.avg) || 0 },
+  dl: { label: "Download", key: "dl", getValue: (item) => parseFloat(item.avgDl?.avg) || 0 },
+  ul: { label: "Upload", key: "ul", getValue: (item) => parseFloat(item.avgUl?.avg) || 0 },
+  latency: { label: "Latency", key: "latency", getValue: (item) => parseFloat(item.avgLatency?.avg) || 9999 },
+  jitter: { label: "Jitter", key: "jitter", getValue: (item) => parseFloat(item.avgJitter?.avg) || 9999 },
+  cells: { label: "Cells", key: "cells", getValue: (item) => item.cellCount || 0 },
+  nodebs: { label: "NodeBs", key: "nodebs", getValue: (item) => item.nodebCount || 0 },
+};
+
+// Provider sort options
+const PROVIDER_SORT_OPTIONS = {
+  count: { label: "Samples", key: "count", getValue: (item) => item.totalCount || 0 },
+  pciCount: { label: "PCIs", key: "pciCount", getValue: (item) => item.pciCount || 0 },
+  rsrp: { label: "RSRP", key: "rsrp", getValue: (item) => parseFloat(item.avgRsrp?.avg) || -999 },
+  sinr: { label: "SINR", key: "sinr", getValue: (item) => parseFloat(item.avgSinr?.avg) || -999 },
+  mos: { label: "MOS", key: "mos", getValue: (item) => parseFloat(item.avgMos?.avg) || 0 },
+  dl: { label: "Download", key: "dl", getValue: (item) => parseFloat(item.avgDl?.avg) || 0 },
+  ul: { label: "Upload", key: "ul", getValue: (item) => parseFloat(item.avgUl?.avg) || 0 },
+  latency: { label: "Latency", key: "latency", getValue: (item) => parseFloat(item.avgLatency?.avg) || 9999 },
+  cells: { label: "Cells", key: "cells", getValue: (item) => item.cellCount || 0 },
+};
+
+// Cell sort options
+const CELL_SORT_OPTIONS = {
+  count: { label: "Samples", key: "count", getValue: (item) => item.count || 0 },
+  pciCount: { label: "PCIs", key: "pciCount", getValue: (item) => item.pciCount || 0 },
+  rsrp: { label: "RSRP", key: "rsrp", getValue: (item) => parseFloat(item.avgRsrp?.avg) || -999 },
+  sinr: { label: "SINR", key: "sinr", getValue: (item) => parseFloat(item.avgSinr?.avg) || -999 },
+  mos: { label: "MOS", key: "mos", getValue: (item) => parseFloat(item.avgMos?.avg) || 0 },
+  dl: { label: "Download", key: "dl", getValue: (item) => parseFloat(item.avgDl?.avg) || 0 },
+  ul: { label: "Upload", key: "ul", getValue: (item) => parseFloat(item.avgUl?.avg) || 0 },
+  latency: { label: "Latency", key: "latency", getValue: (item) => parseFloat(item.avgLatency?.avg) || 9999 },
+  nodebId: { label: "NodeB ID", key: "nodebId", getValue: (item) => item.nodebId || "" },
+};
+
 const getProviderColor = (provider) => {
   if (!provider) return "#6B7280";
   if (PROVIDER_COLORS[provider]) return PROVIDER_COLORS[provider];
@@ -151,9 +198,171 @@ const calculateStats = (values) => {
   };
 };
 
+// Sort Control Component
+const SortControl = ({ sortConfig, onSortChange, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleSortClick = (key) => {
+    if (sortConfig.key === key) {
+      // Toggle direction
+      onSortChange({
+        key,
+        direction: sortConfig.direction === 'desc' ? 'asc' : 'desc'
+      });
+    } else {
+      // New sort field, default to desc
+      onSortChange({ key, direction: 'desc' });
+    }
+    setIsOpen(false);
+  };
+
+  const toggleDirection = () => {
+    onSortChange({
+      ...sortConfig,
+      direction: sortConfig.direction === 'desc' ? 'asc' : 'desc'
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      {/* Sort Dropdown */}
+      <div className="relative">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 rounded transition-colors"
+        >
+          <Filter className="h-3 w-3" />
+          <span>Sort: {options[sortConfig.key]?.label || 'Samples'}</span>
+          <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {isOpen && (
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setIsOpen(false)}
+            />
+            <div className="absolute left-0 top-full mt-1 z-50 bg-slate-800 border border-slate-600 rounded-lg shadow-xl min-w-[140px] py-1 max-h-[300px] overflow-y-auto">
+              {Object.entries(options).map(([key, option]) => (
+                <button
+                  key={key}
+                  onClick={() => handleSortClick(key)}
+                  className={`w-full flex items-center justify-between px-3 py-1.5 text-[10px] hover:bg-slate-700 transition-colors ${
+                    sortConfig.key === key ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {sortConfig.key === key && (
+                    sortConfig.direction === 'desc' 
+                      ? <ArrowDown className="h-3 w-3" />
+                      : <ArrowUp className="h-3 w-3" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Direction Toggle Button */}
+      <button
+        onClick={toggleDirection}
+        className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+          sortConfig.direction === 'desc' 
+            ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30'
+            : 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
+        }`}
+        title={sortConfig.direction === 'desc' ? 'Descending (High to Low)' : 'Ascending (Low to High)'}
+      >
+        {sortConfig.direction === 'desc' ? (
+          <>
+            <SortDesc className="h-3 w-3" />
+            <span>High→Low</span>
+          </>
+        ) : (
+          <>
+            <SortAsc className="h-3 w-3" />
+            <span>Low→High</span>
+          </>
+        )}
+      </button>
+    </div>
+  );
+};
+
+// Quick Sort Chips
+const QuickSortChips = ({ sortConfig, onSortChange, options, showAll = false }) => {
+  const displayOptions = showAll 
+    ? Object.entries(options) 
+    : Object.entries(options).slice(0, 6);
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {displayOptions.map(([key, option]) => {
+        const isActive = sortConfig.key === key;
+        return (
+          <button
+            key={key}
+            onClick={() => {
+              if (isActive) {
+                onSortChange({
+                  key,
+                  direction: sortConfig.direction === 'desc' ? 'asc' : 'desc'
+                });
+              } else {
+                onSortChange({ key, direction: 'desc' });
+              }
+            }}
+            className={`flex items-center gap-1 px-2 py-0.5 text-[9px] font-medium rounded transition-all ${
+              isActive
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+            }`}
+          >
+            <span>{option.label}</span>
+            {isActive && (
+              sortConfig.direction === 'desc' 
+                ? <ArrowDown className="h-2.5 w-2.5" />
+                : <ArrowUp className="h-2.5 w-2.5" />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// Sort helper function
+const sortData = (data, sortConfig, options) => {
+  if (!data || !sortConfig || !options[sortConfig.key]) return data;
+  
+  const option = options[sortConfig.key];
+  const sorted = [...data].sort((a, b) => {
+    const aVal = option.getValue(a);
+    const bVal = option.getValue(b);
+    
+    // Handle string comparison
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return sortConfig.direction === 'desc' 
+        ? bVal.localeCompare(aVal)
+        : aVal.localeCompare(bVal);
+    }
+    
+    // Handle numeric comparison
+    return sortConfig.direction === 'desc' ? bVal - aVal : aVal - bVal;
+  });
+  
+  return sorted;
+};
+
 export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
   const [viewMode, setViewMode] = useState("color-map");
   const [selectedPci, setSelectedPci] = useState(null);
+  
+  // Sort states for different views
+  const [pciSortConfig, setPciSortConfig] = useState({ key: 'count', direction: 'desc' });
+  const [providerSortConfig, setProviderSortConfig] = useState({ key: 'count', direction: 'desc' });
+  const [cellSortConfig, setCellSortConfig] = useState({ key: 'count', direction: 'desc' });
 
   // ============================================
   // ENHANCED PCI DATA PROCESSING
@@ -174,7 +383,6 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
           sessions: new Set(),
           nodebIds: new Set(),
           cellIds: new Set(),
-          // Metrics arrays
           rsrp: [],
           rsrq: [],
           sinr: [],
@@ -191,7 +399,6 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
       acc[pci].count++;
       acc[pci].samples.push(loc);
 
-      // Categorical data
       const provider = loc.provider || "Unknown";
       const technology = loc.technology || "Unknown";
       const band = loc.band || "Unknown";
@@ -200,18 +407,10 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
       acc[pci].technologies[technology] = (acc[pci].technologies[technology] || 0) + 1;
       acc[pci].bands[band] = (acc[pci].bands[band] || 0) + 1;
 
-      // Identifiers
-      if (loc.session_id != null) {
-        acc[pci].sessions.add(String(loc.session_id));
-      }
-      if (loc.nodeb_id != null && loc.nodeb_id !== "Unknown") {
-        acc[pci].nodebIds.add(String(loc.nodeb_id));
-      }
-      if (loc.cell_id != null && loc.cell_id !== "Unknown") {
-        acc[pci].cellIds.add(String(loc.cell_id));
-      }
+      if (loc.session_id != null) acc[pci].sessions.add(String(loc.session_id));
+      if (loc.nodeb_id != null && loc.nodeb_id !== "Unknown") acc[pci].nodebIds.add(String(loc.nodeb_id));
+      if (loc.cell_id != null && loc.cell_id !== "Unknown") acc[pci].cellIds.add(String(loc.cell_id));
 
-      // Metrics
       if (loc.rsrp != null && !isNaN(loc.rsrp)) acc[pci].rsrp.push(parseFloat(loc.rsrp));
       if (loc.rsrq != null && !isNaN(loc.rsrq)) acc[pci].rsrq.push(parseFloat(loc.rsrq));
       if (loc.sinr != null && !isNaN(loc.sinr)) acc[pci].sinr.push(parseFloat(loc.sinr));
@@ -231,7 +430,6 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
         const pciNum = parseInt(pci);
         const colorIndex = isNaN(pciNum) ? 0 : pciNum % PCI_COLOR_PALETTE.length;
 
-        // Get dominant values
         const dominantProvider = Object.entries(data.providers).sort((a, b) => b[1] - a[1])[0];
         const dominantTechnology = Object.entries(data.technologies).sort((a, b) => b[1] - a[1])[0];
         const dominantBand = Object.entries(data.bands).sort((a, b) => b[1] - a[1])[0];
@@ -242,27 +440,19 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
           color: PCI_COLOR_PALETTE[colorIndex],
           colorIndex,
           count: data.count,
-          
-          // Categorical breakdowns
           providers: data.providers,
           technologies: data.technologies,
           bands: data.bands,
-          
-          // Dominant values
           dominantProvider: dominantProvider?.[0] || "Unknown",
           dominantProviderCount: dominantProvider?.[1] || 0,
           dominantTechnology: dominantTechnology?.[0] || "Unknown",
           dominantBand: dominantBand?.[0] || "Unknown",
-          
-          // Identifiers
           sessions: Array.from(data.sessions).sort(),
           sessionCount: data.sessions.size,
           nodebIds: Array.from(data.nodebIds).sort(),
           nodebCount: data.nodebIds.size,
           cellIds: Array.from(data.cellIds).sort(),
           cellCount: data.cellIds.size,
-          
-          // Calculated metrics
           avgRsrp: calculateStats(data.rsrp),
           avgRsrq: calculateStats(data.rsrq),
           avgSinr: calculateStats(data.sinr),
@@ -273,8 +463,6 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
           avgJitter: calculateStats(data.jitter),
           avgSpeed: calculateStats(data.speed),
           avgBler: calculateStats(data.lte_bler),
-          
-          // Raw arrays for detailed analysis
           rawData: {
             rsrp: data.rsrp,
             rsrq: data.rsrq,
@@ -286,9 +474,13 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
             jitter: data.jitter,
           },
         };
-      })
-      .sort((a, b) => b.count - a.count);
+      });
   }, [locations]);
+
+  // Sorted PCI data
+  const sortedPciColorMap = useMemo(() => {
+    return sortData(pciColorMap, pciSortConfig, SORT_OPTIONS);
+  }, [pciColorMap, pciSortConfig]);
 
   // ============================================
   // PROVIDER DATA PROCESSING
@@ -361,7 +553,6 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
       if (loc.cell_id) providerStats[provider].pcis[pci].cellIds.add(String(loc.cell_id));
       if (loc.nodeb_id) providerStats[provider].pcis[pci].nodebIds.add(String(loc.nodeb_id));
 
-      // Collect metrics
       if (loc.rsrp != null) {
         providerStats[provider].rsrp.push(parseFloat(loc.rsrp));
         providerStats[provider].pcis[pci].rsrp.push(parseFloat(loc.rsrp));
@@ -396,7 +587,6 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
       }
     });
 
-    // Format providers
     const providers = Object.values(providerStats)
       .map((p) => ({
         name: p.name,
@@ -438,10 +628,8 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
         avgUl: calculateStats(p.ul_tpt),
         avgLatency: calculateStats(p.latency),
         avgJitter: calculateStats(p.jitter),
-      }))
-      .sort((a, b) => b.totalCount - a.totalCount);
+      }));
 
-    // Summary
     const summary = {
       totalProviders: providers.length,
       totalPcis: pciColorMap.length,
@@ -454,66 +642,10 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
     return { providers, summary };
   }, [locations, pciColorMap]);
 
-  // ============================================
-  // TECHNOLOGY DATA PROCESSING
-  // ============================================
-  const technologyData = useMemo(() => {
-    if (!locations?.length) return [];
-
-    const techStats = {};
-
-    locations.forEach((loc) => {
-      const tech = loc.technology || "Unknown";
-      
-      if (!techStats[tech]) {
-        techStats[tech] = {
-          name: tech,
-          count: 0,
-          pcis: new Set(),
-          providers: {},
-          bands: {},
-          rsrp: [],
-          sinr: [],
-          mos: [],
-          dl_tpt: [],
-          ul_tpt: [],
-          latency: [],
-        };
-      }
-
-      techStats[tech].count++;
-      if (loc.pci != null) techStats[tech].pcis.add(String(loc.pci));
-      
-      const provider = loc.provider || "Unknown";
-      const band = loc.band || "Unknown";
-      techStats[tech].providers[provider] = (techStats[tech].providers[provider] || 0) + 1;
-      techStats[tech].bands[band] = (techStats[tech].bands[band] || 0) + 1;
-
-      if (loc.rsrp != null) techStats[tech].rsrp.push(parseFloat(loc.rsrp));
-      if (loc.sinr != null) techStats[tech].sinr.push(parseFloat(loc.sinr));
-      if (loc.mos != null) techStats[tech].mos.push(parseFloat(loc.mos));
-      if (loc.dl_tpt != null) techStats[tech].dl_tpt.push(parseFloat(loc.dl_tpt));
-      if (loc.ul_tpt != null) techStats[tech].ul_tpt.push(parseFloat(loc.ul_tpt));
-      if (loc.latency != null) techStats[tech].latency.push(parseFloat(loc.latency));
-    });
-
-    return Object.values(techStats)
-      .map((t) => ({
-        name: t.name,
-        color: getTechnologyColor(t.name),
-        count: t.count,
-        pciCount: t.pcis.size,
-        dominantProvider: Object.entries(t.providers).sort((a, b) => b[1] - a[1])[0]?.[0] || "Unknown",
-        dominantBand: Object.entries(t.bands).sort((a, b) => b[1] - a[1])[0]?.[0] || "Unknown",
-        avgRsrp: calculateStats(t.rsrp),
-        avgSinr: calculateStats(t.sinr),
-        avgMos: calculateStats(t.mos),
-        avgDl: calculateStats(t.dl_tpt),
-        avgUl: calculateStats(t.ul_tpt),
-        avgLatency: calculateStats(t.latency),
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [locations]);
+  // Sorted provider data
+  const sortedProviderData = useMemo(() => {
+    return sortData(providerPciData.providers, providerSortConfig, PROVIDER_SORT_OPTIONS);
+  }, [providerPciData.providers, providerSortConfig]);
 
   // ============================================
   // CELL/NODEB DATA PROCESSING
@@ -589,9 +721,13 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
         avgUl: calculateStats(c.ul_tpt),
         avgLatency: calculateStats(c.latency),
         avgJitter: calculateStats(c.jitter),
-      }))
-      .sort((a, b) => b.count - a.count);
+      }));
   }, [locations]);
+
+  // Sorted cell data
+  const sortedCellData = useMemo(() => {
+    return sortData(cellData, cellSortConfig, CELL_SORT_OPTIONS);
+  }, [cellData, cellSortConfig]);
 
   if (!pciColorMap.length) {
     return (
@@ -628,48 +764,35 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
       <div className="flex flex-wrap gap-1 mb-3">
         <ViewModeButton mode="color-map" icon={MapPin} label="Map" />
         <ViewModeButton mode="by-provider" icon={Globe} label="Provider" />
-        {/* <ViewModeButton mode="by-technology" icon={Wifi} label="Technology" /> */}
         <ViewModeButton mode="by-cell" icon={Antenna} label="Cells" />
-        {/* <ViewModeButton mode="performance" icon={Signal} label="Performance" /> */}
-        {/* <ViewModeButton mode="distribution" icon={BarChart3} label="Stats" /> */}
       </div>
 
       {/* Color Map View */}
       {viewMode === "color-map" && (
         <PCIColorMapView 
-          pciColorMap={pciColorMap} 
+          pciColorMap={sortedPciColorMap} 
           selectedPci={selectedPci}
           onSelectPci={setSelectedPci}
-          
+          sortConfig={pciSortConfig}
+          onSortChange={setPciSortConfig}
         />
       )}
 
       {/* Provider View */}
       {viewMode === "by-provider" && (
-        <PCIByProviderView providerData={providerPciData.providers} />
-      )}
-
-      {/* Technology View */}
-      {viewMode === "by-technology" && (
-        <PCIByTechnologyView technologyData={technologyData} />
+        <PCIByProviderView 
+          providerData={sortedProviderData}
+          sortConfig={providerSortConfig}
+          onSortChange={setProviderSortConfig}
+        />
       )}
 
       {/* Cell/NodeB View */}
       {viewMode === "by-cell" && (
-        <PCIByCellView cellData={cellData} />
-      )}
-
-      {/* Performance View */}
-      {viewMode === "performance" && (
-        <PCIPerformanceView pciColorMap={pciColorMap.slice(0, 15)} />
-      )}
-
-      {/* Distribution View */}
-      {viewMode === "distribution" && (
-        <PCIDistributionView 
-          pciColorMap={pciColorMap} 
-          locations={locations} 
-          summary={providerPciData.summary}
+        <PCIByCellView 
+          cellData={sortedCellData}
+          sortConfig={cellSortConfig}
+          onSortChange={setCellSortConfig}
         />
       )}
     </ChartContainer>
@@ -678,191 +801,158 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
 
 // ==================== SUB-COMPONENTS ====================
 
-// Enhanced Color Map View
-const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci }) => {
+// Enhanced Color Map View with Sorting
+const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, onSortChange }) => {
   const [expandedPci, setExpandedPci] = useState(null);
 
   return (
-    <div className="space-y-1 max-h-[400px] overflow-y-auto scrollbar-hide">
-      {pciColorMap.map((item, idx) => (
-        <div key={idx} className="bg-slate-800/50 rounded overflow-hidden">
-          {/* PCI Header Row */}
-          <div 
-            className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-slate-800 transition-colors ${
-              expandedPci === item.pci ? 'bg-slate-800' : ''
-            }`}
-            onClick={() => setExpandedPci(expandedPci === item.pci ? null : item.pci)}
-          >
-            <div
-              className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/20"
-              style={{ backgroundColor: item.color }}
-            />
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-white text-xs">PCI {item.pci}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
-                  {item.count} samples
-                </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
-                  {item.nodebIds}-{item.cellIds}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2 mt-0.5">
-                <span 
-                  className="text-[9px] px-1 py-0.5 rounded"
-                  style={{ 
-                    backgroundColor: `${getProviderColor(item.dominantProvider)}20`,
-                    color: getProviderColor(item.dominantProvider)
-                  }}
-                >
-                  {item.dominantProvider}
-                </span>
-                <span 
-                  className="text-[9px] px-1 py-0.5 rounded"
-                  style={{ 
-                    backgroundColor: `${getTechnologyColor(item.dominantTechnology)}20`,
-                    color: getTechnologyColor(item.dominantTechnology)
-                  }}
-                >
-                  {item.dominantTechnology}
-                </span>
-                <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                  B{item.dominantBand}
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {item.nodebCount > 0 && (
-                <span className="text-[9px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                  <Antenna className="h-2.5 w-2.5" />
-                  {item.nodebCount}
-                </span>
-              )}
-              {item.cellCount > 0 && (
-                <span className="text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
-                  {item.cellCount} cells
-                </span>
-              )}
-              <span className="text-slate-400 text-xs">
-                {expandedPci === item.pci ? '▲' : '▼'}
-              </span>
-            </div>
-          </div>
-
-          {/* Expanded Details */}
-          {expandedPci === item.pci && (
-            <div className="border-t border-slate-700 bg-slate-900/50 p-2 space-y-2">
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-4 gap-1">
-                <MetricMiniCard 
-                  label="RSRP" 
-                  value={item.avgRsrp?.avg} 
-                  unit="dBm"
-                  color={parseFloat(item.avgRsrp?.avg) >= -90 ? "green" : 
-                         parseFloat(item.avgRsrp?.avg) >= -105 ? "yellow" : "red"}
-                />
-                <MetricMiniCard 
-                  label="RSRQ" 
-                  value={item.avgRsrq?.avg} 
-                  unit="dB"
-                  color="blue"
-                />
-                <MetricMiniCard 
-                  label="SINR" 
-                  value={item.avgSinr?.avg} 
-                  unit="dB"
-                  color="green"
-                />
-                <MetricMiniCard 
-                  label="MOS" 
-                  value={item.avgMos?.avg} 
-                  unit=""
-                  color="yellow"
-                />
-              </div>
-
-              <div className="grid grid-cols-4 gap-1">
-                <MetricMiniCard 
-                  label="DL" 
-                  value={item.avgDl?.avg} 
-                  unit="Mbps"
-                  color="cyan"
-                />
-                <MetricMiniCard 
-                  label="UL" 
-                  value={item.avgUl?.avg} 
-                  unit="Mbps"
-                  color="orange"
-                />
-                <MetricMiniCard 
-                  label="Latency" 
-                  value={item.avgLatency?.avg} 
-                  unit="ms"
-                  color={parseFloat(item.avgLatency?.avg) <= 50 ? "green" : 
-                         parseFloat(item.avgLatency?.avg) <= 100 ? "yellow" : "red"}
-                />
-                <MetricMiniCard 
-                  label="Jitter" 
-                  value={item.avgJitter?.avg} 
-                  unit="ms"
-                  color="purple"
-                />
-              </div>
-
-              {/* Cell IDs */}
-              {item.cellIds.length > 0 && (
-                <div className="text-[9px]">
-                  <span className="text-slate-400">Cell IDs: </span>
-                  <span className="text-cyan-400">{item.cellIds.slice(0, 5).join(', ')}</span>
-                  {item.cellIds.length > 5 && (
-                    <span className="text-slate-500"> +{item.cellIds.length - 5} more</span>
-                  )}
-                </div>
-              )}
-
-              {/* NodeB IDs */}
-              {item.nodebIds.length > 0 && (
-                <div className="text-[9px]">
-                  <span className="text-slate-400">NodeB IDs: </span>
-                  <span className="text-orange-400">{item.nodebIds.slice(0, 5).join(', ')}</span>
-                  {item.nodebIds.length > 5 && (
-                    <span className="text-slate-500"> +{item.nodebIds.length - 5} more</span>
-                  )}
-                </div>
-              )}
-
-              {/* Band Distribution */}
-              {Object.keys(item.bands).length > 1 && (
-                <div className="space-y-1">
-                  <span className="text-[9px] text-slate-400">Band Distribution:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {Object.entries(item.bands)
-                      .sort((a, b) => b[1] - a[1])
-                      .slice(0, 5)
-                      .map(([band, count], bidx) => (
-                        <span 
-                          key={bidx}
-                          className="text-[9px] px-1.5 py-0.5 rounded"
-                          style={{
-                            backgroundColor: `${getBandColor(band)}20`,
-                            color: getBandColor(band)
-                          }}
-                        >
-                          {band}: {count}
-                        </span>
-                      ))
-                    }
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+    <div className="space-y-2">
+      {/* Sort Controls */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <SortControl 
+          sortConfig={sortConfig} 
+          onSortChange={onSortChange} 
+          options={SORT_OPTIONS}
+        />
+        <div className="text-[9px] text-slate-500">
+          {pciColorMap.length} PCIs
         </div>
-      ))}
+      </div>
+
+      {/* Quick Sort Chips */}
+      <QuickSortChips 
+        sortConfig={sortConfig} 
+        onSortChange={onSortChange} 
+        options={SORT_OPTIONS}
+      />
+
+      {/* PCI List */}
+      <div className="space-y-1 max-h-[350px] overflow-y-auto scrollbar-hide">
+        {pciColorMap.map((item, idx) => (
+          <div key={idx} className="bg-slate-800/50 rounded overflow-hidden">
+            {/* PCI Header Row */}
+            <div 
+              className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-slate-800 transition-colors ${
+                expandedPci === item.pci ? 'bg-slate-800' : ''
+              }`}
+              onClick={() => setExpandedPci(expandedPci === item.pci ? null : item.pci)}
+            >
+              <div
+                className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/20"
+                style={{ backgroundColor: item.color }}
+              />
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white text-xs">PCI {item.pci}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                    {item.count} samples
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span 
+                    className="text-[9px] px-1 py-0.5 rounded"
+                    style={{ 
+                      backgroundColor: `${getProviderColor(item.dominantProvider)}20`,
+                      color: getProviderColor(item.dominantProvider)
+                    }}
+                  >
+                    {item.dominantProvider}
+                  </span>
+                  <span 
+                    className="text-[9px] px-1 py-0.5 rounded"
+                    style={{ 
+                      backgroundColor: `${getTechnologyColor(item.dominantTechnology)}20`,
+                      color: getTechnologyColor(item.dominantTechnology)
+                    }}
+                  >
+                    {item.dominantTechnology}
+                  </span>
+                  <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                    B{item.dominantBand}
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {item.avgRsrp?.avg && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                    parseFloat(item.avgRsrp.avg) >= -90 ? "text-green-400 bg-green-500/10" : 
+                    parseFloat(item.avgRsrp.avg) >= -105 ? "text-yellow-400 bg-yellow-500/10" : 
+                    "text-red-400 bg-red-500/10"
+                  }`}>
+                    {item.avgRsrp.avg}dBm
+                  </span>
+                )}
+                {item.avgDl?.avg && (
+                  <span className="text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                    {item.avgDl.avg}Mbps
+                  </span>
+                )}
+                <span className="text-slate-400 text-xs">
+                  {expandedPci === item.pci ? '▲' : '▼'}
+                </span>
+              </div>
+            </div>
+
+            {/* Expanded Details */}
+            {expandedPci === item.pci && (
+              <div className="border-t border-slate-700 bg-slate-900/50 p-2 space-y-2">
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-4 gap-1">
+                  <MetricMiniCard 
+                    label="RSRP" 
+                    value={item.avgRsrp?.avg} 
+                    unit="dBm"
+                    color={parseFloat(item.avgRsrp?.avg) >= -90 ? "green" : 
+                           parseFloat(item.avgRsrp?.avg) >= -105 ? "yellow" : "red"}
+                  />
+                  <MetricMiniCard label="RSRQ" value={item.avgRsrq?.avg} unit="dB" color="blue" />
+                  <MetricMiniCard label="SINR" value={item.avgSinr?.avg} unit="dB" color="green" />
+                  <MetricMiniCard label="MOS" value={item.avgMos?.avg} unit="" color="yellow" />
+                </div>
+
+                <div className="grid grid-cols-4 gap-1">
+                  <MetricMiniCard label="DL" value={item.avgDl?.avg} unit="Mbps" color="cyan" />
+                  <MetricMiniCard label="UL" value={item.avgUl?.avg} unit="Mbps" color="orange" />
+                  <MetricMiniCard 
+                    label="Latency" 
+                    value={item.avgLatency?.avg} 
+                    unit="ms"
+                    color={parseFloat(item.avgLatency?.avg) <= 50 ? "green" : 
+                           parseFloat(item.avgLatency?.avg) <= 100 ? "yellow" : "red"}
+                  />
+                  <MetricMiniCard label="Jitter" value={item.avgJitter?.avg} unit="ms" color="purple" />
+                </div>
+
+                {/* Cell IDs */}
+                {item.cellIds.length > 0 && (
+                  <div className="text-[9px]">
+                    <span className="text-slate-400">Cell IDs: </span>
+                    <span className="text-cyan-400">{item.cellIds.slice(0, 5).join(', ')}</span>
+                    {item.cellIds.length > 5 && (
+                      <span className="text-slate-500"> +{item.cellIds.length - 5} more</span>
+                    )}
+                  </div>
+                )}
+
+                {/* NodeB IDs */}
+                {item.nodebIds.length > 0 && (
+                  <div className="text-[9px]">
+                    <span className="text-slate-400">NodeB IDs: </span>
+                    <span className="text-orange-400">{item.nodebIds.slice(0, 5).join(', ')}</span>
+                    {item.nodebIds.length > 5 && (
+                      <span className="text-slate-500"> +{item.nodebIds.length - 5} more</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -889,8 +979,8 @@ const MetricMiniCard = ({ label, value, unit, color }) => {
   );
 };
 
-// Provider View Component
-const PCIByProviderView = ({ providerData }) => {
+// Provider View Component with Sorting
+const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
   const [expandedProvider, setExpandedProvider] = useState(null);
 
   if (!providerData?.length) {
@@ -902,8 +992,25 @@ const PCIByProviderView = ({ providerData }) => {
   }
 
   return (
-    <div className="space-y-3">
-      
+    <div className="space-y-2">
+      {/* Sort Controls */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <SortControl 
+          sortConfig={sortConfig} 
+          onSortChange={onSortChange} 
+          options={PROVIDER_SORT_OPTIONS}
+        />
+        <div className="text-[9px] text-slate-500">
+          {providerData.length} providers
+        </div>
+      </div>
+
+      {/* Quick Sort Chips */}
+      <QuickSortChips 
+        sortConfig={sortConfig} 
+        onSortChange={onSortChange} 
+        options={PROVIDER_SORT_OPTIONS}
+      />
 
       {/* Provider Cards */}
       <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
@@ -1035,117 +1142,8 @@ const PCIByProviderView = ({ providerData }) => {
   );
 };
 
-// Technology View Component
-const PCIByTechnologyView = ({ technologyData }) => {
-  if (!technologyData?.length) {
-    return (
-      <div className="text-center py-4 text-slate-400 text-sm">
-        No technology data available
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* Technology Distribution Chart */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="bg-slate-800/50 rounded-lg p-2">
-          <div className="text-[10px] text-slate-400 mb-2 font-medium">Technology Distribution</div>
-          <ResponsiveContainer width="100%" height={180}>
-            <PieChart>
-              <Pie
-                data={technologyData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, count }) => `${name}: ${count}`}
-                outerRadius={60}
-                dataKey="count"
-              >
-                {technologyData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "#1e293b", 
-                  border: "1px solid #475569",
-                  borderRadius: "8px",
-                  fontSize: "10px" 
-                }} 
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-lg p-2">
-          <div className="text-[10px] text-slate-400 mb-2 font-medium">Performance by Technology</div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={technologyData} layout="vertical" margin={{ left: 50, right: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis type="number" tick={{ fill: "#94A3B8", fontSize: 9 }} />
-              <YAxis 
-                type="category" 
-                dataKey="name" 
-                tick={{ fill: "#94A3B8", fontSize: 9 }}
-                width={50}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "#1e293b", 
-                  border: "1px solid #475569",
-                  borderRadius: "8px",
-                  fontSize: "10px" 
-                }} 
-              />
-              <Bar dataKey={(d) => parseFloat(d.avgDl?.avg) || 0} fill="#06b6d4" name="Avg DL (Mbps)" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Technology Cards */}
-      <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-hide">
-        {technologyData.map((tech, idx) => (
-          <div 
-            key={idx}
-            className="bg-slate-800/50 rounded-lg p-2 border border-slate-700"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: tech.color }}
-                />
-                <span className="font-semibold text-white text-xs">{tech.name}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">
-                  {tech.count} samples
-                </span>
-                <span className="text-[9px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
-                  {tech.pciCount} PCIs
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-6 gap-1">
-              <MetricMiniCard label="RSRP" value={tech.avgRsrp?.avg} unit="" color="green" />
-              <MetricMiniCard label="SINR" value={tech.avgSinr?.avg} unit="" color="green" />
-              <MetricMiniCard label="MOS" value={tech.avgMos?.avg} unit="" color="yellow" />
-              <MetricMiniCard label="DL" value={tech.avgDl?.avg} unit="" color="cyan" />
-              <MetricMiniCard label="UL" value={tech.avgUl?.avg} unit="" color="orange" />
-              <MetricMiniCard label="Latency" value={tech.avgLatency?.avg} unit="" color="purple" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// Cell/NodeB View Component
-const PCIByCellView = ({ cellData }) => {
+// Cell/NodeB View Component with Sorting
+const PCIByCellView = ({ cellData, sortConfig, onSortChange }) => {
   if (!cellData?.length) {
     return (
       <div className="text-center py-4 text-slate-400 text-sm">
@@ -1155,7 +1153,26 @@ const PCIByCellView = ({ cellData }) => {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
+      {/* Sort Controls */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <SortControl 
+          sortConfig={sortConfig} 
+          onSortChange={onSortChange} 
+          options={CELL_SORT_OPTIONS}
+        />
+        <div className="text-[9px] text-slate-500">
+          {cellData.length} cells
+        </div>
+      </div>
+
+      {/* Quick Sort Chips */}
+      <QuickSortChips 
+        sortConfig={sortConfig} 
+        onSortChange={onSortChange} 
+        options={CELL_SORT_OPTIONS}
+      />
+
       {/* Summary Stats */}
       <div className="grid grid-cols-4 gap-1">
         <StatCard label="NodeBs" value={[...new Set(cellData.map(c => c.nodebId))].length} color="orange" />
@@ -1166,7 +1183,7 @@ const PCIByCellView = ({ cellData }) => {
 
       {/* Cell Table */}
       <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-        <div className="max-h-[350px] overflow-y-auto scrollbar-hide">
+        <div className="max-h-[300px] overflow-y-auto scrollbar-hide">
           <table className="w-full text-[10px]">
             <thead className="sticky top-0 bg-slate-900 z-10">
               <tr className="border-b border-slate-700">
@@ -1229,278 +1246,6 @@ const PCIByCellView = ({ cellData }) => {
     </div>
   );
 };
-
-// Performance View Component
-const PCIPerformanceView = ({ pciColorMap }) => (
-  <div className="space-y-3">
-    {/* Performance Charts */}
-    <div className="grid grid-cols-2 gap-2">
-      <div className="bg-slate-800/50 rounded-lg p-2">
-        <div className="text-[10px] text-slate-400 mb-1 font-medium">RSRP & MOS by PCI</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <ComposedChart data={pciColorMap} margin={{ top: 5, right: 10, left: -10, bottom: 40 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis
-              dataKey="pci"
-              angle={-45}
-              textAnchor="end"
-              height={40}
-              tick={{ fill: "#94A3B8", fontSize: 8 }}
-            />
-            <YAxis yAxisId="left" tick={{ fill: "#94A3B8", fontSize: 9 }} />
-            <YAxis yAxisId="right" orientation="right" domain={[0, 5]} tick={{ fill: "#94A3B8", fontSize: 9 }} />
-            <Tooltip contentStyle={{ ...CHART_CONFIG.tooltip, fontSize: '10px' }} />
-            <Legend wrapperStyle={{ fontSize: "9px" }} />
-            <Bar 
-              yAxisId="left" 
-              dataKey={(d) => parseFloat(d.avgRsrp?.avg) || 0} 
-              fill="#3b82f6" 
-              name="RSRP" 
-              radius={[4, 4, 0, 0]} 
-            />
-            <Line 
-              yAxisId="right" 
-              type="monotone" 
-              dataKey={(d) => parseFloat(d.avgMos?.avg) || 0} 
-              stroke="#facc15" 
-              name="MOS" 
-              strokeWidth={2} 
-              dot={{ r: 3 }} 
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="bg-slate-800/50 rounded-lg p-2">
-        <div className="text-[10px] text-slate-400 mb-1 font-medium">Throughput by PCI</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={pciColorMap} margin={{ top: 5, right: 10, left: -10, bottom: 40 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis
-              dataKey="pci"
-              angle={-45}
-              textAnchor="end"
-              height={40}
-              tick={{ fill: "#94A3B8", fontSize: 8 }}
-            />
-            <YAxis tick={{ fill: "#94A3B8", fontSize: 9 }} />
-            <Tooltip contentStyle={{ ...CHART_CONFIG.tooltip, fontSize: '10px' }} />
-            <Legend wrapperStyle={{ fontSize: "9px" }} />
-            <Bar 
-              dataKey={(d) => parseFloat(d.avgDl?.avg) || 0} 
-              fill="#06b6d4" 
-              name="DL (Mbps)" 
-              radius={[4, 4, 0, 0]} 
-            />
-            <Bar 
-              dataKey={(d) => parseFloat(d.avgUl?.avg) || 0} 
-              fill="#fb923c" 
-              name="UL (Mbps)" 
-              radius={[4, 4, 0, 0]} 
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-
-    {/* Performance Table */}
-    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-      <div className="max-h-[200px] overflow-y-auto scrollbar-hide">
-        <table className="w-full text-[10px]">
-          <thead className="sticky top-0 bg-slate-900 z-10">
-            <tr className="border-b border-slate-700">
-              <th className="text-left p-1.5 text-slate-400 font-medium">PCI</th>
-              <th className="text-center p-1.5 text-slate-400 font-medium">Samples</th>
-              <th className="text-center p-1.5 text-slate-400 font-medium">Cells</th>
-              <th className="text-center p-1.5 text-slate-400 font-medium">RSRP</th>
-              <th className="text-center p-1.5 text-slate-400 font-medium">SINR</th>
-              <th className="text-center p-1.5 text-slate-400 font-medium">MOS</th>
-              <th className="text-center p-1.5 text-slate-400 font-medium">DL</th>
-              <th className="text-center p-1.5 text-slate-400 font-medium">Latency</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pciColorMap.map((item, idx) => (
-              <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="p-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="font-medium text-white">{item.pci}</span>
-                  </div>
-                </td>
-                <td className="p-1.5 text-center text-slate-300">{item.count}</td>
-                <td className="p-1.5 text-center text-cyan-400">{item.cellCount}</td>
-                <td className={`p-1.5 text-center font-medium ${
-                  parseFloat(item.avgRsrp?.avg) >= -90 ? "text-green-400" : 
-                  parseFloat(item.avgRsrp?.avg) >= -105 ? "text-yellow-400" : "text-red-400"
-                }`}>
-                  {item.avgRsrp?.avg || "-"}
-                </td>
-                <td className="p-1.5 text-center text-green-400">{item.avgSinr?.avg || "-"}</td>
-                <td className="p-1.5 text-center text-yellow-400">{item.avgMos?.avg || "-"}</td>
-                <td className="p-1.5 text-center text-cyan-400">{item.avgDl?.avg || "-"}</td>
-                <td className={`p-1.5 text-center ${
-                  parseFloat(item.avgLatency?.avg) <= 50 ? "text-green-400" : 
-                  parseFloat(item.avgLatency?.avg) <= 100 ? "text-yellow-400" : "text-red-400"
-                }`}>
-                  {item.avgLatency?.avg || "-"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
-
-// Distribution View Component  
-const PCIDistributionView = ({ pciColorMap, locations, summary }) => (
-  <div className="space-y-3">
-    {/* Summary Stats */}
-    <div className="grid grid-cols-6 gap-1">
-      <StatCard label="PCIs" value={summary.totalPcis || pciColorMap.length} color="blue" />
-      <StatCard label="Samples" value={summary.totalSamples || locations.length} color="green" />
-      <StatCard label="Sessions" value={summary.totalSessions} color="purple" />
-      <StatCard label="NodeBs" value={summary.totalNodebs} color="orange" />
-      <StatCard label="Cells" value={summary.totalCells} color="cyan" />
-      <StatCard label="Providers" value={summary.totalProviders} color="pink" />
-    </div>
-
-    <div className="grid grid-cols-2 gap-2">
-      {/* PCI Distribution Pie */}
-      <div className="bg-slate-800/50 rounded-lg p-2">
-        <div className="text-[10px] text-slate-400 mb-1 font-medium">Top 10 PCIs by Samples</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <PieChart>
-            <Pie
-              data={pciColorMap.slice(0, 10)}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={({ pci, count }) => `${pci}:${count}`}
-              outerRadius={60}
-              dataKey="count"
-            >
-              {pciColorMap.slice(0, 10).map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip contentStyle={{ ...CHART_CONFIG.tooltip, fontSize: '10px' }} />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Samples per PCI Bar Chart */}
-      <div className="bg-slate-800/50 rounded-lg p-2">
-        <div className="text-[10px] text-slate-400 mb-1 font-medium">Sample Count Distribution</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={pciColorMap.slice(0, 15)} margin={{ top: 5, right: 10, left: -10, bottom: 40 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis
-              dataKey="pci"
-              angle={-45}
-              textAnchor="end"
-              height={40}
-              tick={{ fill: "#94A3B8", fontSize: 8 }}
-            />
-            <YAxis tick={{ fill: "#94A3B8", fontSize: 9 }} />
-            <Tooltip contentStyle={{ ...CHART_CONFIG.tooltip, fontSize: '10px' }} />
-            <Bar dataKey="count" name="Samples" radius={[4, 4, 0, 0]}>
-              {pciColorMap.slice(0, 15).map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-
-    {/* Quick Stats by Category */}
-    <div className="grid grid-cols-3 gap-2">
-      {/* Top Providers */}
-      <div className="bg-slate-800/50 rounded-lg p-2">
-        <div className="text-[10px] text-slate-400 mb-1 font-medium">Top Providers</div>
-        <div className="space-y-1">
-          {[...new Set(locations.map(l => l.provider).filter(Boolean))]
-            .map(provider => ({
-              name: provider,
-              count: locations.filter(l => l.provider === provider).length
-            }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5)
-            .map((p, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <div 
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: getProviderColor(p.name) }}
-                  />
-                  <span className="text-[10px] text-slate-300">{p.name}</span>
-                </div>
-                <span className="text-[10px] text-slate-400">{p.count}</span>
-              </div>
-            ))
-          }
-        </div>
-      </div>
-
-      {/* Top Technologies */}
-      <div className="bg-slate-800/50 rounded-lg p-2">
-        <div className="text-[10px] text-slate-400 mb-1 font-medium">Top Technologies</div>
-        <div className="space-y-1">
-          {[...new Set(locations.map(l => l.technology).filter(Boolean))]
-            .map(tech => ({
-              name: tech,
-              count: locations.filter(l => l.technology === tech).length
-            }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5)
-            .map((t, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <div 
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: getTechnologyColor(t.name) }}
-                  />
-                  <span className="text-[10px] text-slate-300 truncate max-w-[80px]">{t.name}</span>
-                </div>
-                <span className="text-[10px] text-slate-400">{t.count}</span>
-              </div>
-            ))
-          }
-        </div>
-      </div>
-
-      {/* Top Bands */}
-      <div className="bg-slate-800/50 rounded-lg p-2">
-        <div className="text-[10px] text-slate-400 mb-1 font-medium">Top Bands</div>
-        <div className="space-y-1">
-          {[...new Set(locations.map(l => l.band).filter(Boolean))]
-            .map(band => ({
-              name: band,
-              count: locations.filter(l => l.band === band).length
-            }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5)
-            .map((b, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <div 
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: getBandColor(b.name) }}
-                  />
-                  <span className="text-[10px] text-slate-300">Band {b.name}</span>
-                </div>
-                <span className="text-[10px] text-slate-400">{b.count}</span>
-              </div>
-            ))
-          }
-        </div>
-      </div>
-    </div>
-  </div>
-);
 
 // Stat Card Component
 const StatCard = ({ label, value, color }) => {

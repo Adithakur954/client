@@ -19,10 +19,10 @@ export const PerformanceTab = ({ locations, expanded, chartRefs }) => {
 
   return (
     <div className={`grid ${expanded ? "grid-cols-2" : "grid-cols-1"} gap-4`}>
-      <ThroughputTimelineChart 
+      {/* <ThroughputTimelineChart 
         ref={chartRefs?.throughputTimeline} 
         locations={locations} 
-      />
+      /> */}
       <JitterLatencyChart 
         ref={chartRefs?.jitterLatency} 
         locations={locations} 

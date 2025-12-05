@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { SignalTab } from "./tabs/SignalTab";
 import { NetworkTab } from "./tabs/NetworkTab";
-// import { PerformanceTab } from "./tabs/PerformanceTab";
+import { PerformanceTab } from "./tabs/PerformanceTab";
 import { ApplicationTab } from "./tabs/ApplicationTab";
 
 // Common
@@ -428,13 +428,13 @@ export default function UnifiedDetailLogs({
           />
         )}
 
-        {/* {activeTab === "performance" && filteredLocations.length > 0 && (
+        {activeTab === "performance" && filteredLocations.length > 0 && (
           <PerformanceTab
             locations={filteredLocations}
             expanded={expanded}
             chartRefs={chartRefs}
           />
-        )} */}
+        )}
 
         {activeTab === "Application" && (
           <ApplicationTab

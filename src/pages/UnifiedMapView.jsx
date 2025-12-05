@@ -1279,18 +1279,7 @@ const UnifiedMapView = () => {
 
 
 
-  // Add this useEffect to debug/verify state updates
-  useEffect(() => {
-    console.log("appSummary updated:", appSummary);
-  }, [appSummary]);
-
-  useEffect(() => {
-    console.log("inpSummary updated:", InpSummary);
-  }, [InpSummary]);
-
-  useEffect(() => {
-    console.log("tptVolume updated:", tptVolume);
-  }, [tptVolume]);
+ 
 
   const fetchPredictionData = useCallback(async () => {
     if (!projectId) {

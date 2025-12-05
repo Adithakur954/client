@@ -25,7 +25,7 @@ export const TABS = [
   { id: "overview", label: "Overview", icon: "BarChart3" },
   { id: "signal", label: "Signal", icon: "Signal" },
   { id: "network", label: "Comparison", icon: "Wifi" },
-  // { id: "performance", label: "Performance", icon: "Zap" },
+  { id: "performance", label: "Performance", icon: "Zap" },
   { id: "Application", label: "Apps", icon: "PieChartIcon" },
 ];
 

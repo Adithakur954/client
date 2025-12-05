@@ -111,7 +111,7 @@ export const ChartContainer = React.forwardRef(
                 <div>
                   <h3 className="text-lg font-bold text-white">{title}</h3>
                   {subtitle && (
-                    <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+                    <p className="text-xs text-slate-100 mt-0.5">{subtitle}</p>
                   )}
                 </div>
                 {badge && (
@@ -126,14 +126,14 @@ export const ChartContainer = React.forwardRef(
                 {actions}
                 <button
                   onClick={toggleExpand}
-                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-white"
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-100 hover:text-white"
                   title="Exit fullscreen"
                 >
                   <Minimize2 className="h-5 w-5" />
                 </button>
                 <button
                   onClick={toggleExpand}
-                  className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-slate-400 hover:text-red-400"
+                  className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-slate-100 hover:text-red-400"
                   title="Close"
                 >
                   <X className="h-5 w-5" />
@@ -182,7 +182,7 @@ export const ChartContainer = React.forwardRef(
             {collapsible && (
               <button
                 onClick={toggleCollapse}
-                className="p-1 hover:bg-slate-800 rounded transition-colors text-slate-400 hover:text-white flex-shrink-0"
+                className="p-1 hover:bg-slate-800 rounded transition-colors text-slate-100 hover:text-white flex-shrink-0"
                 title={isCollapsed ? "Expand" : "Collapse"}
               >
                 {isCollapsed ? (
@@ -353,7 +353,7 @@ export const ChartContainer = React.forwardRef(
         {/* Collapsed Indicator */}
         {isCollapsed && collapsible && (
           <div 
-            className="text-center py-2 text-slate-500 text-xs cursor-pointer hover:text-slate-400 transition-colors"
+            className="text-center py-2 text-slate-500 text-xs cursor-pointer hover:text-slate-100 transition-colors"
             onClick={toggleCollapse}
           >
             Click to expand

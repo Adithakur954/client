@@ -1,18 +1,173 @@
 import React, { useMemo } from "react";
 import { Activity } from "lucide-react";
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 import { ChartContainer } from "../../common/ChartContainer";
 import { EmptyState } from "../../common/EmptyState";
 import { CHART_CONFIG } from "@/utils/constants";
+
+// Define ranges for latency (in ms)
+const LATENCY_RANGES = [
+  { min: 0, max: 20, label: "0-20", color: "#22c55e", quality: "Excellent" },
+  { min: 20, max: 50, label: "20-50", color: "#84cc16", quality: "Good" },
+  { min: 50, max: 100, label: "50-100", color: "#facc15", quality: "Fair" },
+  { min: 100, max: 150, label: "100-150", color: "#fb923c", quality: "Poor" },
+  { min: 150, max: Infinity, label: "150+", color: "#ef4444", quality: "Bad" },
+];
+
+// Define ranges for jitter (in ms)
+const JITTER_RANGES = [
+  { min: 0, max: 5, label: "0-5", color: "#22c55e", quality: "Excellent" },
+  { min: 5, max: 10, label: "5-10", color: "#84cc16", quality: "Good" },
+  { min: 10, max: 20, label: "10-20", color: "#facc15", quality: "Fair" },
+  { min: 20, max: 30, label: "20-30", color: "#fb923c", quality: "Poor" },
+  { min: 30, max: Infinity, label: "30+", color: "#ef4444", quality: "Bad" },
+];
+
+// Distribution Chart Tooltip
+const DistributionTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl">
+      <div className="font-semibold text-white mb-2 border-b border-slate-700 pb-2">
+        {label} ms
+      </div>
+      <div className="space-y-1.5">
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-2.5 h-2.5 rounded-sm"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-slate-300 text-sm">{entry.name}</span>
+            </div>
+            <span className="font-semibold text-white text-sm">
+              {entry.value} samples
+              <span className="text-slate-400 text-xs ml-1">
+                ({entry.payload?.percentage}%)
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Single Distribution Bar Chart
+const DistributionBarChart = ({ data, ranges, title, totalSamples }) => {
+  const distributionData = useMemo(() => {
+    return ranges.map((range) => {
+      const count = data.filter(
+        (d) => d >= range.min && d < range.max
+      ).length;
+      const percentage = totalSamples > 0 
+        ? ((count / totalSamples) * 100).toFixed(1) 
+        : 0;
+      return {
+        range: range.label,
+        count,
+        percentage,
+        color: range.color,
+        quality: range.quality,
+      };
+    });
+  }, [data, ranges, totalSamples]);
+
+  return (
+    <div className="flex-1">
+      <div className="text-sm font-medium text-slate-300 mb-2 text-center">
+        {title}
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={distributionData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+          <CartesianGrid {...CHART_CONFIG.grid} />
+          <XAxis
+            dataKey="range"
+            tick={{ fill: "#9CA3AF", fontSize: 10 }}
+            label={{ value: "ms", position: "bottom", fill: "#9CA3AF", fontSize: 10 }}
+          />
+          <YAxis
+            tick={{ fill: "#9CA3AF", fontSize: 10 }}
+            label={{ value: "Samples", angle: -90, position: "insideLeft", fill: "#9CA3AF", fontSize: 10 }}
+          />
+          <Tooltip content={<DistributionTooltip />} />
+          <Bar dataKey="count" name={title} radius={[4, 4, 0, 0]}>
+            {distributionData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      
+      {/* Legend with quality labels */}
+      <div className="flex flex-wrap justify-center gap-2 mt-2">
+        {distributionData.map((item, idx) => (
+          <div
+            key={idx}
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs"
+            style={{ backgroundColor: `${item.color}20` }}
+          >
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span style={{ color: item.color }}>{item.range}ms</span>
+            <span className="text-slate-400">({item.count})</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Quality Summary Bar
+const QualitySummary = ({ data, ranges, title, totalSamples }) => {
+  return (
+    <div>
+      <div className="text-xs text-slate-400 mb-2">{title}</div>
+      <div className="space-y-1.5">
+        {ranges.map((range, idx) => {
+          const count = data.filter(
+            (d) => d >= range.min && d < range.max
+          ).length;
+          const percentage = totalSamples > 0 
+            ? ((count / totalSamples) * 100).toFixed(1) 
+            : 0;
+          const barWidth = totalSamples > 0 ? (count / totalSamples) * 100 : 0;
+          
+          return (
+            <div key={idx} className="flex items-center gap-2">
+              <div className="w-16 text-xs text-slate-400">{range.quality}</div>
+              <div className="flex-1 h-4 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${barWidth}%`,
+                    backgroundColor: range.color,
+                  }}
+                />
+              </div>
+              <div className="w-16 text-xs text-right" style={{ color: range.color }}>
+                {percentage}%
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
   const data = useMemo(() => {
@@ -20,8 +175,7 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
 
     return locations
       .filter((loc) => loc.jitter != null || loc.latency != null)
-      .map((loc, idx) => ({
-        index: idx + 1,
+      .map((loc) => ({
         jitter: parseFloat(loc.jitter) || 0,
         latency: parseFloat(loc.latency) || 0,
       }));
@@ -30,9 +184,18 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
   const stats = useMemo(() => {
     if (!data.length) return null;
 
+    const latencyValues = data.map((d) => d.latency);
+    const jitterValues = data.map((d) => d.jitter);
+
     return {
       avgJitter: (data.reduce((sum, d) => sum + d.jitter, 0) / data.length).toFixed(2),
       avgLatency: (data.reduce((sum, d) => sum + d.latency, 0) / data.length).toFixed(2),
+      minLatency: Math.min(...latencyValues).toFixed(2),
+      maxLatency: Math.max(...latencyValues).toFixed(2),
+      minJitter: Math.min(...jitterValues).toFixed(2),
+      maxJitter: Math.max(...jitterValues).toFixed(2),
+      latencyValues,
+      jitterValues,
     };
   }, [data]);
 
@@ -45,34 +208,79 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
   }
 
   return (
-    <ChartContainer ref={ref} title="Network Latency & Jitter" icon={Activity}>
+    <ChartContainer ref={ref} title="Network Latency & Jitter Distribution" icon={Activity}>
+      {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-slate-800 rounded p-2 text-center hover:bg-slate-750 transition-colors">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+          <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
             <div className="text-xs text-slate-400">Avg Latency</div>
             <div className="text-xl font-bold text-pink-400">{stats.avgLatency} ms</div>
+            <div className="text-[10px] text-slate-500 mt-1">
+              {stats.minLatency} - {stats.maxLatency} ms
+            </div>
           </div>
-          <div className="bg-slate-800 rounded p-2 text-center hover:bg-slate-750 transition-colors">
+          <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
             <div className="text-xs text-slate-400">Avg Jitter</div>
             <div className="text-xl font-bold text-indigo-400">{stats.avgJitter} ms</div>
+            <div className="text-[10px] text-slate-500 mt-1">
+              {stats.minJitter} - {stats.maxJitter} ms
+            </div>
+          </div>
+          <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
+            <div className="text-xs text-slate-400">Total Samples</div>
+            <div className="text-xl font-bold text-cyan-400">{data.length}</div>
+          </div>
+          <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
+            <div className="text-xs text-slate-400">Quality Score</div>
+            <div className="text-xl font-bold text-green-400">
+              {stats.avgLatency < 50 && stats.avgJitter < 10 
+                ? "Good" 
+                : stats.avgLatency < 100 && stats.avgJitter < 20 
+                ? "Fair" 
+                : "Poor"}
+            </div>
           </div>
         </div>
       )}
 
-      <ResponsiveContainer width="100%" height={250}>
-        <LineChart data={data} margin={CHART_CONFIG.margin}>
-          <CartesianGrid {...CHART_CONFIG.grid} />
-          <XAxis dataKey="index" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
-          <YAxis
-            tick={{ fill: "#9CA3AF", fontSize: 11 }}
-            label={{ value: "ms", angle: -90, position: "insideLeft", fill: "#9CA3AF" }}
+      {/* Distribution Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="bg-slate-800/50 rounded-lg p-3">
+          <DistributionBarChart
+            data={stats?.latencyValues || []}
+            ranges={LATENCY_RANGES}
+            title="Latency Distribution"
+            totalSamples={data.length}
           />
-          <Tooltip contentStyle={CHART_CONFIG.tooltip} formatter={(value) => `${value.toFixed(2)} ms`} />
-          <Legend wrapperStyle={{ fontSize: "12px" }} />
-          <Line type="monotone" dataKey="latency" stroke="#ec4899" strokeWidth={2} dot={false} name="Latency" />
-          <Line type="monotone" dataKey="jitter" stroke="#6366f1" strokeWidth={2} dot={false} name="Jitter" />
-        </LineChart>
-      </ResponsiveContainer>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3">
+          <DistributionBarChart
+            data={stats?.jitterValues || []}
+            ranges={JITTER_RANGES}
+            title="Jitter Distribution"
+            totalSamples={data.length}
+          />
+        </div>
+      </div>
+
+      {/* Quality Summary Blocks */}
+      <div className="bg-slate-800 rounded-lg p-4">
+        <div className="text-sm font-medium text-slate-300 mb-3">Quality Summary</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <QualitySummary
+            data={stats?.latencyValues || []}
+            ranges={LATENCY_RANGES}
+            title="Latency Quality"
+            totalSamples={data.length}
+          />
+          <QualitySummary
+            data={stats?.jitterValues || []}
+            ranges={JITTER_RANGES}
+            title="Jitter Quality"
+            totalSamples={data.length}
+          />
+        </div>
+      </div>
     </ChartContainer>
   );
 });
