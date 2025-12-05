@@ -23,7 +23,7 @@ const SWR_CONFIG = {
   dedupingInterval: 5000,
   focusThrottleInterval: 30000,
   loadingTimeout: 10000,
-  keepPreviousData: true,
+  keepPreviousData: true, // ✅ Always keep previous data
   revalidateIfStale: true,
 };
 
@@ -121,14 +121,17 @@ const safeFetch = async (apiFn, fallback = []) => {
 };
 
 /**
- * Fetch with session storage fallback
+ * Fetch with session storage fallback - ALWAYS returns cached data on error
  */
 const fetchWithFallback = async (apiFn, cacheKey, fallback = []) => {
+  // ✅ Try to get cached data first
+  const cachedData = getCachedData(cacheKey, null);
+  
   try {
     const response = await apiFn();
     const data = extractData(response, null);
     
-    // Valid data - cache and return
+    // ✅ Valid data - cache and return
     if (data !== null && data !== undefined) {
       const isValidArray = Array.isArray(data) && data.length > 0;
       const isValidObject = !Array.isArray(data) && typeof data === 'object' && Object.keys(data).length > 0;
@@ -144,10 +147,11 @@ const fetchWithFallback = async (apiFn, cacheKey, fallback = []) => {
       }
     }
     
-    // No valid data - try cache
-    return getCachedData(cacheKey, fallback);
+    // ✅ No valid new data - return cached data if available, otherwise fallback
+    return cachedData !== null ? cachedData : fallback;
   } catch {
-    return getCachedData(cacheKey, fallback);
+    // ✅ API error - ALWAYS return cached data if available
+    return cachedData !== null ? cachedData : fallback;
   }
 };
 

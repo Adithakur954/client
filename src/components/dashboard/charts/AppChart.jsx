@@ -37,16 +37,7 @@ function AppChart() {
     isValidating
   } = useAppData();
 
-  // ✅ Debug logging
-  console.log('🔍 [AppChart] Hook Result:', {
-    chartData,
-    isLoading,
-    error,
-    isValidating,
-    dataType: typeof chartData,
-    isArray: Array.isArray(chartData),
-    length: chartData?.length
-  });
+  
 
   // Ensure data is always an array
   const data = useMemo(() => {
@@ -88,7 +79,7 @@ function AppChart() {
     });
     
     const result = sorted.slice(0, topN);
-    console.log('✅ [AppChart] Display Data:', result);
+    
     return result;
   }, [data, topN, sortBy]);
 

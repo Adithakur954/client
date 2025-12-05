@@ -3,7 +3,7 @@
 const DB_NAME = 'swr-cache-db';
 const STORE_NAME = 'cache';
 const DB_VERSION = 1;
-const CACHE_EXPIRY = 7*24 * 60 * 60 * 1000; // 7 days
+const CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 class IndexedDBCache {
   constructor() {
@@ -21,7 +21,7 @@ class IndexedDBCache {
       await this.loadToMemory();
       this.isReady = true;
     } catch (error) {
-      console.warn('IndexedDB not available, using memory cache:', error);
+      // ✅ REMOVED: console.warn - Silent fallback to memory cache
       this.isReady = true;
     }
   }
@@ -129,7 +129,8 @@ class IndexedDBCache {
         transaction.onerror = () => reject(transaction.error);
       });
     } catch (error) {
-      console.warn('Failed to write to IndexedDB:', error);
+      // ✅ REMOVED: console.warn - Silent error handling
+      // Failed writes will be retried on next batch
     }
   }
 

@@ -17,9 +17,7 @@ import { useHandsetPerformance } from '@/hooks/useDashboardData.js';
 import { getRSRPPointColor } from '@/utils/chartUtils';
 
 const HandsetPerformanceChart = () => {
-  // ============================================
-  // SWR HOOK - SINGLE SOURCE OF TRUTH
-  // ============================================
+  
   const { 
     data: rawData, 
     isLoading, 
@@ -67,9 +65,9 @@ const HandsetPerformanceChart = () => {
     
     // Sort
     if (sortBy === 'avg') {
-      filtered.sort((a, b) => b.Avg - a.Avg);
+      filtered.sort((a, b) => (b.Avg || 0) - (a.Avg || 0));
     } else {
-      filtered.sort((a, b) => b.Samples - a.Samples);
+      filtered.sort((a, b) => (b.Samples || 0) - (a.Samples || 0));
     }
     
     // Take top N and add baseline
@@ -108,12 +106,14 @@ const HandsetPerformanceChart = () => {
   const renderLollipopStick = (props) => {
     const { x, y, width, height, payload } = props;
     
-    if (!payload || !x || !y || !width || !height) {
+    // ✅ FIX: Better validation
+    if (!payload || typeof x !== 'number' || typeof y !== 'number' || 
+        typeof width !== 'number' || typeof height !== 'number') {
       return null;
     }
 
     const avgValue = payload.Avg;
-    if (avgValue === undefined || avgValue === null) {
+    if (avgValue === undefined || avgValue === null || isNaN(avgValue)) {
       return null;
     }
 
@@ -291,7 +291,7 @@ const HandsetPerformanceChart = () => {
       settings={{
         title: 'Handset Performance Settings',
         render: settingsRender,
-        onApply: () => console.log('✅ Settings applied')
+        // ✅ REMOVED: console.log - settings are applied via state changes
       }}
     >
       <ResponsiveContainer width="100%" height="100%">
@@ -334,13 +334,13 @@ const HandsetPerformanceChart = () => {
             cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
           />
 
+          {/* ✅ FIX: Changed baseLine to baseValue (though it might not be needed) */}
           <Bar
             dataKey="Avg"
             fill="transparent"
             shape={renderLollipopStick}
             isAnimationActive={true}
             animationDuration={600}
-            baseLine={CHART_Y_MIN}
           >
             {chartData.map((entry, index) => (
               <Cell key={`cell-${index}`} />

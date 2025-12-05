@@ -233,28 +233,41 @@ const getColorFromValueOrMetric = (value, thresholds, metric) => {
 
   // Try thresholds first
   if (thresholds?.length > 0) {
-    // Find threshold where value falls within range
-    const threshold = thresholds.find((t) => {
+    // ✅ FIX: Sort by min value first
+    const sorted = [...thresholds]
+      .filter(t => t.min != null && t.max != null) // Remove invalid entries
+      .sort((a, b) => parseFloat(a.min) - parseFloat(b.min));
+
+    // ✅ FIX: Find the LAST matching range (handles overlaps)
+    let matchedThreshold = null;
+    
+    for (const t of sorted) {
       const min = parseFloat(t.min);
       const max = parseFloat(t.max);
-      // Handle inclusive ranges properly
-      return value >= min && value <= max;
-    });
-
-    if (threshold?.color) {
-      return threshold.color;
-    }
-
-    // If no exact match, find closest range
-    const sorted = [...thresholds].sort((a, b) => a.min - b.min);
-    for (let i = 0; i < sorted.length; i++) {
-      if (value <= sorted[i].max) {
-        return sorted[i].color;
+      
+      // Use inclusive on min, exclusive on max to avoid overlaps
+      // Exception: if it's the last range, include max
+      const isLastRange = t === sorted[sorted.length - 1];
+      
+      if (value >= min && (isLastRange ? value <= max : value < max)) {
+        matchedThreshold = t;
+        // Don't break - keep looking for better match
       }
     }
 
-    // Return last threshold color if value exceeds all ranges
-    return sorted[sorted.length - 1]?.color || "#999999";
+    if (matchedThreshold?.color) {
+      return matchedThreshold.color;
+    }
+
+    // ✅ FIX: Handle values outside all ranges
+    if (value < sorted[0].min) {
+      return sorted[0].color; // Below minimum - use first color
+    }
+    if (value > sorted[sorted.length - 1].max) {
+      return sorted[sorted.length - 1].color; // Above maximum - use last color
+    }
+
+    return "#999999"; // Fallback for gaps
   }
 
   // Fall back to metric-based color
@@ -371,6 +384,41 @@ const calculateMedian = (values) => {
   const sorted = [...validValues].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+// Add this after the calculateMedian function
+const cleanThresholds = (thresholds) => {
+  if (!thresholds?.length) return [];
+
+  // Filter out invalid entries
+  const valid = thresholds
+    .filter(t => {
+      const min = parseFloat(t.min);
+      const max = parseFloat(t.max);
+      return !isNaN(min) && !isNaN(max) && min < max;
+    })
+    .map(t => ({
+      ...t,
+      min: parseFloat(t.min),
+      max: parseFloat(t.max)
+    }));
+
+  // Sort by min value
+  const sorted = [...valid].sort((a, b) => a.min - b.min);
+
+  // Log gaps and overlaps for debugging
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i];
+    const next = sorted[i + 1];
+    
+    if (current.max > next.min) {
+      console.warn(`⚠️ Overlap detected: ${current.max} > ${next.min}`, current, next);
+    } else if (current.max < next.min) {
+      console.warn(`⚠️ Gap detected: ${current.max} to ${next.min}`, current, next);
+    }
+  }
+
+  return sorted;
 };
 
 const calculateCategoryStats = (points, category, metric) => {
@@ -1156,30 +1204,30 @@ const UnifiedMapView = () => {
 
   // Load thresholds
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await settingApi.getThresholdSettings();
+  const load = async () => {
+    try {
+      const res = await settingApi.getThresholdSettings();
 
-        console.log("📦 Raw API Response:", res);
-        console.log("📦 Response.Data:", res?.Data);
-        const d = res?.Data;
-        if (d) {
-          setThresholds({
-            rsrp: JSON.parse(d.rsrp_json || "[]"),
-            rsrq: JSON.parse(d.rsrq_json || "[]"),
-            sinr: JSON.parse(d.sinr_json || "[]"),
-            dl_thpt: JSON.parse(d.dl_thpt_json || "[]"),
-            ul_thpt: JSON.parse(d.ul_thpt_json || "[]"),
-            mos: JSON.parse(d.mos_json || "[]"),
-            lte_bler: JSON.parse(d.lte_bler_json || "[]"),
-          });
-        }
-      } catch (e) {
-        console.error("Failed to load thresholds:", e);
+      console.log("📦 Raw API Response:", res);
+      console.log("📦 Response.Data:", res?.Data);
+      const d = res?.Data;
+      if (d) {
+        setThresholds({
+          rsrp: cleanThresholds(JSON.parse(d.rsrp_json || "[]")),
+          rsrq: cleanThresholds(JSON.parse(d.rsrq_json || "[]")),
+          sinr: cleanThresholds(JSON.parse(d.sinr_json || "[]")),
+          dl_thpt: cleanThresholds(JSON.parse(d.dl_thpt_json || "[]")),
+          ul_thpt: cleanThresholds(JSON.parse(d.ul_thpt_json || "[]")),
+          mos: cleanThresholds(JSON.parse(d.mos_json || "[]")),
+          lte_bler: cleanThresholds(JSON.parse(d.lte_bler_json || "[]")),
+        });
       }
-    };
-    load();
-  }, []);
+    } catch (e) {
+      console.error("Failed to load thresholds:", e);
+    }
+  };
+  load();
+}, []);
 
   // Fetch functions
   const fetchSampleData = useCallback(async () => {
