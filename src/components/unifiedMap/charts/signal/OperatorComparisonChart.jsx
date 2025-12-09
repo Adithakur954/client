@@ -327,7 +327,7 @@ export const OperatorComparisonChart = React.forwardRef(({
         <div className="flex items-center gap-2">
           {/* View Mode Toggle */}
           <div className="flex rounded-lg overflow-hidden border border-slate-600">
-            {["bar", "radar", "table"].map((mode) => (
+            {["bar",  "table"].map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}

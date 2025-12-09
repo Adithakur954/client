@@ -46,7 +46,6 @@ export default function UnifiedDetailLogs({
   tptVolume,
   InpSummary,
   
-  
   // Filter props
   dataFilters = DEFAULT_DATA_FILTERS,
   onFilteredDataChange,
@@ -131,18 +130,15 @@ export default function UnifiedDetailLogs({
       setIsFilterLoading(false);
     }
   }, [projectId, sessionIds, locations]);
-      // yaha pe filtered loations hai isme sab data hai 
+      
   // Apply filters when dataFilters change
   useEffect(() => {
     const applyFilters = async () => {
       if (hasActiveFilters) {
         const filtered = await fetchFilteredData(dataFilters);
-
-       
         setFilteredLocations(filtered);
         onFilteredDataChange?.(filtered);
       } else {
-        
         setFilteredLocations(locations);
         onFilteredDataChange?.(locations);
       }
@@ -151,9 +147,6 @@ export default function UnifiedDetailLogs({
     applyFilters();
   }, [dataFilters, hasActiveFilters]); 
 
-  
-
-  
   useEffect(() => {
     if (!hasActiveFilters) {
       setFilteredLocations(locations);
@@ -177,7 +170,6 @@ export default function UnifiedDetailLogs({
     { revalidateOnFocus: false, shouldRetryOnError: false }
   );
 
- 
   const stats = useMemo(
     () => calculateStats(filteredLocations, selectedMetric),
     [filteredLocations, selectedMetric]
@@ -222,37 +214,25 @@ export default function UnifiedDetailLogs({
     });
   };
 
-  // Debug logs
-  useEffect(() => {
-    console.log("📊 Analytics Component State:", {
-      originalLocations: locations?.length,
-      filteredLocations: filteredLocations?.length,
-      activeFilters: dataFilters,
-      hasActiveFilters,
-      isFilterLoading,
-      activeTab,
-    });
-  }, [locations, filteredLocations, dataFilters, hasActiveFilters, isFilterLoading, activeTab]);
-
   // Collapsed state
   if (collapsed) {
     return (
       <div className="fixed bottom-4 left-4 flex gap-2 z-40">
         <button
           onClick={() => setCollapsed(false)}
-          className="bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2"
+          className="bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2 text-sm"
         >
           <BarChart3 className="h-4 w-4" />
           Show Analytics
           {hasActiveFilters && (
-            <span className="ml-1 bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+            <span className="ml-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-medium">
               Filtered
             </span>
           )}
         </button>
         <button
           onClick={onClose}
-          className="bg-red-900 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-red-800 transition-all"
+          className="bg-red-900 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-red-800 transition-all text-sm"
         >
           ✕
         </button>
@@ -273,18 +253,18 @@ export default function UnifiedDetailLogs({
       `}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-slate-700 bg-slate-900 rounded-t-lg">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between p-3 border-b border-slate-700 bg-slate-900 rounded-t-lg">
+        <div className="flex items-center gap-3">
           <BarChart3 className="h-5 w-5 text-blue-400" />
-          <h3 className="font-semibold">Analytics Dashboard</h3>
+          <h3 className="font-semibold text-lg">Analytics Dashboard</h3>
           {hasActiveFilters && (
-            <span className="bg-blue-500 text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1">
+            <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
               <Filter className="h-3 w-3" />
               Filtered
             </span>
           )}
           {isFilterLoading && (
-            <div className="flex items-center gap-1 text-xs text-blue-400">
+            <div className="flex items-center gap-1 text-sm text-blue-400">
               <div className="animate-spin rounded-full h-3 w-3 border border-blue-400 border-t-transparent" />
               <span>Applying...</span>
             </div>
@@ -299,7 +279,7 @@ export default function UnifiedDetailLogs({
             title="Export Analytics"
           >
             <Download className="h-4 w-4" />
-            <span className="text-xs font-medium hidden lg:inline">Export</span>
+            <span className="text-sm font-medium hidden lg:inline">Export</span>
           </button>
           
           <button
@@ -330,31 +310,31 @@ export default function UnifiedDetailLogs({
 
       {/* Filter Summary Bar */}
       {hasActiveFilters && (
-        <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center gap-3 text-xs flex-wrap">
+        <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center gap-3 text-sm flex-wrap">
           <span className="text-slate-400 font-medium flex items-center gap-1">
             <Filter className="h-3 w-3" />
             Active Filters:
           </span>
           
           {dataFilters.providers?.length > 0 && (
-            <span className="bg-blue-900/50 text-blue-300 px-2 py-1 rounded border border-blue-700/30">
+            <span className="bg-blue-900/50 text-blue-300 px-2 py-1 rounded border border-blue-700/30 text-xs font-medium">
               📡 Providers: {dataFilters.providers.join(", ")}
             </span>
           )}
           
           {dataFilters.bands?.length > 0 && (
-            <span className="bg-purple-900/50 text-purple-300 px-2 py-1 rounded border border-purple-700/30">
+            <span className="bg-purple-900/50 text-purple-300 px-2 py-1 rounded border border-purple-700/30 text-xs font-medium">
               📶 Bands: {dataFilters.bands.join(", ")}
             </span>
           )}
           
           {dataFilters.technologies?.length > 0 && (
-            <span className="bg-green-900/50 text-green-300 px-2 py-1 rounded border border-green-700/30">
+            <span className="bg-green-900/50 text-green-300 px-2 py-1 rounded border border-green-700/30 text-xs font-medium">
               🔧 Tech: {dataFilters.technologies.join(", ")}
             </span>
           )}
           
-          <span className="text-slate-400 ml-auto font-mono">
+          <span className="text-slate-400 ml-auto font-mono text-xs">
             {filteredLocations.length.toLocaleString()} / {totalLocations.toLocaleString()} logs
             <span className="text-blue-400 ml-2">
               ({totalLocations > 0 ? ((filteredLocations.length / totalLocations) * 100).toFixed(1) : 0}%)

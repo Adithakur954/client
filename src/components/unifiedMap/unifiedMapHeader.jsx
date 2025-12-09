@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, Filter, ChartBar, ChevronDown } from "lucide-react";
+import { LogOut, Filter, ChartBar, ChevronDown, ChevronUp } from "lucide-react";
 import { useLocation, Link, useSearchParams } from "react-router-dom";
 import { mapViewApi } from "@/api/apiEndpoints";
 import ProjectsDropdown from "../project/ProjectsDropdown";
@@ -14,12 +14,16 @@ export default function UnifiedHeader({
   showAnalytics,
   projectId,
   sessionIds,
+  // ✅ Renamed for clarity
+  isOpacityCollapsed,
+  setIsOpacityCollapsed,
+  opacity,
+  setOpacity,
 }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  
   const effectiveProjectId =
     projectId || searchParams.get("project_id") || searchParams.get("project");
   const sessionParam =
@@ -33,14 +37,12 @@ export default function UnifiedHeader({
           .filter((id) => id)
       : []);
   const [project, setProject] = useState(null);
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProject = async () => {
       try {
         const response = await mapViewApi.getProjects();
-
         const allProjects = response?.Data || [];
 
         if (!Array.isArray(allProjects)) {
@@ -68,7 +70,7 @@ export default function UnifiedHeader({
       fetchProject();
     }
   }, [effectiveProjectId]);
-  
+
   const isMapPage = location.pathname.includes("unified-map");
 
   return (
@@ -81,7 +83,8 @@ export default function UnifiedHeader({
               <span className="text-sm font-normal text-gray-400 ml-2">
                 {effectiveProjectId && `(Project: ${effectiveProjectId})`}
               </span>
-            </h1> 
+            </h1>
+
             <Button
               onClick={onToggleControls}
               size="sm"
@@ -90,18 +93,61 @@ export default function UnifiedHeader({
               <Filter className="h-4 w-4" />
               {isControlsOpen ? "Close" : "Open"} Filter
             </Button>
-             <Button
+
+            <Button
               onClick={onLeftToggle}
               size="sm"
               className={`flex gap-1 items-center ${
-                showAnalytics 
-                  ? "bg-green-600 hover:bg-green-500" 
+                showAnalytics
+                  ? "bg-green-600 hover:bg-green-500"
                   : "bg-blue-600 hover:bg-blue-500"
               } text-white`}
             >
               <ChartBar className="h-4 w-4" />
               {showAnalytics ? "Hide" : "Show"} Analytics
             </Button>
+
+            {/* ✅ FIX: Opacity Control - Now INSIDE isMapPage block */}
+            <div className="flex items-center gap-2 bg-gray-700/80 rounded-lg px-3 py-1.5 border border-gray-600">
+              <span className="text-xs text-gray-300 font-medium">Opacity</span>
+
+              {!isOpacityCollapsed ? (
+                <>
+                  {/* ✅ FIX: Better color visibility on dark background */}
+                  <span className="text-xs font-bold text-blue-400 min-w-[40px] text-center">
+                    {Math.round((opacity ?? 0.8) * 100)}%
+                  </span>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={(opacity ?? 0.8) * 100}
+                    onChange={(e) => setOpacity(Number(e.target.value) / 100)}
+                    className="w-24 h-2 bg-gray-500 rounded-lg cursor-pointer accent-blue-500"
+                  />
+                  <button
+                    onClick={() => setIsOpacityCollapsed(true)}
+                    className="text-gray-400 hover:text-white transition-colors p-0.5 rounded hover:bg-gray-600"
+                    title="Collapse"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-blue-400 font-medium">
+                    {Math.round((opacity ?? 0.8) * 100)}%
+                  </span>
+                  <button
+                    onClick={() => setIsOpacityCollapsed(false)}
+                    className="text-gray-400 hover:text-white transition-colors p-0.5 rounded hover:bg-gray-600"
+                    title="Expand"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -113,7 +159,7 @@ export default function UnifiedHeader({
         <Button>
           <Link to="/mapview">Map View</Link>
         </Button>
-          <ProjectsDropdown currentProjectId={effectiveProjectId} />
+        <ProjectsDropdown currentProjectId={effectiveProjectId} />
         <p className="text-gray-300 text-sm">
           Welcome,{" "}
           <span className="font-semibold text-white">

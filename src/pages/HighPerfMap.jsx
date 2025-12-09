@@ -222,30 +222,41 @@ export default function HighPerfMap() {
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchThresholds = async () => {
-      try {
-        const res = await settingApi.getThresholdSettings();
+// In HighPerfMap.jsx - Update the fetchThresholds useEffect
+useEffect(() => {
+  const fetchThresholds = async () => {
+    try {
+      const res = await settingApi.getThresholdSettings();
 
-        if (res?.Data) {
-          const d = res.Data;
-          setThresholds({
-            rsrp: JSON.parse(d.rsrp_json || "[]"),
-            rsrq: JSON.parse(d.rsrq_json || "[]"),
-            sinr: JSON.parse(d.sinr_json || "[]"),
-            dl_thpt: JSON.parse(d.dl_thpt_json || "[]"),
-            ul_thpt: JSON.parse(d.ul_thpt_json || "[]"),
-            mos: JSON.parse(d.mos_json || "[]"),
-            lte_bler: JSON.parse(d.lte_bler_json || "[]"),
-            coveragehole: parseFloat(d.coveragehole_json) || -110,
-          });
-        }
-      } catch {
-        toast.error("Could not load color thresholds.");
+      if (res?.Data) {
+        const d = res.Data;
+        
+        // ✅ Debug: See what API returns
+        console.log("📊 Raw threshold API response:", d);
+        
+        const parsed = {
+          rsrp: JSON.parse(d.rsrp_json || "[]"),
+          rsrq: JSON.parse(d.rsrq_json || "[]"),
+          sinr: JSON.parse(d.sinr_json || "[]"),
+          // ✅ Handle both possible API field names for DL
+          dl_tpt: JSON.parse(d.dl_tpt_json || d.dl_thpt_json || "[]"),
+          // ✅ Handle both possible API field names for UL
+          ul_thpt: JSON.parse(d.ul_thpt_json || d.ul_tpt_json || "[]"),
+          mos: JSON.parse(d.mos_json || "[]"),
+          lte_bler: JSON.parse(d.lte_bler_json || "[]"),
+          coveragehole: parseFloat(d.coveragehole_json) || -110,
+        };
+        
+        console.log("📊 Parsed thresholds:", parsed);
+        setThresholds(parsed);
       }
-    };
-    fetchThresholds();
-  }, []);
+    } catch (err) {
+      console.error("Failed to fetch thresholds:", err);
+      toast.error("Could not load color thresholds.");
+    }
+  };
+  fetchThresholds();
+}, []);
 
   const fetchAllSessions = useCallback(async () => {
     setIsLoading(true);
@@ -331,17 +342,43 @@ export default function HighPerfMap() {
     setMap(null);
   }, []);
 
-  const handleApplyFilters = (filters) => {
-    setActiveFilters(filters);
-    setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
-    setSelectedSessionData(null);
-    setDrawnLogs([]);
-    setAnalysis(null);
-    setTemporalAnalysis(null); // ✅ Reset temporal analysis
-    setUi((u) => ({ ...u, showLogsCircles: true }));
-    setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
-    setColorBy(filters.colorBy || null);
+// ✅ FIXED handleApplyFilters - Don't clear logs if only metric changes
+
+const handleApplyFilters = (filters) => {
+  // Check if actual API params changed (not just the metric)
+  const newApiParams = {
+    startDate: filters.startDate,
+    endDate: filters.endDate,
+    provider: filters.provider,
+    technology: filters.technology,
+    band: filters.band,
   };
+  
+  const oldApiParams = activeFilters ? {
+    startDate: activeFilters.startDate,
+    endDate: activeFilters.endDate,
+    provider: activeFilters.provider,
+    technology: activeFilters.technology,
+    band: activeFilters.band,
+  } : null;
+  
+  const apiParamsChanged = JSON.stringify(newApiParams) !== JSON.stringify(oldApiParams);
+  
+  setActiveFilters(filters);
+  setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
+  setSelectedSessionData(null);
+  
+  // ✅ Only clear logs if actual API params changed
+  if (apiParamsChanged) {
+    setDrawnLogs([]);
+  }
+  
+  setAnalysis(null);
+  setTemporalAnalysis(null);
+  setUi((u) => ({ ...u, showLogsCircles: true }));
+  setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
+  setColorBy(filters.colorBy || null);
+};
 
   const handleClearFilters = useCallback(() => {
     setActiveFilters(null);
@@ -555,7 +592,7 @@ export default function HighPerfMap() {
             let val =
               log[h] ??
               log[h.replace("_", "-")] ??
-              log[h.replace("dl_throughput", "dl_thpt")] ??
+              log[h.replace("dl_throughput", "dl_tpt")] ??
               log[h.replace("ul_throughput", "ul_thpt")] ??
               "";
 
@@ -637,6 +674,7 @@ export default function HighPerfMap() {
         isSearchOpen={isSearchOpen}
         onSearchToggle={() => setIsSearchOpen((prev) => !prev)}
         thresholds={thresholds}
+        logs={drawnLogs}
       />
 
       <div className="relative flex-1">
@@ -750,6 +788,7 @@ export default function HighPerfMap() {
             thresholds={thresholds}
             selectedMetric={selectedMetric}
             colorBy={colorBy}
+            logs={drawnLogs}
           />
         )}
 

@@ -1,4 +1,3 @@
-// src/components/unifiedMap/NetworkPlannerMap.jsx
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { PolygonF } from "@react-google-maps/api";
 import { cellSiteApi } from "@/api/apiEndpoints";
@@ -42,7 +41,7 @@ function getColorForNetwork(network) {
     "IND-JIO": "#3B82F6",
     "jio": "#3B82F6",
     
-    // Airtel variants
+    
     "IND airtel": "#EF4444",
     "ind airtel": "#EF4444",
     
@@ -58,12 +57,12 @@ function getColorForNetwork(network) {
     "VI": "#22C55E",
     "Vi": "#22C55E",
     
-    // BSNL
+    
     "BSNL": "#F59E0B",
     "bsnl": "#F59E0B",
     
-    // Unknown
-    "Unknown": "#8B5CF6", // Purple for unknown
+    
+    "Unknown": "#8B5CF6", 
   };
 
   const networkStr = String(network).trim();
@@ -91,7 +90,7 @@ function getColorForNetwork(network) {
   if (lowerNetwork.includes("bsnl")) return "#F59E0B";
 
   // Return a visible color instead of gray
-  console.log("⚠️ Unknown operator:", networkStr, "using purple");
+  console.log(" Unknown operator:", networkStr, "using purple");
   return "#8B5CF6"; // Purple for unmatched
 }
 
@@ -118,11 +117,11 @@ function extractNetworkFromSite(site) {
     }
   }
   
-  console.log("⚠️ No network field found in site:", Object.keys(site));
+  console.log(" No network field found in site:", Object.keys(site));
   return null;
 }
 
-// ✅ Generate unique ID for sector
+
 function generateUniqueSectorId(site, sectorIndex, siteIndex) {
   const cellId = site.cell_id_representative ?? site.cell_id ?? 'unknown';
   const siteKey = site.site_key_inferred ?? site.site_key ?? '';
@@ -132,7 +131,7 @@ function generateUniqueSectorId(site, sectorIndex, siteIndex) {
   return `sector-${siteIndex}-${cellId}-${siteKey}-${sectorIndex}-${lat}-${lng}`.replace(/\s+/g, '_');
 }
 
-// Generate sectors from site data
+
 function generateSectorsFromSite(site, siteIndex) {
   const sectors = [];
   const sectorCount = site.sector_count || 3;
@@ -142,10 +141,9 @@ function generateSectorsFromSite(site, siteIndex) {
   // ✅ Extract network with fallback
   const network = extractNetworkFromSite(site);
   const color = getColorForNetwork(network);
-  
-  // ✅ Debug log for first few sites
+
   if (siteIndex < 3) {
-    console.log(`🏗️ Site ${siteIndex}:`, {
+    console.log(` Site ${siteIndex}:`, {
       network: network,
       color: color,
       sectorCount: sectorCount,
@@ -232,7 +230,7 @@ const NetworkPlannerMap = ({
 
   useEffect(() => {
     if (externalSectors && externalSectors.length > 0) {
-      console.log(`ℹ️ [NetworkPlanner ${instanceId.current}] Using ${externalSectors.length} external sectors`);
+      console.log(`ℹ [NetworkPlanner ${instanceId.current}] Using ${externalSectors.length} external sectors`);
       return;
     }
 
@@ -370,7 +368,7 @@ const NetworkPlannerMap = ({
 
   // ✅ Settings with better defaults for visibility
   const effectiveScale = options.scale ?? 1;
-  const effectiveZIndex = options.zIndex ?? 200;
+  const effectiveZIndex = options.zIndex ?? 2000;
   const effectiveOpacity = options.opacity ?? 0.6; // ✅ Higher opacity for visibility
 
   console.log(`🖼️ [NetworkPlanner ${instanceId.current}] Rendering ${visibleSectors.length} sectors`);

@@ -119,37 +119,56 @@ const SessionSelector = ({ sessions, selectedSessions, setSelectedSessions, disa
   );
 };
 
-const GridSizeInput = ({ gridSize, setGridSize, disabled }) => {
+const GridSizeInput = ({ gridSize, setGridSize, minSamples, setMinSamples, disabled }) => {
   const presets = [50, 100, 200, 500];
 
   return (
-    <div className="space-y-2">
-      <Label>Grid Size (meters)</Label>
-      <div className="flex gap-2 items-center">
+    <div className="space-y-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+      {/* Grid Size */}
+      <div className="space-y-2">
+        <Label>Area Grid Size (meters) <span className="text-red-500">*</span></Label>
+        <div className="flex gap-2 items-center">
+          <Input
+            type="number"
+            value={gridSize}
+            onChange={(e) => setGridSize(e.target.value)}
+            disabled={disabled}
+            min="1"
+            max="10000"
+            className="w-24"
+          />
+          <div className="flex gap-1">
+            {presets.map((size) => (
+              <Button
+                key={size}
+                type="button"
+                variant={gridSize == size ? "default" : "outline"}
+                size="sm"
+                onClick={() => setGridSize(size.toString())}
+                disabled={disabled}
+                className="h-8 px-2 text-xs"
+              >
+                {size}m
+              </Button>
+            ))}
+          </div>
+        </div>
+        <p className="text-xs text-gray-500">Grid block size for area breakdown</p>
+      </div>
+
+      {/* Min Samples */}
+      <div className="space-y-2">
+        <Label>Min Samples for Clustering <span className="text-red-500">*</span></Label>
         <Input
           type="number"
-          value={gridSize}
-          onChange={(e) => setGridSize(e.target.value)}
+          value={minSamples}
+          onChange={(e) => setMinSamples(e.target.value)}
           disabled={disabled}
           min="1"
-          max="10000"
+          max="1000"
           className="w-24"
         />
-        <div className="flex gap-1">
-          {presets.map((size) => (
-            <Button
-              key={size}
-              type="button"
-              variant={gridSize == size ? "default" : "outline"}
-              size="sm"
-              onClick={() => setGridSize(size.toString())}
-              disabled={disabled}
-              className="h-8 px-2 text-xs"
-            >
-              {size}m
-            </Button>
-          ))}
-        </div>
+        <p className="text-xs text-gray-500">Minimum samples required for building clusters (default: 10)</p>
       </div>
     </div>
   );
@@ -161,11 +180,14 @@ const PredictionOptions = ({
   enabled, 
   setEnabled, 
   indoorMode, 
-  setIndoorMode, 
+  setIndoorMode,
+  predictionGrid,
+  setPredictionGrid,
   disabled,
   sessionCount 
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const gridPresets = [10, 22, 50, 100];
 
   return (
     <div className="space-y-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
@@ -213,9 +235,10 @@ const PredictionOptions = ({
 
       {/* Advanced Options */}
       {enabled && showAdvanced && (
-        <div className="pt-3 border-t border-purple-200 space-y-3">
+        <div className="pt-3 border-t border-purple-200 space-y-4">
+          {/* Indoor Mode */}
           <div>
-            <Label className="text-sm text-purple-800">Indoor Detection Mode</Label>
+            <Label className="text-sm text-purple-800">Indoor Detection Mode <span className="text-red-500">*</span></Label>
             <select
               value={indoorMode}
               onChange={(e) => setIndoorMode(e.target.value)}
@@ -229,6 +252,38 @@ const PredictionOptions = ({
             <p className="text-xs text-gray-500 mt-1">
               Method used to detect indoor/outdoor locations
             </p>
+          </div>
+
+          {/* Prediction Grid Size */}
+          <div className="space-y-2">
+            <Label className="text-sm text-purple-800">Prediction Grid Size (meters) <span className="text-red-500">*</span></Label>
+            <div className="flex gap-2 items-center">
+              <Input
+                type="number"
+                value={predictionGrid}
+                onChange={(e) => setPredictionGrid(e.target.value)}
+                disabled={disabled}
+                min="1"
+                max="1000"
+                className="w-24"
+              />
+              <div className="flex gap-1">
+                {gridPresets.map((size) => (
+                  <Button
+                    key={size}
+                    type="button"
+                    variant={predictionGrid == size ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setPredictionGrid(size.toString())}
+                    disabled={disabled}
+                    className="h-8 px-2 text-xs"
+                  >
+                    {size}m
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">Grid resolution for prediction output (default: 22m)</p>
           </div>
         </div>
       )}
@@ -249,11 +304,13 @@ export const ProjectForm = ({
   const [selectedPolygonData, setSelectedPolygonData] = useState(null);
   const [selectedSessions, setSelectedSessions] = useState([]);
   const [gridSize, setGridSize] = useState("100");
+  const [minSamples, setMinSamples] = useState("10");
   const [siteFile, setSiteFile] = useState(null);
 
   // Prediction state
   const [runPrediction, setRunPrediction] = useState(false);
   const [indoorMode, setIndoorMode] = useState("heuristic");
+  const [predictionGrid, setPredictionGrid] = useState("22");
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -301,12 +358,30 @@ export const ProjectForm = ({
 
   const validateForm = () => {
     const errors = [];
-    if (!projectName.trim()) errors.push("Project name is required");
-    if (!selectedPolygon) errors.push("Please select a polygon");
+    
+    if (!projectName.trim()) {
+      errors.push("Project name is required");
+    }
+    
+    if (!selectedPolygon) {
+      errors.push("Please select a polygon");
+    }
     
     const numGridSize = parseFloat(gridSize);
-    if (isNaN(numGridSize) || numGridSize <= 0) {
-      errors.push("Grid size must be a positive number");
+    if (isNaN(numGridSize) || numGridSize < 1 || numGridSize > 10000) {
+      errors.push("Grid size must be between 1 and 10000");
+    }
+
+    const numMinSamples = parseInt(minSamples, 10);
+    if (isNaN(numMinSamples) || numMinSamples < 1 || numMinSamples > 1000) {
+      errors.push("Min samples must be between 1 and 1000");
+    }
+
+    if (runPrediction) {
+      const numPredictionGrid = parseFloat(predictionGrid);
+      if (isNaN(numPredictionGrid) || numPredictionGrid < 1 || numPredictionGrid > 1000) {
+        errors.push("Prediction grid must be between 1 and 1000");
+      }
     }
     
     return errors;
@@ -355,7 +430,7 @@ export const ProjectForm = ({
         try {
           const buildingRes = await buildingApi.generateBuildings({
             WKT: selectedPolygonData.wkt,
-            Name: selectedPolygonData.label,
+            Name: selectedPolygonData.label || projectName.trim(),
             project_id: projectId,
           });
 
@@ -369,7 +444,7 @@ export const ProjectForm = ({
         }
 
         // ========== STEP 3: Area Breakdown ==========
-        setCurrentStep(`Analyzing area (${gridSize}m grid)...`);
+        setCurrentStep(`Analyzing area (${gridSize}m grid, min ${minSamples} samples)...`);
 
         try {
           const breakdownRes = await areaBreakdownApi.getAreaBreakdown({
@@ -377,17 +452,17 @@ export const ProjectForm = ({
             project_id: projectId,
             Name: projectName.trim(),
             grid: parseFloat(gridSize),
-            include_buildings: true,
-            include_zones: true,
-            include_metrics: true,
+            min_samples: parseInt(minSamples, 10),
           });
 
-          if (breakdownRes?.breakdown) {
-            toast.success("Area analysis complete");
+          if (breakdownRes?.status === "success") {
+            const details = breakdownRes.details || [];
+            toast.success(`Area analysis complete: ${details.length} items processed`);
             completedSteps.push("breakdown_processed");
           }
         } catch (err) {
           console.error("Breakdown error:", err);
+          toast.warn("Area breakdown failed: " + (err.message || "Unknown error"));
         }
       }
 
@@ -437,18 +512,19 @@ export const ProjectForm = ({
         }
       }
 
-      // ========== STEP 6: Run Prediction (Optional) ==========
+      // ========== STEP 6: Run Prediction ==========
       if (runPrediction && selectedSessions.length > 0) {
-        setCurrentStep("Running LTE prediction pipeline...");
+        setCurrentStep(`Running LTE prediction (${predictionGrid}m grid)...`);
 
         try {
           const predRes = await predictionApi.runPrediction({
             Project_id: projectId,
             Session_ids: selectedSessions,
             indoor_mode: indoorMode,
+            grid: parseFloat(predictionGrid),
           });
 
-          if (predRes.message || predRes.success) {
+          if (predRes.status === "success" || predRes.message) {
             predictionResult = predRes;
             toast.success(`Prediction complete! ${predRes.predictions_saved || 0} predictions saved`);
             completedSteps.push("prediction_completed");
@@ -469,8 +545,10 @@ export const ProjectForm = ({
       setSelectedSessions([]);
       setSiteFile(null);
       setGridSize("100");
+      setMinSamples("10");
       setRunPrediction(false);
       setIndoorMode("heuristic");
+      setPredictionGrid("22");
       if (fileInputRef.current) fileInputRef.current.value = null;
 
       // Callback
@@ -481,6 +559,8 @@ export const ProjectForm = ({
           completedSteps,
           predictionResult,
           gridSize: parseFloat(gridSize),
+          minSamples: parseInt(minSamples, 10),
+          predictionGrid: parseFloat(predictionGrid),
         });
       }
 
@@ -504,7 +584,7 @@ export const ProjectForm = ({
     }
   };
 
-  const canSubmit = projectName.trim() && selectedPolygon && parseFloat(gridSize) > 0;
+  const canSubmit = projectName.trim() && selectedPolygon && parseFloat(gridSize) > 0 && parseInt(minSamples, 10) > 0;
   const isLoadingPolygons = parentLoading && (!polygons || polygons.length === 0);
 
   return (
@@ -512,7 +592,7 @@ export const ProjectForm = ({
       <CardHeader>
         <CardTitle>Create New Project</CardTitle>
         <CardDescription>
-          Set up a project with polygon, buildings, and optional prediction
+          Set up a project with polygon, buildings, area breakdown, and optional prediction
         </CardDescription>
       </CardHeader>
       
@@ -554,11 +634,23 @@ export const ProjectForm = ({
               />
             )}
 
-            {/* Grid Size - Show when polygon selected */}
+            {/* Show WKT info when polygon is selected */}
+            {selectedPolygonData?.wkt && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-800 font-medium">✓ Polygon WKT loaded</p>
+                <p className="text-xs text-green-600 mt-1 truncate" title={selectedPolygonData.wkt}>
+                  {selectedPolygonData.wkt.substring(0, 80)}...
+                </p>
+              </div>
+            )}
+
+            {/* Grid Size & Min Samples - Show when polygon selected */}
             {selectedPolygonData && (
               <GridSizeInput
                 gridSize={gridSize}
                 setGridSize={setGridSize}
+                minSamples={minSamples}
+                setMinSamples={setMinSamples}
                 disabled={loading}
               />
             )}
@@ -581,6 +673,8 @@ export const ProjectForm = ({
               setEnabled={setRunPrediction}
               indoorMode={indoorMode}
               setIndoorMode={setIndoorMode}
+              predictionGrid={predictionGrid}
+              setPredictionGrid={setPredictionGrid}
               disabled={loading}
               sessionCount={selectedSessions.length}
             />
@@ -683,11 +777,18 @@ export const ProjectForm = ({
 
           {/* Summary Info */}
           {selectedPolygonData && !loading && (
-            <div className="text-xs text-gray-500 border-t pt-3 mt-3">
-              <strong>Will create:</strong> Project + Buildings + Area Analysis
-              {selectedSessions.length > 0 && ` + ${selectedSessions.length} Sessions`}
-              {siteFile && " + Site Data"}
-              {runPrediction && selectedSessions.length > 0 && " + Predictions"}
+            <div className="text-xs text-gray-500 border-t pt-3 mt-3 space-y-1">
+              <p><strong>Pipeline Steps:</strong></p>
+              <ol className="list-decimal list-inside space-y-0.5 ml-2">
+                <li>Create project with polygon</li>
+                <li>Generate buildings from WKT</li>
+                <li>Area breakdown (grid: {gridSize}m, min samples: {minSamples})</li>
+                {selectedSessions.length > 0 && <li>Process {selectedSessions.length} session(s)</li>}
+                {siteFile && <li>Upload site data</li>}
+                {runPrediction && selectedSessions.length > 0 && (
+                  <li>Run prediction (grid: {predictionGrid}m, mode: {indoorMode})</li>
+                )}
+              </ol>
             </div>
           )}
         </form>
@@ -695,3 +796,5 @@ export const ProjectForm = ({
     </Card>
   );
 };
+
+export default ProjectForm;

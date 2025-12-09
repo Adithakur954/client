@@ -153,25 +153,60 @@ const PanelSection = ({ title, children }) => (
   </div>
 );
 
-const ColorLegend = ({ colorBy }) => {
+const ColorLegend = ({ colorBy, logs=[] }) => {
   if (!colorBy) return null;
 
   const scheme = COLOR_SCHEMES[colorBy];
   if (!scheme) return null;
+
+  const counts = React.useMemo(() => {
+    const c = {};
+    Object.keys(scheme).forEach(k => c[k] = 0);
+
+    logs.forEach(log => {
+      let key = "Unknown";
+      
+      // Use existing normalization logic
+      if (colorBy === 'provider') {
+        key = normalizeProviderName(log.provider || log.Provider);
+      } else if (colorBy === 'technology') {
+        key = normalizeTechName(log.network || log.Network);
+      } else if (colorBy === 'band') {
+        const b = String(log.band || log.Band).trim();
+        // Bands map directly if they exist in scheme
+        key = scheme[b] ? b : "Unknown"; 
+      }
+
+      // If key matches a scheme entry, increment
+      // Note: normalizeProviderName returns "Jio" but scheme has "JIO", handle case
+      const match = Object.keys(scheme).find(k => k.toLowerCase() === key.toLowerCase());
+      if (match) {
+        c[match]++;
+      } else if (c[key] !== undefined) {
+        c[key]++;
+      }
+    });
+    return c;
+  }, [logs, colorBy, scheme]);
 
   return (
     <div className="mt-2 p-2 bg-slate-800 rounded-md">
       <div className="text-xs font-medium mb-2 text-slate-300">
         Color Legend ({colorBy})
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-1">
         {Object.entries(scheme).map(([key, color]) => (
-          <div key={key} className="flex items-center gap-2">
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: color }}
-            />
-            <span className="text-xs text-slate-300">{key}</span>
+          <div key={key} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-xs text-slate-300">{key}</span>
+            </div>
+            <span className="text-xs text-slate-400 font-mono">
+              {counts[key] || 0}
+            </span>
           </div>
         ))}
       </div>
@@ -191,6 +226,7 @@ export default function MapSidebarFloating({
   onOpenChange,
   hideTrigger = false,
   thresholds = {},
+  logs = [],
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = typeof controlledOpen === "boolean";
@@ -441,8 +477,8 @@ export default function MapSidebarFloating({
                     <SelectItem value="rsrp">RSRP</SelectItem>
                     <SelectItem value="rsrq">RSRQ</SelectItem>
                     <SelectItem value="sinr">SINR</SelectItem>
-                    <SelectItem value="ul-tpt">UL-Throughput</SelectItem>
-                    <SelectItem value="dl-tpt">DL-Throughput</SelectItem>
+                    <SelectItem value="ul_tpt">UL-Throughput</SelectItem>
+                    <SelectItem value="dl_tpt">DL-Throughput</SelectItem>
                     <SelectItem value="lte-bler">LTE-BLER</SelectItem>
                     <SelectItem value="mos">MOS</SelectItem>
                     <SelectItem value="pci">PCI</SelectItem>

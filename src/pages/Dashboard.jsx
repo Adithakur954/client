@@ -1,13 +1,12 @@
 // src/pages/Dashboard.jsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback, useState, memo } from 'react';
 import { 
   BarChart2, RefreshCw, Users, Car, Waypoints, FileText, 
-  Wifi, Radio, Layers, Home, MapPin 
+  Wifi, Layers, Home, MapPin 
 } from 'lucide-react';
 
 import MonthlySamplesChart from '@/components/dashboard/charts/MonthlySamplesChart';
 import OperatorNetworkChart from '@/components/dashboard/charts/OperatorNetworkChart';
-import NetworkDistributionChart from '@/components/dashboard/charts/NetworkDistributionChart';
 import MetricChart from '@/components/dashboard/charts/MetricChart';
 import BandDistributionChart from '@/components/dashboard/charts/BandDistributionChart';
 import HandsetPerformanceChart from '@/components/dashboard/charts/HandsetPerformanceChart';
@@ -23,27 +22,39 @@ import {
   useBandCount,
   useIndoorCount,
   useOutdoorCount,
-  useClearDashboardCache
+  useRefreshDashboard
 } from '@/hooks/useDashboardData.js';
 
 import { usePersistedFilters, clearAllPersistedFilters } from '@/hooks/usePersistedFilters';
 
+// ✅ Memoized components to prevent unnecessary re-renders
+const MemoizedStatCard = memo(StatCard);
+const MemoizedMonthlySamplesChart = memo(MonthlySamplesChart);
+const MemoizedOperatorNetworkChart = memo(OperatorNetworkChart);
+const MemoizedAppChart = memo(AppChart);
+const MemoizedMetricChart = memo(MetricChart);
+const MemoizedBandDistributionChart = memo(BandDistributionChart);
+const MemoizedHandsetPerformanceChart = memo(HandsetPerformanceChart);
+const MemoizedCoverageRankingChart = memo(CoverageRankingChart);
+const MemoizedQualityRankingChart = memo(QualityRankingChart);
+
 const DashboardPage = () => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // Persisted filters for each chart
   const [monthlySamplesFilters, setMonthlySamplesFilters] = usePersistedFilters('monthlySamples');
   const [operatorSamplesFilters, setOperatorSamplesFilters] = usePersistedFilters('operatorSamples');
   const [metricFilters, setMetricFilters] = usePersistedFilters('metric');
   const [bandDistFilters, setBandDistFilters] = usePersistedFilters('bandDist');
 
-  // Fetch data using hooks
+  // ✅ Fetch ONLY KPI data on initial load - no chart data yet
   const { data: totalsData, isLoading: isTotalsLoading } = useTotals();
   const { operators, networks, operatorCount, isLoading: isOperatorsLoading } = useOperatorsAndNetworks();
   const { data: bandCount, isLoading: isBandCountLoading } = useBandCount();
   const { data: indoorCount, isLoading: isIndoorLoading } = useIndoorCount();
   const { data: outdoorCount, isLoading: isOutdoorLoading } = useOutdoorCount();
   
-  // Cache clear function
-  const clearCache = useClearDashboardCache();
+  const refreshDashboard = useRefreshDashboard();
 
   // Calculate total samples
   const totalLocationSamples = useMemo(() => {
@@ -53,7 +64,7 @@ const DashboardPage = () => {
   // Check if any KPI data is loading
   const isKPILoading = isTotalsLoading || isOperatorsLoading || isBandCountLoading || isIndoorLoading || isOutdoorLoading;
 
-  // Stats for KPI cards
+  // ✅ Memoized stats
   const stats = useMemo(() => {
     const totals = totalsData || {};
     
@@ -117,26 +128,42 @@ const DashboardPage = () => {
     ];
   }, [totalsData, operatorCount, bandCount, indoorCount, outdoorCount, totalLocationSamples]);
 
-  // Handle refresh all
-  const handleRefreshAll = () => {
-    // Clear SWR cache
-    clearCache();
+  // ✅ Optimized refresh without page reload
+  const handleRefreshAll = useCallback(async () => {
+    setIsRefreshing(true);
     
-    // Clear localStorage cache
-    localStorage.removeItem('swr-cache');
-    localStorage.removeItem('app-swr-cache');
-    
-    // Clear all persisted filters
-    clearAllPersistedFilters();
-    
-    // Reload page
-    window.location.reload();
-  };
+    try {
+      // Trigger SWR revalidation
+      await refreshDashboard();
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  }, [refreshDashboard]);
+
+  // ✅ Stable filter handlers
+  const handleMonthlySamplesFilterChange = useCallback((filters) => {
+    setMonthlySamplesFilters(filters);
+  }, [setMonthlySamplesFilters]);
+
+  const handleOperatorSamplesFilterChange = useCallback((filters) => {
+    setOperatorSamplesFilters(filters);
+  }, [setOperatorSamplesFilters]);
+
+  const handleMetricFilterChange = useCallback((filters) => {
+    setMetricFilters(filters);
+  }, [setMetricFilters]);
+
+  const handleBandDistFilterChange = useCallback((filters) => {
+    setBandDistFilters(filters);
+  }, [setBandDistFilters]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
       <div className="max-w-[1920px] mx-auto p-6 space-y-6">
        
+        {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -148,10 +175,18 @@ const DashboardPage = () => {
           </div>
           <button
             onClick={handleRefreshAll}
-            className="px-5 py-2.5 rounded-lg border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 flex items-center gap-2 transition-all font-medium shadow-sm hover:shadow-md"
+            disabled={isRefreshing}
+            className={`
+              px-5 py-2.5 rounded-lg border-2 flex items-center gap-2 
+              transition-all font-medium shadow-sm
+              ${isRefreshing 
+                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 hover:shadow-md'
+              }
+            `}
           >
-            <RefreshCw className="h-4 w-4" />
-            Refresh All
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh All'}
           </button>
         </div>
 
@@ -166,47 +201,51 @@ const DashboardPage = () => {
           ) : (
             stats.map(s => (
               <div key={s.title} className="flex-1 min-w-[280px] max-w-[320px]">
-                <StatCard {...s} />
+                <MemoizedStatCard {...s} />
               </div>
             ))
           )}
         </div>
 
-        {/* Charts Grid */}
+        {/* Charts Grid - NO lazy loading, let SWR handle optimization */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <MonthlySamplesChart
+          
+          <MemoizedMonthlySamplesChart
             chartFilters={monthlySamplesFilters}
-            onChartFiltersChange={setMonthlySamplesFilters}
+            onChartFiltersChange={handleMonthlySamplesFilterChange}
             operators={operators}
             networks={networks}
           />
 
-          <OperatorNetworkChart
+          <MemoizedOperatorNetworkChart
             chartFilters={operatorSamplesFilters}
-            onChartFiltersChange={setOperatorSamplesFilters}
+            onChartFiltersChange={handleOperatorSamplesFilterChange}
             operators={operators}
             networks={networks}
           />
 
-          <AppChart />
+          <MemoizedAppChart />
 
-          <MetricChart
+          <MemoizedMetricChart
             chartFilters={metricFilters}
-            onChartFiltersChange={setMetricFilters}
+            onChartFiltersChange={handleMetricFilterChange}
             operators={operators}
             networks={networks}
           />
 
-          <BandDistributionChart
+          <MemoizedBandDistributionChart
             chartFilters={bandDistFilters}
-            onChartFiltersChange={setBandDistFilters}
+            onChartFiltersChange={handleBandDistFilterChange}
             operators={operators}
             networks={networks}
           />
 
-          <HandsetPerformanceChart />
-          <CoverageRankingChart />
-          <QualityRankingChart />
+          {/* ✅ Handset Performance - Load without any wrappers */}
+          <MemoizedHandsetPerformanceChart />
+
+          <MemoizedCoverageRankingChart />
+          
+          <MemoizedQualityRankingChart />
         </div>
       </div>
     </div>

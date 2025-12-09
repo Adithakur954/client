@@ -68,6 +68,7 @@ export default function LogCirclesLayer({
         console.log("📊 Provider value being sent:", apiParams.Provider);
 
         const response = await mapViewApi.getLogsByDateRange(apiParams);
+        console.log(response, '++_+_+__++__+_+_+_+_+_+_+_+_+_+_+_+_+_+_+');
         
         const fetched = response?.data || response || [];
         const appSummaryData = response?.app_summary || null;

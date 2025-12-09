@@ -1,5 +1,5 @@
 // src/components/MapwithMultipleCircle.jsx
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { GoogleMap, PolygonF, RectangleF } from "@react-google-maps/api";
 import { getColorForMetric } from "../utils/metrics";
 import { mapViewApi } from "../api/apiEndpoints";
@@ -261,21 +261,30 @@ const MapWithMultipleCircles = ({
   showControls = true,
   showStats = true,
   enableOpacityControl = true,
+  onFilteredLocationsChange,
+  opacity = 1,
+  drawnPolygons=[]  //change no 2
 }) => {
   const [map, setMap] = useState(null);
-  const [opacity, setOpacity] = useState(0.8);
+  
   const [hoveredCell, setHoveredCell] = useState(null);
 
   // Polygon state
   const [polygonData, setPolygonData] = useState([]);
   const [polygonsFetched, setPolygonsFetched] = useState(false);
   const [fetchError, setFetchError] = useState(null);
-  const [dropButton, setDropButton] = useState(true);  
+  
 
-  // Fetch polygons
+  // ✅ FIX: Use ref to store callback to avoid dependency issues
+  const onFilteredLocationsChangeRef = useRef(onFilteredLocationsChange);
+  
+  useEffect(() => {
+    onFilteredLocationsChangeRef.current = onFilteredLocationsChange;
+  }, [onFilteredLocationsChange]);
+
+  // Fetch polygons (existing code)
   useEffect(() => {
     const fetchPolygons = async () => {
-      // If no project ID or polygon filter disabled, skip fetch
       if (!projectId) {
         console.log("📍 No projectId, skipping polygon fetch");
         setPolygonData([]);
@@ -326,10 +335,10 @@ const MapWithMultipleCircles = ({
     fetchPolygons();
   }, [projectId, polygonSource, enablePolygonFilter]);
 
-  // Filter locations inside polygons
+  // ✅ Filter locations inside polygons
   const locationsToRender = useMemo(() => {
-   
-
+    console.group("🔍 Polygon Filtering");
+    
     // No locations
     if (!locations?.length) {
       console.log("⚠️ No locations to filter");
@@ -339,40 +348,51 @@ const MapWithMultipleCircles = ({
 
     // Polygon filter disabled - return all
     if (!enablePolygonFilter) {
-      console.log("✅ Filter disabled, returning all locations");
+      console.log(`✅ Filter disabled, returning all ${locations.length} locations`);
       console.groupEnd();
       return locations;
     }
 
-    // Polygons not yet fetched - wait (return empty to avoid showing points outside)
+    // Polygons not yet fetched - wait
     if (!polygonsFetched) {
       console.log("⏳ Waiting for polygons to load...");
       console.groupEnd();
-      return []; // Return empty while loading
+      return [];
     }
 
     // No polygons defined - return all locations
     if (polygonData.length === 0) {
-      console.log("⚠️ No polygons found, returning all locations");
+      console.log(`⚠️ No polygons found, returning all ${locations.length} locations`);
       console.groupEnd();
-      return locations;
-    }
+      return locations;   //yaha pe 1 change 
+        }
 
     // Filter locations inside polygons
     const filtered = filterLocationsInsidePolygons(locations, polygonData);
+    
     console.log(`✅ Filtered: ${filtered.length} inside / ${locations.length} total`);
     console.log(`📊 ${((filtered.length / locations.length) * 100).toFixed(1)}% of points inside polygon`);
     
     if (filtered.length === 0 && locations.length > 0) {
       console.warn("⚠️ All points filtered out! Check if polygon covers the data area.");
-     
     }
     
     console.groupEnd();
     return filtered;
   }, [locations, polygonData, polygonsFetched, enablePolygonFilter]);
 
-  // Generate grid cells (only for filtered locations)
+  // ✅ FIX: Notify parent of filtered locations with stable callback reference
+  useEffect(() => {
+    const callback = onFilteredLocationsChangeRef.current;
+    if (callback) {
+      console.log(`📤 Sending ${locationsToRender.length} filtered locations to parent (for MapLegend)`);
+      callback(locationsToRender);
+    }
+  }, [locationsToRender]);
+
+  // ... rest of the component stays the same ...
+
+  // Generate grid cells (existing code)
   const gridCells = useMemo(() => {
     if (!enableGrid) return [];
     if (polygonData.length === 0) return [];
@@ -396,7 +416,6 @@ const MapWithMultipleCircles = ({
 
   // Compute map center from filtered locations
   const computedCenter = useMemo(() => {
-    // Use filtered locations if available, otherwise original
     const locs = locationsToRender.length > 0 ? locationsToRender : 
                  locations.length > 0 ? locations : null;
     
@@ -413,7 +432,6 @@ const MapWithMultipleCircles = ({
   const handleMapLoad = useCallback((mapInstance) => {
     setMap(mapInstance);
     
-    // Fit to filtered locations
     const locs = locationsToRender.length > 0 ? locationsToRender : locations;
     if (fitToLocations && locs?.length && window.google) {
       const bounds = new window.google.maps.LatLngBounds();
@@ -441,10 +459,7 @@ const MapWithMultipleCircles = ({
   
   if (!isLoaded) return null;
 
-  // Determine if we should show points
   const showPoints = !enableGrid && !areaEnabled;
-  
-  // Show loading state while fetching polygons (if filter is enabled)
   const isLoadingPolygons = enablePolygonFilter && !polygonsFetched && projectId;
 
   return (
@@ -533,7 +548,7 @@ const MapWithMultipleCircles = ({
         </div>
       )}
 
-      {/* Stats Badge */}
+      {/* ✅ UPDATED: Stats Badge showing polygon-filtered count */}
       {showStats && (
         <div className="absolute bottom-4 right-4 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs text-gray-600 z-10">
           {isLoadingPolygons ? (
@@ -542,10 +557,12 @@ const MapWithMultipleCircles = ({
             <span>🔲 {gridCells.filter(c => c.count > 0).length} cells with data</span>
           ) : (
             <div className="flex flex-col">
-              <span>📍 {locationsToRender.length.toLocaleString()} points inside polygon</span>
+              <span className="font-medium text-green-600">
+                📍 {locationsToRender.length.toLocaleString()} points shown
+              </span>
               {enablePolygonFilter && locations.length !== locationsToRender.length && (
                 <span className="text-[10px] text-gray-400">
-                  ({locations.length - locationsToRender.length} filtered out)
+                  ({locations.length - locationsToRender.length} outside polygon)
                 </span>
               )}
             </div>
@@ -553,15 +570,15 @@ const MapWithMultipleCircles = ({
         </div>
       )}
 
-      {/* Controls Panel */}
+      {/* Controls Panel
       {showControls && !enableGrid && (
         <div className="absolute top-2 left-49 bg-white rounded-lg shadow-lg p-3 z-10 space-y-3">
-          {!dropButton ? (<div>
+          {!dropButton ? (
+            <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-gray-600 font-medium">Opacity </span>
                 <span className="text-xs font-semibold text-blue-600">{Math.round(opacity * 100)}%</span>
                 <button onClick={() => setDropButton(!dropButton)}> <X /> </button>
-
               </div>
               <input
                 type="range"
@@ -572,15 +589,14 @@ const MapWithMultipleCircles = ({
                 className="w-24 h-2 bg-gray-200 rounded-lg cursor-pointer accent-blue-600"
               />
             </div>
-            
-          ):(<div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-gray-600 font-medium">Opacity</span>
-            <button onClick={() => setDropButton(!dropButton)}> <ArrowDown /> </button>
-          </div>)}
-          
-          
+          ) : (
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-600 font-medium">Opacity</span>
+              <button onClick={() => setDropButton(!dropButton)}> <ArrowDown /> </button>
+            </div>
+          )}
         </div>
-      )}
+      )} */}
 
       {/* Grid Controls */}
       {showControls && enableGrid && (
@@ -602,8 +618,6 @@ const MapWithMultipleCircles = ({
           </div>
         </div>
       )}
-
-     
     </div>
   );
 };

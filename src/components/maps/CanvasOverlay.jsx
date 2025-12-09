@@ -28,10 +28,15 @@ const createCanvasOverlayClass = () => {
       this.devicePixelRatio = window.devicePixelRatio || 1;
     }
 
+    
+
     onAdd() {
       this.canvas = document.createElement('canvas');
       this.canvas.style.position = 'absolute';
       this.canvas.style.pointerEvents = 'auto';
+      // ✅ Set a low z-index so logs stay below polygons (which are usually z-index > 100)
+      this.canvas.style.zIndex = '1'; 
+      
       this.ctx = this.canvas.getContext('2d', { 
         alpha: true,
         desynchronized: true,
@@ -46,8 +51,12 @@ const createCanvasOverlayClass = () => {
       this.canvas.addEventListener('mouseout', this.boundHandleMouseOut);
 
       const panes = this.getPanes();
-      if (panes?.overlayMouseTarget) {
-        panes.overlayMouseTarget.appendChild(this.canvas);
+      
+      // ✅ CHANGE: Attach to overlayLayer instead of overlayMouseTarget
+      // This places the canvas in the same pane as Polygons, allowing Polygons (z-index 5000) 
+      // to render ON TOP of the logs (z-index 1).
+      if (panes?.overlayLayer) {
+        panes.overlayLayer.appendChild(this.canvas);
       }
     }
 
