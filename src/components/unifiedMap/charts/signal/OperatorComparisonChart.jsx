@@ -1,6 +1,6 @@
 // src/components/analytics/OperatorComparisonChart.jsx
 import React, { useMemo, useState, useCallback } from "react";
-import { Globe, Settings, ChevronDown, Check } from "lucide-react";
+import { Globe, Settings } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -14,50 +14,12 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
-  Radar,
   Cell,
+  Radar,
 } from "recharts";
 import { ChartContainer } from "../../common/ChartContainer";
 import { EmptyState } from "../../common/EmptyState";
-import { CHART_CONFIG } from "@/utils/constants";
-
-// Provider colors
-const PROVIDER_COLORS = {
-  "JIO": "#3B82F6",
-  "Jio": "#3B82F6",
-  "Jio True5G": "#3B82F6",
-  "JIO 4G": "#3B82F6",
-  "JIO4G": "#3B82F6",
-  "IND-JIO": "#3B82F6",
-  "IND airtel": "#EF4444",
-  "IND Airtel": "#EF4444",
-  "Airtel": "#EF4444",
-  "airtel": "#EF4444",
-  "Airtel 5G": "#EF4444",
-  "VI India": "#22C55E",
-  "Vi India": "#22C55E",
-  "Vodafone IN": "#22C55E",
-  "VI": "#22C55E",
-  "BSNL": "#F59E0B",
-  "bsnl": "#F59E0B",
-  "Unknown": "#6B7280",
-};
-
-const getProviderColor = (provider) => {
-  if (!provider) return "#6B7280";
-  if (PROVIDER_COLORS[provider]) return PROVIDER_COLORS[provider];
-  
-  const lower = provider.toLowerCase();
-  if (lower.includes("jio")) return "#3B82F6";
-  if (lower.includes("airtel")) return "#EF4444";
-  if (lower.includes("vi") || lower.includes("vodafone")) return "#22C55E";
-  if (lower.includes("bsnl")) return "#F59E0B";
-  
-  // Generate consistent color for unknown providers
-  const hash = provider.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hue = hash % 360;
-  return `hsl(${hue}, 70%, 50%)`;
-};
+import { getProviderColor } from "@/utils/constants"; // 👈 Import from constants
 
 // Safe number parsing
 const safeNumber = (value) => {
@@ -109,7 +71,7 @@ export const OperatorComparisonChart = React.forwardRef(({
 }, ref) => {
   const [selectedMetrics, setSelectedMetrics] = useState(defaultMetrics);
   const [showSettings, setShowSettings] = useState(false);
-  const [viewMode, setViewMode] = useState("bar"); // "bar" | "radar" | "table"
+  const [viewMode, setViewMode] = useState("bar");
 
   // Process operator data
   const operatorData = useMemo(() => {
@@ -123,7 +85,7 @@ export const OperatorComparisonChart = React.forwardRef(({
       if (!operatorStats[provider]) {
         operatorStats[provider] = {
           name: provider,
-          color: getProviderColor(provider),
+          color: getProviderColor(provider), // 👈 Using centralized function
           samples: 0,
           rsrp: [],
           rsrq: [],
@@ -203,7 +165,6 @@ export const OperatorComparisonChart = React.forwardRef(({
   const radarChartData = useMemo(() => {
     if (!operatorData.length) return [];
 
-    // Normalize metrics to 0-100 scale for radar
     const normalizers = {
       rsrp: (v) => v !== null ? Math.max(0, Math.min(100, ((v + 140) / 60) * 100)) : 0,
       rsrq: (v) => v !== null ? Math.max(0, Math.min(100, ((v + 20) / 17) * 100)) : 0,
@@ -233,14 +194,14 @@ export const OperatorComparisonChart = React.forwardRef(({
   const toggleMetric = useCallback((metricKey) => {
     setSelectedMetrics((prev) => {
       if (prev.includes(metricKey)) {
-        if (prev.length === 1) return prev; // Keep at least one
+        if (prev.length === 1) return prev;
         return prev.filter((m) => m !== metricKey);
       }
       return [...prev, metricKey];
     });
   }, []);
 
-  // Custom Tooltip
+  // Custom Tooltip for Bar Chart
   const CustomBarTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
 
@@ -281,6 +242,7 @@ export const OperatorComparisonChart = React.forwardRef(({
     );
   };
 
+  // Custom Tooltip for Radar Chart
   const CustomRadarTooltip = ({ active, payload }) => {
     if (!active || !payload?.length) return null;
     const data = payload[0]?.payload;
@@ -309,6 +271,24 @@ export const OperatorComparisonChart = React.forwardRef(({
     );
   };
 
+  // Custom Bar with dynamic color based on provider
+  const CustomBar = (props) => {
+    const { x, y, width, height, payload } = props;
+    const color = getProviderColor(payload?.name); // 👈 Get color dynamically
+    
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={color}
+        rx={4}
+        ry={4}
+      />
+    );
+  };
+
   if (!operatorData.length) {
     return (
       <ChartContainer ref={ref} title="Operator Comparison" icon={Globe}>
@@ -327,7 +307,7 @@ export const OperatorComparisonChart = React.forwardRef(({
         <div className="flex items-center gap-2">
           {/* View Mode Toggle */}
           <div className="flex rounded-lg overflow-hidden border border-slate-600">
-            {["bar",  "table"].map((mode) => (
+            {["bar", "radar", "table"].map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -452,9 +432,16 @@ export const OperatorComparisonChart = React.forwardRef(({
                   key={metricKey}
                   dataKey={metricKey}
                   name={config.label}
-                  fill={config.color}
                   radius={[4, 4, 0, 0]}
-                />
+                >
+                  {/* 👇 Dynamic colors per provider */}
+                  {barChartData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={getProviderColor(entry.name)} 
+                    />
+                  ))}
+                </Bar>
               );
             })}
           </BarChart>
@@ -482,8 +469,8 @@ export const OperatorComparisonChart = React.forwardRef(({
                 key={op.name}
                 name={op.name}
                 dataKey={op.name}
-                stroke={op.color}
-                fill={op.color}
+                stroke={getProviderColor(op.name)} // 👈 Using centralized function
+                fill={getProviderColor(op.name)}   // 👈 Using centralized function
                 fillOpacity={0.2}
                 strokeWidth={2}
               />
@@ -535,7 +522,7 @@ export const OperatorComparisonChart = React.forwardRef(({
                     <div className="flex items-center gap-2">
                       <div
                         className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: op.color }}
+                        style={{ backgroundColor: getProviderColor(op.name) }} // 👈 Using centralized function
                       />
                       <span className="font-semibold text-white">{op.name}</span>
                       {idx === 0 && (
@@ -551,7 +538,6 @@ export const OperatorComparisonChart = React.forwardRef(({
                     const stats = op[metricKey];
                     const value = stats?.avg;
                     
-                    // Determine if this is the best value
                     const allValues = operatorData.map((o) => o[metricKey]?.avg).filter(Boolean);
                     const isBest = config.higherBetter
                       ? value === Math.max(...allValues)
@@ -587,7 +573,7 @@ export const OperatorComparisonChart = React.forwardRef(({
           >
             <div
               className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: op.color }}
+              style={{ backgroundColor: getProviderColor(op.name) }} // 👈 Using centralized function
             />
             <span className="text-xs text-white font-medium">{op.name}</span>
             <span className="text-[10px] text-slate-400">{op.samples}</span>

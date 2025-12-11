@@ -8,22 +8,105 @@ import { ArrowDown, X } from "lucide-react";
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
-// Color schemes for categorical coloring
-const COLOR_SCHEMES = {
-  provider: {
-    JIO: "#3B82F6", "Jio True5G": "#3B82F6", "JIO 4G": "#3B82F6",
-    Airtel: "#EF4444", "IND Airtel": "#EF4444", "IND airtel": "#EF4444",
-    "VI India": "#22C55E", "Vi India": "#22C55E",
-    BSNL: "#F59E0B", Unknown: "#6B7280",
-  },
-  technology: {
-    "5G": "#EC4899", "NR (5G)": "#EC4899", "4G": "#8B5CF6", "LTE (4G)": "#8B5CF6",
-    "3G": "#10B981", "2G": "#6B7280", Unknown: "#F59E0B",
-  },
-  band: {
-    "3": "#EF4444", "5": "#F59E0B", "8": "#10B981", "40": "#3B82F6",
-    "41": "#8B5CF6", n28: "#EC4899", n78: "#F472B6", Unknown: "#6B7280",
-  },
+const OPERATOR_COLORS = {
+  jio: "#3B82F6",
+  airtel: "#EF4444",
+  vi: "#22C55E",
+  vodafone: "#22C55E",
+  bsnl: "#F59E0B",
+  unknown: "#6B7280",
+};
+
+const TECHNOLOGY_COLORS = {
+  "5g": "#EC4899",
+  "nr": "#EC4899",
+  "4g": "#8B5CF6",
+  "lte": "#8B5CF6",
+  "3g": "#10B981",
+  "2g": "#6B7280",
+  "unknown": "#F59E0B",
+};
+
+const BAND_COLORS = {
+  "1": "#EF4444",
+  "2": "#F59E0B",
+  "3": "#EF4444",
+  "5": "#F59E0B",
+  "7": "#10B981",
+  "8": "#10B981",
+  "20": "#0EA5E9",
+  "38": "#14B8A6",
+  "40": "#3B82F6",
+  "41": "#8B5CF6",
+  "42": "#6366F1",
+  "n28": "#EC4899",
+  "n78": "#F472B6",
+  "n258": "#D946EF",
+  "Unknown": "#6B7280"
+};
+
+// Smart matching functions
+const getOperatorColor = (name) => {
+  if (!name || typeof name !== 'string') return OPERATOR_COLORS.unknown;
+  const cleanName = name.toLowerCase().trim();
+  
+  if (cleanName.includes('jio') || cleanName.includes('reliance')) return OPERATOR_COLORS.jio;
+  if (cleanName.includes('airtel') || cleanName.includes('bharti')) return OPERATOR_COLORS.airtel;
+  if (cleanName.includes('vodafone') || cleanName.includes('idea') || cleanName === 'vi' || cleanName.includes('vi india')) return OPERATOR_COLORS.vi;
+  if (cleanName.includes('bsnl')) return OPERATOR_COLORS.bsnl;
+  
+  return OPERATOR_COLORS.unknown;
+};
+
+const getTechnologyColor = (tech) => {
+  if (!tech || typeof tech !== 'string') return TECHNOLOGY_COLORS.unknown;
+  const cleanTech = tech.toLowerCase().trim();
+  
+  if (cleanTech.includes('5g') || cleanTech.includes('nr')) return TECHNOLOGY_COLORS['5g'];
+  if (cleanTech.includes('4g') || cleanTech.includes('lte')) return TECHNOLOGY_COLORS['4g'];
+  if (cleanTech.includes('3g') || cleanTech.includes('hspa') || cleanTech.includes('wcdma')) return TECHNOLOGY_COLORS['3g'];
+  if (cleanTech.includes('2g') || cleanTech.includes('gsm') || cleanTech.includes('edge')) return TECHNOLOGY_COLORS['2g'];
+  
+  return TECHNOLOGY_COLORS.unknown;
+};
+
+const getBandColor = (band) => {
+  if (!band) return BAND_COLORS.unknown;
+  const cleanBand = String(band).toLowerCase().trim();
+  
+  if (BAND_COLORS[cleanBand]) return BAND_COLORS[cleanBand];
+  
+  const bandMatch = cleanBand.match(/(\d+)/);
+  if (bandMatch && BAND_COLORS[bandMatch[1]]) return BAND_COLORS[bandMatch[1]];
+  
+  return BAND_COLORS.unknown;
+};
+
+// Updated getColorByScheme with smart matching
+const getColorByScheme = (location, colorBy) => {
+  if (!colorBy) return null;
+  
+  const value = location[colorBy];
+  if (!value) return "#6B7280";
+  
+  switch (colorBy.toLowerCase()) {
+    case 'provider':
+    case 'operator':
+    case 'network':
+      return getOperatorColor(value);
+      
+    case 'technology':
+    case 'tech':
+    case 'rat':
+      return getTechnologyColor(value);
+      
+    case 'band':
+    case 'frequency':
+      return getBandColor(value);
+      
+    default:
+      return "#6B7280";
+  }
 };
 
 // Aggregation methods
@@ -41,13 +124,13 @@ const AGGREGATION_METHODS = {
 };
 
 // Utility functions
-const getColorByScheme = (location, colorBy) => {
-  if (!colorBy) return null;
-  const scheme = COLOR_SCHEMES[colorBy];
-  if (!scheme) return null;
-  const value = location[colorBy];
-  return scheme[value] || scheme["Unknown"] || "#6B7280";
-};
+// const getColorByScheme = (location, colorBy) => {
+//   if (!colorBy) return null;
+//   const scheme = COLOR_SCHEMES[colorBy];
+//   if (!scheme) return null;
+//   const value = location[colorBy];
+//   return scheme[value] || scheme["Unknown"] || "#6B7280";
+// };
 
 const parseWKTToPolygons = (wkt) => {
   if (!wkt?.trim()) return [];
@@ -263,7 +346,7 @@ const MapWithMultipleCircles = ({
   enableOpacityControl = true,
   onFilteredLocationsChange,
   opacity = 1,
-  drawnPolygons=[]  //change no 2
+  showPoints: showPointsProp = true,
 }) => {
   const [map, setMap] = useState(null);
   
@@ -459,7 +542,7 @@ const MapWithMultipleCircles = ({
   
   if (!isLoaded) return null;
 
-  const showPoints = !enableGrid && !areaEnabled;
+  const showPoints = showPointsProp && !enableGrid && !areaEnabled;
   const isLoadingPolygons = enablePolygonFilter && !polygonsFetched && projectId;
 
   return (

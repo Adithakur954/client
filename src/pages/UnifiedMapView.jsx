@@ -238,7 +238,7 @@ const getThresholdKey = (metric) => {
     rsrq: "rsrq",
     sinr: "sinr",
     mos: "mos",
-    lte_bler: "lte_bler",
+    lte_bler: "lte_bler_json",
     pci: "pci",
   };
   return mapping[metric?.toLowerCase()] || metric;
@@ -395,7 +395,7 @@ const parseLogEntry = (log, sessionId) => {
     dl_tpt: parseFloat(log.dl_tpt ?? log.dl_thpt ?? log.DL ?? log.dl_throughput ?? log.DlThpt) || null,
     ul_tpt: parseFloat(log.ul_tpt ?? log.ul_thpt ?? log.UL ?? log.ul_throughput ?? log.UlThpt) || null,
     mos: parseFloat(log.mos ?? log.MOS ?? log.Mos) || null,
-    lte_bler: parseFloat(log.lte_bler ?? log.LTE_BLER ?? log.LteBler) || null,
+    lte_bler: parseFloat(log.lte_bler_json ?? log.LTE_BLER ?? log.LteBler) || null,
     provider: String(log.provider ?? log.Provider ?? log.operator ?? log.Operator ?? "").trim(),
     technology: String(log.network ?? log.technology ?? log.Network ?? log.Technology ?? "").trim(),
     band: String(log.band ?? log.Band ?? "").trim(),
@@ -404,6 +404,7 @@ const parseLogEntry = (log, sessionId) => {
     nodeb_id: log.nodeb_id,
     latency: parseFloat(log.latency ?? log.Latency ?? log.Lat) || null,
     jitter: parseFloat(log.jitter ?? log.Jitter ?? log.Jit) || null,
+    packet_loss:parseFloat(log.packet_loss),
     speed: parseFloat(log.speed ?? log.Speed ?? log.Sp) || null,
     cell_id: parseFloat(log.cell_id ?? log.CellId ?? log.Cell_ID ?? log.Cell_Id) || null,
   };
@@ -470,6 +471,8 @@ const useThresholdSettings = () => {
     };
 
     fetchThresholds();
+
+    console.log(thresholds,"thresholds for setting")
 
     return () => {
       isMounted = false;
@@ -562,7 +565,7 @@ const useSampleData = (sessionIds, enabled) => {
       const fetchTime = ((performance.now() - startTime) / 1000).toFixed(2);
 
       if (accumulatedLogs.length > 0) {
-        toast.success(`✅ ${accumulatedLogs.length} points loaded in ${fetchTime}s`);
+        toast.success(` ${accumulatedLogs.length} points loaded in ${fetchTime}s`);
       } else {
         toast.warn("No valid log data found");
       }
@@ -573,6 +576,7 @@ const useSampleData = (sessionIds, enabled) => {
       setError(err.message);
     } finally {
       setLoading(false);
+      console.log(locations," gcgjhjhvhv")
     }
   }, [sessionIds, enabled]);
 
@@ -849,6 +853,7 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
     name,
     pointCount,
     fillColor,
+    medianValue,
     bestProvider,
     bestProviderValue,
     bestBand,
@@ -860,9 +865,6 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
 
   const config = METRIC_CONFIG[selectedMetric] || { unit: "", higherIsBetter: true };
   const unit = config.unit || "";
-
-  // ... rest of ZoneTooltip implementation (same as original)
-  // Keeping this abbreviated for length - the full implementation remains the same
 
   if (!pointCount || pointCount === 0) {
     return (
@@ -880,7 +882,6 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
     );
   }
 
-  // Return full tooltip (abbreviated here for length)
   return (
     <div
       className="fixed z-[1000] bg-white rounded-xl shadow-2xl border-2 overflow-hidden"
@@ -893,14 +894,119 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
         maxWidth: "420px",
       }}
     >
-      {/* Full tooltip content - same as original */}
+      {/* Header */}
       <div className="px-4 py-3" style={{ backgroundColor: fillColor || "#3B82F6" }}>
-        <span className="text-white font-medium">{name} - {pointCount} samples</span>
+        <span className="text-white font-semibold text-sm">
+          {name} - {pointCount} samples
+        </span>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 space-y-3">
+        {/* Median Value */}
+        {medianValue !== null && medianValue !== undefined && (
+          <div className="flex items-center justify-between pb-2 border-b">
+            <span className="text-sm font-medium text-gray-600">
+              Median {config.label}:
+            </span>
+            <span className="text-base font-bold text-gray-900">
+              {medianValue.toFixed(2)} {unit}
+            </span>
+          </div>
+        )}
+
+        {/* Best Provider */}
+        {selectedCategory === "provider" && bestProvider && (
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-gray-500 uppercase">Best Provider</div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded"
+                  style={{ backgroundColor: getProviderColor(bestProvider) }}
+                />
+                <span className="text-sm font-medium">{bestProvider}</span>
+              </div>
+              {bestProviderValue !== null && (
+                <span className="text-sm text-gray-600">
+                  {bestProviderValue.toFixed(2)} {unit}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Best Band */}
+        {selectedCategory === "band" && bestBand && (
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-gray-500 uppercase">Best Band</div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded"
+                  style={{ backgroundColor: getBandColor(bestBand) }}
+                />
+                <span className="text-sm font-medium">Band {bestBand}</span>
+              </div>
+              {bestBandValue !== null && (
+                <span className="text-sm text-gray-600">
+                  {bestBandValue.toFixed(2)} {unit}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Best Technology */}
+        {selectedCategory === "technology" && bestTechnology && (
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-gray-500 uppercase">Best Technology</div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded"
+                  style={{ backgroundColor: getTechnologyColor(bestTechnology) }}
+                />
+                <span className="text-sm font-medium">{bestTechnology}</span>
+              </div>
+              {bestTechnologyValue !== null && (
+                <span className="text-sm text-gray-600">
+                  {bestTechnologyValue.toFixed(2)} {unit}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Category Stats */}
+        {categoryStats && selectedCategory && categoryStats[selectedCategory]?.stats && (
+          <div className="pt-2 border-t">
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+              All {selectedCategory}s
+            </div>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {categoryStats[selectedCategory].stats.slice(0, 5).map((stat) => (
+                <div key={stat.name} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600">{stat.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">{stat.count} pts</span>
+                    {stat.medianValue !== null && (
+                      <span className="font-medium">
+                        {stat.medianValue.toFixed(1)} {unit}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 });
 
+ZoneTooltip.displayName = "ZoneTooltip";
 ZoneTooltip.displayName = "ZoneTooltip";
 
 const BestNetworkLegend = React.memo(({ stats, providerColors, enabled }) => {
@@ -1578,7 +1684,7 @@ const UnifiedMapView = () => {
       />
 
       <div className="flex-grow relative overflow-hidden">
-        {shouldShowLegend && !bestNetworkEnabled && (
+        {shouldShowLegend && !bestNetworkEnabled && !isLoading && (
           <MapLegend
             thresholds={effectiveThresholds}
             selectedMetric={selectedMetric}

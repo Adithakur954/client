@@ -309,7 +309,7 @@ export default function MapSidebarFloating({
 
   const sideClasses = useMemo(() => {
     const base =
-      "fixed top-0 h-full z-50 w-[90vw] sm:w-[360px] bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out";
+      "fixed top-16 h-[calc(100vh-4rem)] z-50 w-[90vw] sm:w-[360px] bg-slate-950 text-white  transition-transform duration-200 ease-out";
     if (position === "right") {
       return isOpen
         ? `${base} right-0 translate-x-0`
@@ -343,7 +343,7 @@ export default function MapSidebarFloating({
       {!hideTrigger && (
         <button
           type="button"
-          className={`${fabPosition} inline-flex items-center gap-2 rounded-full px-4 py-2 bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none`}
+          className={`${fabPosition} inline-flex items-center gap-2 rounded-full px-4 py-2 bg-blue-600 text-white  hover:bg-blue-700 focus:outline-none`}
           onClick={() => setOpen(true)}
           aria-label="Open filters"
         >
@@ -360,13 +360,13 @@ export default function MapSidebarFloating({
 
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
+          className="fixed inset-0 z-40  "
           onClick={() => setOpen(false)}
         />
       )}
 
       <div className={sideClasses}>
-        <div className="flex items-center justify-between p-3 border-b">
+        <div className="flex items-center justify-between p-2 border-b">
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4" />
             <h3 className="text-base font-semibold">Map Filters</h3>
@@ -380,7 +380,7 @@ export default function MapSidebarFloating({
         </div>
 
         <div className="h-[calc(100%-112px)] overflow-y-auto p-3 space-y-4">
-          <PanelSection title="Date Range">
+          <PanelSection title="Date Filter">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="pb-2">Start</Label>
@@ -479,7 +479,6 @@ export default function MapSidebarFloating({
                     <SelectItem value="sinr">SINR</SelectItem>
                     <SelectItem value="ul_tpt">UL-Throughput</SelectItem>
                     <SelectItem value="dl_tpt">DL-Throughput</SelectItem>
-                    <SelectItem value="lte-bler">LTE-BLER</SelectItem>
                     <SelectItem value="mos">MOS</SelectItem>
                     <SelectItem value="pci">PCI</SelectItem>
                   </SelectContent>

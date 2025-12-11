@@ -38,27 +38,29 @@ const AppLayout = ({ children }) => {
 
       {/* Sidebar */}
       {shouldShowSidebar && (
+        <>
         <div
           className={`fixed left-0 top-0 h-full z-40 transform transition-transform duration-500 ease-in-out
           ${visible ? "translate-x-0" : "-translate-x-full"} 
-          bg-gray-900 shadow-xl flex`}
+          bg-slate-900 shadow-xl flex`}
           style={{ width: "250px" }}
         >
 
           <div className="flex-1">
             <SideBar collapsed={!visible} />
           </div>
-
-          <div className="w-2 bg-gray-800 relative">
+          <div className="w-2  relative">
             <button
               onClick={changeValue}
-              className="absolute top-1/2 -right-4 transform -translate-y-1/2 rounded-full 
-                bg-purple-600 text-white shadow-lg hover:bg-purple-500 transition-all duration-300"
+              className="absolute top-1/2 -right-4 transform -translate-y-1/2 rounded-r-2xl 
+                bg-slate-950 text-white p-2 hover:bg-purple-500 transition-all duration-300"
             >
               {visible ? "⟨" : "⟩"}
             </button>
           </div>
         </div>
+
+        </>
       )}
 
       {/* Main content */}

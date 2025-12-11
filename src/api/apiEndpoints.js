@@ -637,7 +637,7 @@ export const excelApi = {
     }),
   
   downloadTemplate: (fileType) => {
-    const url = `https://signaltrackers-1.onrender.com/ExcelUpload/DownloadExcel?fileType=${fileType}`;
+    const url = `https://api.stracer.vinfocom.co.in/ExcelUpload/DownloadExcel?fileType=${fileType}`;
     console.log('📥 Downloading template:', url);
     window.open(url, '_blank');
     return Promise.resolve({ success: true });

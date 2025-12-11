@@ -119,7 +119,7 @@ export default function UnifiedHeader({
                   </span>
                   <input
                     type="range"
-                    min="10"
+                    min="0"
                     max="100"
                     value={(opacity ?? 0.8) * 100}
                     onChange={(e) => setOpacity(Number(e.target.value) / 100)}
@@ -161,16 +161,20 @@ export default function UnifiedHeader({
         </Button>
         <ProjectsDropdown currentProjectId={effectiveProjectId} />
         <p className="text-gray-300 text-sm">
-          Welcome,{" "}
-          <span className="font-semibold text-white">
-            {user?.name || "User"}
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg">
+          <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">
+            {user?.name?.charAt(0)?.toUpperCase() || "U"}
+          </div>
+          <span className="text-sm text-gray-300">
+            <span className="font-medium text-white">{user?.name || "User"}</span>
           </span>
+        </div>
         </p>
         <Button
           onClick={logout}
           variant="default"
           size="sm"
-          className="text-white"
+          className="text-white bg-red-600"
         >
           <LogOut className="h-4 w-4 mr-2 text-white" />
           Logout

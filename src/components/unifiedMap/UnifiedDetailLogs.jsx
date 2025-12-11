@@ -136,6 +136,7 @@ export default function UnifiedDetailLogs({
     const applyFilters = async () => {
       if (hasActiveFilters) {
         const filtered = await fetchFilteredData(dataFilters);
+        console.log(filtered,"console for location in  detailslogs ")
         setFilteredLocations(filtered);
         onFilteredDataChange?.(filtered);
       } else {
@@ -154,7 +155,7 @@ export default function UnifiedDetailLogs({
   }, [locations, hasActiveFilters]);
 
   useEffect(() => {
-    console.log(appSummary,"In detail logs getting appSummary")
+    console.log(locations,"In detail logs getting appSummary")
   }, [locations]);
 
   // Fetch duration

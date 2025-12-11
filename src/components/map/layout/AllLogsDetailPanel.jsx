@@ -15,7 +15,6 @@ import Spinner from "@/components/common/Spinner";
 import { adminApi, mapViewApi } from "@/api/apiEndpoints";
 import { toast } from "react-toastify";
 
-// Metric config with units and proper threshold mapping
 const resolveMetricConfig = (selectedMetric) => {
   const key = String(selectedMetric || "").toLowerCase();
   const map = {
@@ -77,7 +76,6 @@ const quantile = (sorted, q) => {
   return sorted[base];
 };
 
-// Format duration from hours to readable format
 const formatDuration = (hours) => {
   if (!hours || hours < 0.001) return "0s";
 
@@ -89,12 +87,11 @@ const formatDuration = (hours) => {
   const parts = [];
   if (h > 0) parts.push(`${h}h`);
   if (m > 0) parts.push(`${m}m`);
-  if (s > 0 && h === 0) parts.push(`${s}s`); // Only show seconds if less than an hour
+  if (s > 0 && h === 0) parts.push(`${s}s`);
 
   return parts.join(" ") || "0s";
 };
 
-// Normalize provider names
 const normalizeProviderName = (provider) => {
   if (
     !provider ||
@@ -102,7 +99,7 @@ const normalizeProviderName = (provider) => {
     provider === undefined ||
     provider.trim() === ""
   ) {
-    return "Unknown";
+    return null;
   }
 
   const cleaned = String(provider)
@@ -110,7 +107,6 @@ const normalizeProviderName = (provider) => {
     .toUpperCase()
     .replace(/[\s\-_]/g, "");
 
-  // JIO variations
   if (
     cleaned.includes("JIO") ||
     cleaned === "JIOTRUE5G" ||
@@ -121,7 +117,6 @@ const normalizeProviderName = (provider) => {
     return "JIO";
   }
 
-  // Airtel variations
   if (
     cleaned.includes("AIRTEL") ||
     cleaned === "INDAIRTEL" ||
@@ -130,7 +125,6 @@ const normalizeProviderName = (provider) => {
     return "Airtel";
   }
 
-  // VI/Vodafone/Idea variations
   if (
     cleaned === "VI" ||
     cleaned === "VIINDIA" ||
@@ -140,52 +134,44 @@ const normalizeProviderName = (provider) => {
     return "VI";
   }
 
-  // BSNL
   if (cleaned.includes("BSNL")) {
     return "BSNL";
   }
 
-  return "Unknown";
+  return null;
 };
 
-// Normalize network type
 const normalizeNetworkType = (network) => {
   if (!network || network === null || network === undefined) {
-    return "Unknown";
+    return null;
   }
 
   const n = String(network).trim().toUpperCase();
 
   if (n === "" || n === "NULL" || n === "UNDEFINED" || n === "UNKNOWN") {
-    return "Unknown";
+    return null;
   }
 
-  // 5G SA
   if (n.includes("5G") && n.includes("SA") && !n.includes("NSA")) {
     return "5G SA";
   }
 
-  // 5G NSA
   if (n.includes("5G") && n.includes("NSA")) {
     return "5G NSA";
   }
 
-  // Generic 5G or NR
   if (n.includes("5G") || n.includes("NR")) {
     return "5G";
   }
 
-  // 4G/LTE
   if (n.includes("4G") || n.includes("LTE")) {
     return "4G";
   }
 
-  // 3G
   if (n.includes("3G") || n.includes("WCDMA") || n.includes("UMTS")) {
     return "3G";
   }
 
-  // 2G
   if (
     n.includes("2G") ||
     n.includes("EDGE") ||
@@ -195,16 +181,18 @@ const normalizeNetworkType = (network) => {
     return "2G";
   }
 
-  return "Unknown";
+  return null;
 };
 
-// Normalize and aggregate durations
 const normalizeAndAggregateDurations = (data) => {
   const aggregated = new Map();
 
   data.forEach((item) => {
     const provider = normalizeProviderName(item.Provider);
     const network = normalizeNetworkType(item.Network);
+
+    if (!provider || !network) return;
+
     const key = `${provider}|${network}`;
 
     if (aggregated.has(key)) {
@@ -223,25 +211,22 @@ const normalizeAndAggregateDurations = (data) => {
     }
   });
 
-  // Convert map to array and sort by duration (descending)
   return Array.from(aggregated.values()).sort(
     (a, b) => b.TotalDurationHours - a.TotalDurationHours
   );
 };
-// Update the normalizeOperator function to handle more edge cases
+
 const normalizeOperator = (raw) => {
-  if (!raw || raw === null || raw === undefined) return "Unknown";
+  if (!raw || raw === null || raw === undefined) return null;
 
   const s = String(raw).trim();
 
-  // Handle empty, null, or special characters
-  if (s === "" || s === "null" || s === "undefined") return "Unknown";
-  if (/^\/+$/.test(s)) return "Unknown";
-  if (s === "404011") return "Unknown";
+  if (s === "" || s === "null" || s === "undefined") return null;
+  if (/^\/+$/.test(s)) return null;
+  if (s === "404011") return null;
 
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
 
-  // JIO variations
   if (
     cleaned.includes("JIO") ||
     cleaned.includes("JIOTRUE") ||
@@ -252,7 +237,6 @@ const normalizeOperator = (raw) => {
     return "JIO";
   }
 
-  // Airtel variations
   if (
     cleaned.includes("AIRTEL") ||
     cleaned === "INDAIRTEL" ||
@@ -261,7 +245,6 @@ const normalizeOperator = (raw) => {
     return "Airtel";
   }
 
-  // VI/Vodafone/Idea variations
   if (
     cleaned === "VI" ||
     cleaned.includes("VIINDIA") ||
@@ -271,36 +254,32 @@ const normalizeOperator = (raw) => {
     return "VI India";
   }
 
-  // BSNL
   if (cleaned.includes("BSNL")) {
     return "BSNL";
   }
 
-  return "Unknown";
+  return null;
 };
 
 const normalizeNetwork = (network) => {
-  if (!network || network === null || network === undefined) return "Unknown";
+  if (!network || network === null || network === undefined) return null;
 
   const n = String(network).trim().toUpperCase();
 
-  if (n === "" || n === "NULL" || n === "UNDEFINED") return "Unknown";
+  if (n === "" || n === "NULL" || n === "UNDEFINED" || n === "UNKNOWN")
+    return null;
 
-  // 5G variations
   if (n.includes("5G") || n.includes("NR")) {
-    if (n.includes("SA")) return "5G SA";
+    if (n.includes("SA") && !n.includes("NSA")) return "5G SA";
     if (n.includes("NSA")) return "5G NSA";
     return "5G";
   }
 
-  // 4G variations
   if (n.includes("4G") || n.includes("LTE")) return "4G";
 
-  // 3G variations
   if (n.includes("3G") || n.includes("WCDMA") || n.includes("UMTS"))
     return "3G";
 
-  // 2G variations
   if (
     n.includes("2G") ||
     n.includes("EDGE") ||
@@ -309,13 +288,9 @@ const normalizeNetwork = (network) => {
   )
     return "2G";
 
-  // Unknown
-  if (n === "UNKNOWN") return "Unknown";
-
-  return "Unknown";
+  return null;
 };
 
-// Network type color mapping
 const getNetworkColor = (network) => {
   const colors = {
     "5G SA": "#ec4899",
@@ -324,7 +299,6 @@ const getNetworkColor = (network) => {
     "4G": "#8b5cf6",
     "3G": "#10b981",
     "2G": "#6b7280",
-    Unknown: "#f59e0b",
   };
 
   return colors[network] || "#f59e0b";
@@ -412,11 +386,15 @@ const buildOperatorNetworkCombo = (logs, topN = 10) => {
   const map = new Map();
 
   for (const l of logs) {
-    const provider = normalizeOperator(
-      l.provider ?? l.m_alpha_long ?? "Unknown"
+    const provider = normalizeOperator(l.provider ?? l.m_alpha_long ?? null);
+    const network = normalizeNetwork(
+      l.network ?? l.technology ?? l.tech ?? l.network_type ?? null
     );
-    const network =
-      l.network ?? l.technology ?? l.tech ?? l.network_type ?? "Unknown";
+
+    // Skip if either provider or network is null/Unknown
+    if (!provider || !network) continue;
+    if (provider === "Unknown" || network === "Unknown") continue;
+
     const key = `${provider} | ${network}`;
     map.set(key, (map.get(key) || 0) + 1);
   }
@@ -480,7 +458,7 @@ const AllLogsDetailPanel = ({
   selectedMetric = "rsrp",
   isLoading,
   startDate,
-  appSummary, 
+  appSummary,
   endDate,
   onClose,
 }) => {
@@ -527,21 +505,15 @@ const AllLogsDetailPanel = ({
       try {
         const res = await adminApi.getNetworkDurations(startDate, endDate);
 
-
-        console.log("Network durations API response:", res);
-
         let rawData = [];
         if (res?.Data && Array.isArray(res.Data)) {
           rawData = res.Data;
         } else if (Array.isArray(res)) {
           rawData = res;
         }
-        console.log("fbfbkjxfbgjbd",appSummary)
 
         const processedData = normalizeAndAggregateDurations(rawData);
-
         setNetworkDurations(processedData);
-        console.log("Processed durations:", processedData);
       } catch (error) {
         console.error("Failed to fetch network durations:", error);
         setDurationsError(error.message || "Failed to load network durations");
@@ -603,23 +575,28 @@ const AllLogsDetailPanel = ({
   const providerTop = useMemo(
     () =>
       buildTopCounts(safeLogsList, (l) =>
-        normalizeOperator(l.provider ?? l.m_alpha_long ?? "Unknown")
+        normalizeOperator(l.provider ?? l.m_alpha_long ?? null)
       ),
     [safeLogsList]
   );
 
   const networkTop = useMemo(
     () =>
-      buildTopCounts(
-        safeLogsList,
-        (l) =>
-          l.network ?? l.technology ?? l.tech ?? l.network_type ?? "Unknown"
+      buildTopCounts(safeLogsList, (l) =>
+        normalizeNetwork(
+          l.network ?? l.technology ?? l.tech ?? l.network_type ?? null
+        )
       ),
     [safeLogsList]
   );
 
   const bandTop = useMemo(
-    () => buildTopCounts(safeLogsList, (l) => l.band ?? "Unknown"),
+    () =>
+      buildTopCounts(safeLogsList, (l) => {
+        const band = l.band;
+        if (!band || band === "Unknown" || band === "unknown") return null;
+        return band;
+      }),
     [safeLogsList]
   );
 
@@ -634,7 +611,6 @@ const AllLogsDetailPanel = ({
   return (
     <div className="fixed top-0 right-0 h-screen w-[26rem] max-w-[100vw] text-white bg-slate-900 shadow-2xl z-50">
       <div className="flex flex-col h-full">
-        {/* Header */}
         <div className="p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
           <div>
             <h3 className="text-lg font-bold">All Logs Metric Summary</h3>
@@ -644,7 +620,7 @@ const AllLogsDetailPanel = ({
             </div>
             {formatDateRange() && (
               <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                <span>📅</span>
+                <span>Date Range:</span>
                 {formatDateRange()}
               </div>
             )}
@@ -673,7 +649,6 @@ const AllLogsDetailPanel = ({
           </div>
         </div>
 
-        {/* Body */}
         <div className="flex-grow overflow-y-auto p-4 space-y-4">
           {isLoading ? (
             <div className="flex justify-center items-center h-full">
@@ -681,7 +656,6 @@ const AllLogsDetailPanel = ({
             </div>
           ) : (
             <>
-              {/* Summary */}
               <div className="bg-slate-800/60 rounded-lg p-3">
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
@@ -726,7 +700,6 @@ const AllLogsDetailPanel = ({
                 </div>
               </div>
 
-              {/* Distribution */}
               <div>
                 <h4 className="font-semibold mb-2">Distribution</h4>
                 <div className="space-y-2">
@@ -770,18 +743,12 @@ const AllLogsDetailPanel = ({
                 </div>
               </div>
 
-              {/* Breakdowns */}
               <div className="grid grid-cols-1 gap-3">
-                {/* Providers */}
-                <div className="bg-slate-800/60 rounded-lg p-3">
-                  <div className="font-semibold mb-2">Providers</div>
-                  <div className="space-y-2">
-                    {safeProviderTop.length === 0 ? (
-                      <div className="text-xs text-slate-400">
-                        No provider data
-                      </div>
-                    ) : (
-                      safeProviderTop.map((o) => (
+                {safeProviderTop.length > 0 && (
+                  <div className="bg-slate-800/60 rounded-lg p-3">
+                    <div className="font-semibold mb-2">Providers</div>
+                    <div className="space-y-2">
+                      {safeProviderTop.map((o) => (
                         <div key={o.name} className="text-sm">
                           <div className="flex items-center justify-between">
                             <span className="text-slate-200">{o.name}</span>
@@ -796,21 +763,16 @@ const AllLogsDetailPanel = ({
                             />
                           </div>
                         </div>
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Network */}
-                <div className="bg-slate-800/60 rounded-lg p-3">
-                  <div className="font-semibold mb-2">Network</div>
-                  <div className="space-y-2">
-                    {safeNetworkTop.length === 0 ? (
-                      <div className="text-xs text-slate-400">
-                        No network data
-                      </div>
-                    ) : (
-                      safeNetworkTop.map((t) => (
+                {safeNetworkTop.length > 0 && (
+                  <div className="bg-slate-800/60 rounded-lg p-3">
+                    <div className="font-semibold mb-2">Network</div>
+                    <div className="space-y-2">
+                      {safeNetworkTop.map((t) => (
                         <div key={t.name} className="text-sm">
                           <div className="flex items-center justify-between">
                             <span className="text-slate-200">{t.name}</span>
@@ -825,157 +787,164 @@ const AllLogsDetailPanel = ({
                             />
                           </div>
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/*================================================================================================================*/}
-                {isDurationsLoading ? (
-                  <Spinner />
-                ) : (
-                  <div className="bg-slate-800/60 rounded-lg p-3">
-                    <div className="font-semibold mb-2">Network Durations</div>
-
-                    <table className="w-full text-sm border-collapse">
-                      <tbody>
-                        {networkDurations.map((n) => (
-                          <tr
-                            key={n.Provider}
-                            className="hover:bg-slate-700/20"
-                          >
-                            <td className="py-1">{n.Provider}</td>
-                            <td className="py-1">{n.Network}</td>
-                            <td className="py-1 text-right">
-                              {formatDuration(n.TotalDurationHours)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                {/*=====================================================================================================================*/}
-                 {/* App Usage Summary */}
-<div className="bg-slate-800/60 rounded-lg p-3">
-  <div className="font-semibold mb-2 flex items-center gap-2">
-    <Clock className="h-4 w-4" />
-    App Usage Summary
-  </div>
-  
-  {!appSummary || Object.keys(appSummary).length === 0 ? (
-    <div className="text-xs text-slate-400">No app usage data available</div>
-  ) : (
-    <div className="space-y-3">
-      {Object.values(appSummary).map((app) => (
-        <div 
-          key={app.appName} 
-          className="border-b border-slate-700 pb-3 last:border-b-0 last:pb-0"
-        >
-          {/* App Header */}
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-medium text-slate-100">{app.appName}</span>
-            <span className="text-xs text-emerald-400 font-mono">
-              {app.durationHHMMSS}
-            </span>
-          </div>
-          
-          {/* Metrics Grid */}
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-400">RSRP:</span>
-              <span className="text-slate-200 font-medium">
-                {app.avgRsrp?.toFixed(2)} dBm
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">RSRQ:</span>
-              <span className="text-slate-200 font-medium">
-                {app.avgRsrq?.toFixed(2)} dB
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">SINR:</span>
-              <span className="text-slate-200 font-medium">
-                {app.avgSinr?.toFixed(2)} dB
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">MOS:</span>
-              <span className="text-slate-200 font-medium">
-                {app.avgMos?.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">DL:</span>
-              <span className="text-slate-200 font-medium">
-                {app.avgDlTptMbps?.toFixed(2)} Mbps
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">UL:</span>
-              <span className="text-slate-200 font-medium">
-                {app.avgUlTptMbps?.toFixed(2)} Mbps
-              </span>
-            </div>
-          </div>
-          
-          {/* Sample Count */}
-          <div className="mt-2 pt-2 border-t border-slate-700/50 flex justify-between items-center text-xs">
-            <span className="text-slate-500">Samples: {app.sampleCount}</span>
-            <span className="text-slate-500">
-              {new Date(app.firstUsedAt).toLocaleDateString()} - {new Date(app.lastUsedAt).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
-
-                {/*================================================================================================================*/}
-                <div className="bg-slate-800/60 rounded-lg p-3">
-                  <div className="font-semibold mb-2">Operator vs Network</div>
-                  <div className="space-y-2">
-                    {safeProviderNetworkTop.length === 0 ? (
-                      <div className="text-xs text-slate-400">
-                        No operator/network data
+                {isDurationsLoading ? (
+                  <Spinner />
+                ) : (
+                  networkDurations.length > 0 && (
+                    <div className="bg-slate-800/60 rounded-lg p-3">
+                      <div className="font-semibold mb-2">
+                        Network Durations
                       </div>
-                    ) : (
-                      safeProviderNetworkTop.map((item) => (
+                      <table className="w-full text-sm border-collapse">
+                        <tbody>
+                          {networkDurations.map((n) => (
+                            <tr
+                              key={`${n.Provider}-${n.Network}`}
+                              className="hover:bg-slate-700/20"
+                            >
+                              <td className="py-1">{n.Provider}</td>
+                              <td className="py-1">{n.Network}</td>
+                              <td className="py-1 text-right">
+                                {formatDuration(n.TotalDurationHours)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                )}
+
+                {appSummary && Object.keys(appSummary).length > 0 && (
+                  <div className="bg-slate-800/60 rounded-lg p-3">
+                    <div className="font-semibold mb-2 flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      App Usage Summary
+                    </div>
+                    <div className="space-y-3">
+                      {Object.values(appSummary).map((app) => (
                         <div
-                          key={`${item.provider}-${item.network}`}
-                          className="text-sm"
+                          key={app.appName}
+                          className="border-b border-slate-700 pb-3 last:border-b-0 last:pb-0"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-200">
-                              {item.provider} / {item.network}
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-slate-100">
+                              {app.appName}
                             </span>
-                            <span className="text-slate-300">
-                              {item.count} ({item.percent}%)
+                            <span className="text-xs text-emerald-400 font-mono">
+                              {app.durationHHMMSS}
                             </span>
                           </div>
-                          <div className="h-1.5 bg-slate-700 rounded mt-1">
-                            <div
-                              className="h-1.5 rounded bg-purple-500"
-                              style={{ width: `${item.percent}%` }}
-                            />
+
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">RSRP:</span>
+                              <span className="text-slate-200 font-medium">
+                                {app.avgRsrp?.toFixed(2)} dBm
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">RSRQ:</span>
+                              <span className="text-slate-200 font-medium">
+                                {app.avgRsrq?.toFixed(2)} dB
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">SINR:</span>
+                              <span className="text-slate-200 font-medium">
+                                {app.avgSinr?.toFixed(2)} dB
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">MOS:</span>
+                              <span className="text-slate-200 font-medium">
+                                {app.avgMos?.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">DL:</span>
+                              <span className="text-slate-200 font-medium">
+                                {app.avgDlTptMbps?.toFixed(2)} Mbps
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">UL:</span>
+                              <span className="text-slate-200 font-medium">
+                                {app.avgUlTptMbps?.toFixed(2)} Mbps
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 pt-2 border-t border-slate-700/50 flex justify-between items-center text-xs">
+                            <span className="text-slate-500">
+                              Samples: {app.sampleCount}
+                            </span>
+                            <span className="text-slate-500">
+                              {new Date(app.firstUsedAt).toLocaleDateString()} -{" "}
+                              {new Date(app.lastUsedAt).toLocaleDateString()}
+                            </span>
                           </div>
                         </div>
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Bands */}
-                <div className="bg-slate-800/60 rounded-lg p-3">
-                  <div className="font-semibold mb-2">Bands</div>
-                  <div className="space-y-2">
-                    {safeBandTop.length === 0 ? (
-                      <div className="text-xs text-slate-400">No band data</div>
-                    ) : (
-                      safeBandTop.map((b) => (
+                {safeProviderNetworkTop.filter(
+                  (item) =>
+                    item.provider &&
+                    item.network &&
+                    item.provider !== "Unknown" &&
+                    item.network !== "Unknown"
+                ).length > 0 && (
+                  <div className="bg-slate-800/60 rounded-lg p-3">
+                    <div className="font-semibold mb-2">
+                      Operator vs Network
+                    </div>
+                    <div className="space-y-2">
+                      {safeProviderNetworkTop
+                        .filter(
+                          (item) =>
+                            item.provider &&
+                            item.network &&
+                            item.provider !== "Unknown" &&
+                            item.network !== "Unknown"
+                        )
+                        .map((item) => (
+                          <div
+                            key={`${item.provider}-${item.network}`}
+                            className="text-sm"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-200">
+                                {item.provider} / {item.network}
+                              </span>
+                              <span className="text-slate-300">
+                                {item.count} ({item.percent}%)
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-slate-700 rounded mt-1">
+                              <div
+                                className="h-1.5 rounded bg-purple-500"
+                                style={{ width: `${item.percent}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {safeBandTop.length > 0 && (
+                  <div className="bg-slate-800/60 rounded-lg p-3">
+                    <div className="font-semibold mb-2">Bands</div>
+                    <div className="space-y-2">
+                      {safeBandTop.map((b) => (
                         <div key={b.name} className="text-sm">
                           <div className="flex items-center justify-between">
                             <span className="text-slate-200">{b.name}</span>
@@ -990,10 +959,10 @@ const AllLogsDetailPanel = ({
                             />
                           </div>
                         </div>
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </>
           )}

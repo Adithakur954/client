@@ -814,7 +814,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
           onSortChange={onSortChange} 
           options={SORT_OPTIONS}
         />
-        <div className="text-[9px] text-slate-500">
+        <div className="text-[15px] text-white">
           {pciColorMap.length} PCIs
         </div>
       </div>
@@ -845,14 +845,14 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-white text-xs">PCI {item.pci}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                  <span className="text-[15px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
                     {item.count} samples
                   </span>
                 </div>
                 
                 <div className="flex items-center gap-2 mt-0.5">
                   <span 
-                    className="text-[9px] px-1 py-0.5 rounded"
+                    className="text-[15px] px-1 py-0.5 rounded"
                     style={{ 
                       backgroundColor: `${getProviderColor(item.dominantProvider)}20`,
                       color: getProviderColor(item.dominantProvider)
@@ -861,7 +861,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
                     {item.dominantProvider}
                   </span>
                   <span 
-                    className="text-[9px] px-1 py-0.5 rounded"
+                    className="text-[12px] px-1 py-0.5 rounded"
                     style={{ 
                       backgroundColor: `${getTechnologyColor(item.dominantTechnology)}20`,
                       color: getTechnologyColor(item.dominantTechnology)
@@ -869,7 +869,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
                   >
                     {item.dominantTechnology}
                   </span>
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                  <span className="text-[12px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-400">
                     B{item.dominantBand}
                   </span>
                 </div>
@@ -878,7 +878,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
               {/* Quick Stats */}
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 {item.avgRsrp?.avg && (
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                  <span className={`text-[11px] px-1.5 py-0.5 rounded ${
                     parseFloat(item.avgRsrp.avg) >= -90 ? "text-green-400 bg-green-500/10" : 
                     parseFloat(item.avgRsrp.avg) >= -105 ? "text-yellow-400 bg-yellow-500/10" : 
                     "text-red-400 bg-red-500/10"
@@ -887,7 +887,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
                   </span>
                 )}
                 {item.avgDl?.avg && (
-                  <span className="text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                  <span className="text-[12px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
                     {item.avgDl.avg}Mbps
                   </span>
                 )}
@@ -929,7 +929,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
 
                 {/* Cell IDs */}
                 {item.cellIds.length > 0 && (
-                  <div className="text-[9px]">
+                  <div className="text-[11px]">
                     <span className="text-slate-400">Cell IDs: </span>
                     <span className="text-cyan-400">{item.cellIds.slice(0, 5).join(', ')}</span>
                     {item.cellIds.length > 5 && (
@@ -940,7 +940,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
 
                 {/* NodeB IDs */}
                 {item.nodebIds.length > 0 && (
-                  <div className="text-[9px]">
+                  <div className="text-[11px]">
                     <span className="text-slate-400">NodeB IDs: </span>
                     <span className="text-orange-400">{item.nodebIds.slice(0, 5).join(', ')}</span>
                     {item.nodebIds.length > 5 && (
@@ -1080,11 +1080,11 @@ const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
             {/* Expanded PCI List */}
             {expandedProvider === provider.name && (
               <div className="border-t border-slate-700 bg-slate-900/50 p-2">
-                <div className="text-[9px] text-slate-400 mb-1.5 font-medium">
+                <div className="text-[10px] text-slate-400 mb-1.5 font-medium">
                   PCIs for {provider.name}
                 </div>
                 <div className="max-h-[180px] overflow-y-auto scrollbar-hide">
-                  <table className="w-full text-[9px]">
+                  <table className="w-full text-[10px]">
                     <thead className="sticky top-0 bg-slate-900">
                       <tr className="border-b border-slate-700">
                         <th className="text-left p-1 text-slate-400">PCI</th>

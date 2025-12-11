@@ -31,16 +31,20 @@ export const COLOR_SCHEMES = {
   },
   band: {
     "1": "#EF4444",
-    "2": "#F59E0B",
-    "3": "#EF4444",
-    "5": "#F59E0B",
-    "7": "#10B981",
-    "8": "#10B981",
-    "40": "#3B82F6",
-    "41": "#8B5CF6",
-    "n28": "#EC4899",
-    "n78": "#F472B6",
-    Unknown: "#6B7280",
+  "2": "#F59E0B",
+  "3": "#EF4444",
+  "5": "#F59E0B",
+  "7": "#10B981",
+  "8": "#10B981",
+  "20": "#0EA5E9",
+  "38": "#14B8A6",
+  "40": "#3B82F6",
+  "41": "#8B5CF6",
+  "42": "#6366F1",
+  "n28": "#EC4899",
+  "n78": "#F472B6",
+  "n258": "#D946EF",
+  "Unknown": "#6B7280"
   },
 };
 
@@ -91,7 +95,7 @@ export const METRIC_CONFIG = {
     fields: ['sinr', 'SINR', 'Sinr', 'lte_sinr', 'LTE_SINR', 'nr_sinr'],
   },
   dl_tpt: {
-    thresholdKey: 'dl_tpt',
+    thresholdKey: 'dl_thpt',
     label: 'DL Throughput',
     unit: 'Mbps',
     fields: ['dl_tpt', 'DL_TPT', 'dl_thpt', 'DL_THPT', 'dl_throughput', 'download'],
@@ -112,7 +116,7 @@ export const METRIC_CONFIG = {
     thresholdKey: 'lte_bler',
     label: 'LTE BLER',
     unit: '%',
-    fields: ['lte_bler', 'LTE_BLER', 'bler', 'BLER'],
+    fields: ['lte_bler','lte_bler_json', 'LTE_BLER', 'bler', 'BLER'],
   },
   pci: {
     thresholdKey: 'pci',

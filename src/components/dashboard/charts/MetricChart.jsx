@@ -6,6 +6,46 @@ import { useOperatorMetrics, useOperatorsAndNetworks } from '@/hooks/useDashboar
 import { getMetricColorFunction } from '@/utils/chartUtils';
 import Spinner from '@/components/common/Spinner';
 
+// Helper function to check if operator is allowed (Airtel, Jio, Vi/Vodafone)
+const isAllowedOperator = (name) => {
+  if (!name || typeof name !== 'string') return false;
+  const cleanName = name.toLowerCase().trim();
+  
+  // Check for Airtel
+  if (cleanName.includes('air') || cleanName.includes('airtel') || cleanName.includes('bharti')) {
+    return true;
+  }
+  
+  // Check for Jio
+  if (cleanName.includes('jio') || cleanName.includes('reliance')) {
+    return true;
+  }
+  
+  // Check for Vi/Vodafone
+  if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
+    return true;
+  }
+  
+  return false;
+};
+
+// Get operator brand name for display
+const getOperatorBrand = (name) => {
+  if (!name || typeof name !== 'string') return name;
+  const cleanName = name.toLowerCase().trim();
+  
+  if (cleanName.includes('air') || cleanName.includes('airtel') || cleanName.includes('bharti')) {
+    return 'Airtel';
+  }
+  if (cleanName.includes('jio') || cleanName.includes('reliance')) {
+    return 'Jio';
+  }
+  if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
+    return 'Vi';
+  }
+  return name;
+};
+
 const MetricChart = () => {
   const [selectedMetric, setSelectedMetric] = useState('rsrp');
   const [showSettings, setShowSettings] = useState(false);
@@ -18,18 +58,25 @@ const MetricChart = () => {
   // Fetch ALL data for selected metric
   const { data: allData, isLoading } = useOperatorMetrics(selectedMetric, {});
 
+  // Filter operators to only show Airtel, Jio, and Vi/Vodafone
+  const availableOperators = useMemo(() => {
+    if (!apiOperators || !Array.isArray(apiOperators)) return [];
+    return apiOperators.filter(operator => isAllowedOperator(operator));
+  }, [apiOperators]);
+
   // Get metric configuration
   const metricConfig = useMemo(() => {
     return METRICS.find(m => m.value === selectedMetric) || METRICS[0];
   }, [selectedMetric]);
 
-  // Client-side filtering and aggregation
+  // Client-side filtering and aggregation - only for allowed operators
   const filteredData = useMemo(() => {
     if (!allData || allData.length === 0) return [];
 
-    let filtered = [...allData];
+    // First filter to only allowed operators
+    let filtered = allData.filter(item => isAllowedOperator(item.name));
 
-    // Filter by operators
+    // Filter by selected operators
     if (selectedOperators.length > 0) {
       filtered = filtered.filter(item => selectedOperators.includes(item.name));
     }
@@ -38,31 +85,34 @@ const MetricChart = () => {
     if (selectedNetworks.length > 0) {
       filtered = filtered.map(item => {
         const networkValues = selectedNetworks
-          .filter(net => item[net] !== undefined)
+          .filter(net => item[net] !== undefined && item[net] > 0)
           .map(net => item[net]);
 
         if (networkValues.length === 0) return null;
 
-        // Calculate average across selected networks
         const avgValue = networkValues.reduce((sum, val) => sum + val, 0) / networkValues.length;
 
         return {
           name: item.name,
+          displayName: getOperatorBrand(item.name),
           value: avgValue
         };
       }).filter(Boolean);
     } else {
-      // Use total (average of all networks)
       filtered = filtered.map(item => ({
         name: item.name,
+        displayName: getOperatorBrand(item.name),
         value: item.total || 0
       }));
     }
 
+    // Filter out items with no value
+    filtered = filtered.filter(item => item.value !== 0 && !isNaN(item.value));
+
     return filtered;
   }, [allData, selectedOperators, selectedNetworks]);
 
-  // Color function
+  // Color function - keep original dynamic colors
   const colorFunction = useMemo(() => {
     return getMetricColorFunction(selectedMetric);
   }, [selectedMetric]);
@@ -100,7 +150,7 @@ const MetricChart = () => {
     if (!filteredData || filteredData.length === 0) return;
 
     const headers = ['Operator', metricConfig.label];
-    const rows = filteredData.map(item => [item.name, item.value]);
+    const rows = filteredData.map(item => [item.displayName || item.name, item.value]);
 
     const csv = [
       headers.join(','),
@@ -207,20 +257,25 @@ const MetricChart = () => {
             <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto p-2 bg-white rounded-lg border border-gray-200">
               {metaLoading ? (
                 <span className="text-sm text-gray-500">Loading...</span>
-              ) : apiOperators && apiOperators.length > 0 ? (
-                apiOperators.map(operator => (
-                  <button
-                    key={operator}
-                    onClick={() => toggleOperator(operator)}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                      selectedOperators.length === 0 || selectedOperators.includes(operator)
-                        ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700'
-                        : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
-                    }`}
-                  >
-                    {operator}
-                  </button>
-                ))
+              ) : availableOperators && availableOperators.length > 0 ? (
+                availableOperators.map(operator => {
+                  const isSelected = selectedOperators.length === 0 || selectedOperators.includes(operator);
+                  const displayName = getOperatorBrand(operator);
+                  
+                  return (
+                    <button
+                      key={operator}
+                      onClick={() => toggleOperator(operator)}
+                      className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700'
+                          : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                      }`}
+                    >
+                      {displayName}
+                    </button>
+                  );
+                })
               ) : (
                 <span className="text-sm text-gray-500">No operators available</span>
               )}
@@ -280,7 +335,7 @@ const MetricChart = () => {
                 )}
                 {selectedOperators.length > 0 && (
                   <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-md font-medium">
-                    {selectedOperators.length} operator(s)
+                    {selectedOperators.map(op => getOperatorBrand(op)).join(', ')}
                   </span>
                 )}
                 {selectedNetworks.length > 0 && (
@@ -307,7 +362,7 @@ const MetricChart = () => {
           <BarChart
             data={filteredData}
             layout="vertical"
-            margin={{ top: 12, right: 70, left: 10, bottom: 8 }}
+            margin={{ top: 12, right: 80, left: 10, bottom: 8 }}
           >
             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.08)" />
             <XAxis
@@ -316,10 +371,10 @@ const MetricChart = () => {
               tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 500 }}
             />
             <YAxis
-              dataKey="name"
+              dataKey="displayName"
               type="category"
-              width={140}
-              tick={{ fill: '#111827', fontSize: 12, fontWeight: 600 }}
+              width={80}
+              tick={{ fill: '#111827', fontSize: 14, fontWeight: 700 }}
             />
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
@@ -327,6 +382,7 @@ const MetricChart = () => {
                 `${Number(v).toFixed(2)} ${metricConfig.unit}`,
                 metricConfig.label
               ]}
+              labelFormatter={(label) => label}
             />
             <Bar dataKey="value" name={metricConfig.label} radius={[0, 8, 8, 0]}>
               <LabelList
@@ -344,7 +400,7 @@ const MetricChart = () => {
                       fill="#111827"
                       dominantBaseline="middle"
                       textAnchor={anchor}
-                      fontSize={12}
+                      fontSize={13}
                       fontWeight={700}
                     >
                       {`${val} ${metricConfig.unit}`}
@@ -352,6 +408,7 @@ const MetricChart = () => {
                   );
                 }}
               />
+              {/* Keep original dynamic colors from colorFunction */}
               {filteredData?.map((entry, index) => (
                 <Cell
                   key={`cell-metric-${index}`}
@@ -368,7 +425,7 @@ const MetricChart = () => {
         <div className="h-96 flex flex-col items-center justify-center text-gray-500">
           <Activity size={48} className="mb-4 opacity-20" />
           <p className="text-lg font-medium">No data available</p>
-          <p className="text-sm mt-1">Try adjusting your filters</p>
+          <p className="text-sm mt-1">Showing Airtel, Jio & Vi only</p>
           {hasActiveFilters && (
             <button
               onClick={clearAllFilters}

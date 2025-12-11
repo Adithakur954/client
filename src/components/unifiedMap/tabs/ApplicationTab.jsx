@@ -382,16 +382,29 @@ export const ApplicationTab = ({
   }, [aggregatedAppData, searchTerm, selectedCategory, sortConfig]);
 
   // Chart data for comparison view
-  const chartData = useMemo(() => {
-    return filteredAndSortedData.map(app => ({
-      name: app.name,
-      mos: app.avgMos || 0,
-      dl: app.avgDl || 0,
-      ul: app.avgUl || 0,
-      latency: app.avgLatency || 0,
-      sessionCount: app.sessionCount,
-    }));
-  }, [filteredAndSortedData]);
+  // Chart data for comparison view - UPDATED
+const chartData = useMemo(() => {
+  return filteredAndSortedData.map(app => ({
+    name: app.name,
+    
+    // Quality metrics
+    mos: app.avgMos || 0,
+    avgSinr: app.avgSinr || 0,
+    avgRsrp: app.avgRsrp || 0,
+    avgRsrq: app.avgRsrq || 0,
+    
+    // Throughput
+    dl: app.avgDl || 0,
+    ul: app.avgUl || 0,
+    
+    // Performance metrics
+    avgLatency: app.avgLatency || 0,
+    avgJitter: app.avgJitter || 0,
+    avgPacketLoss: app.avgPacketLoss || 0,
+    
+    sessionCount: app.sessionCount,
+  }));
+}, [filteredAndSortedData]);
 
   // Handle sort
   const handleSort = (key) => {
@@ -664,8 +677,86 @@ const AppTableView = ({ data, sortConfig, onSort, expanded }) => {
   );
 };
 
-// ==================== COMPARISON VIEW COMPONENT ====================
+
 const AppComparisonView = ({ chartData, chartRefs }) => {
+  // State for chart metric selection
+  const [selectedQualityMetric, setSelectedQualityMetric] = useState('mos');
+  const [selectedPerformanceMetric, setSelectedPerformanceMetric] = useState('latency');
+
+  // Quality metrics configuration (MOS chart)
+  const QUALITY_METRICS = {
+    mos: {
+      key: 'mos',
+      label: 'MOS Score',
+      color: '#fbbf24',
+      format: (val) => val?.toFixed(2) || 'N/A',
+      domain: [0, 5],
+      unit: '',
+      
+    },
+    sinr: {
+      key: 'avgSinr',
+      label: 'SINR',
+      color: '#22c55e',
+      format: (val) => `${val?.toFixed(1) || 0} dB`,
+      domain: [-20, 30],
+      unit: 'dB',
+      
+    },
+    rsrp: {
+      key: 'avgRsrp',
+      label: 'RSRP',
+      color: '#3b82f6',
+      format: (val) => `${val?.toFixed(1) || 0} dBm`,
+      domain: [-140, -40],
+      unit: 'dBm',
+      
+    },
+    rsrq: {
+      key: 'avgRsrq',
+      label: 'RSRQ',
+      color: '#a855f7',
+      format: (val) => `${val?.toFixed(1) || 0} dB`,
+      domain: [-20, 0],
+      unit: 'dB',
+     
+    }
+  };
+
+  // Performance metrics configuration (Latency chart)
+  const PERFORMANCE_METRICS = {
+    latency: {
+      key: 'avgLatency',
+      label: 'Latency',
+      color: '#a855f7',
+      format: (val) => `${val?.toFixed(1) || 0} ms`,
+      domain: [0, 'auto'],
+      unit: 'ms',
+      
+    },
+    jitter: {
+      key: 'avgJitter',
+      label: 'Jitter',
+      color: '#6366f1',
+      format: (val) => `${val?.toFixed(1) || 0} ms`,
+      domain: [0, 'auto'],
+      unit: 'ms',
+      
+    },
+    packetLoss: {
+      key: 'avgPacketLoss',
+      label: 'Packet Loss',
+      color: '#ef4444',
+      format: (val) => `${val?.toFixed(2) || 0}%`,
+      domain: [0, 'auto'],
+      unit: '%',
+      
+    }
+  };
+
+  const currentQualityMetric = QUALITY_METRICS[selectedQualityMetric];
+  const currentPerformanceMetric = PERFORMANCE_METRICS[selectedPerformanceMetric];
+
   if (!chartData?.length) {
     return (
       <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700">
@@ -677,15 +768,34 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
 
   return (
     <div className="space-y-4">
-      {/* MOS Comparison */}
+      {/* Signal Quality Comparison Chart */}
       <div 
         ref={chartRefs?.mosChart}
         className="bg-slate-900 rounded-lg p-4 border border-slate-700"
       >
-        <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4" />
-          MOS Score Comparison (Average)
-        </h4>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Signal Quality Comparison (Average)
+          </h4>
+          
+          {/* Metric Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">Metric:</span>
+            <select
+              value={selectedQualityMetric}
+              onChange={(e) => setSelectedQualityMetric(e.target.value)}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 hover:border-slate-500 transition-colors"
+            >
+              {Object.entries(QUALITY_METRICS).map(([key, config]) => (
+                <option key={key} value={key}>
+                  {config.icon} {config.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -696,7 +806,16 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
               height={80} 
               tick={{ fill: "#9CA3AF", fontSize: 10 }} 
             />
-            <YAxis domain={[0, 5]} tick={{ fill: "#9CA3AF", fontSize: 12 }} />
+            <YAxis 
+              domain={currentQualityMetric.domain}
+              tick={{ fill: "#9CA3AF", fontSize: 12 }} 
+              label={{
+                value: `${currentQualityMetric.label} ${currentQualityMetric.unit ? `(${currentQualityMetric.unit})` : ''}`,
+                angle: -90,
+                position: 'insideLeft',
+                style: { fill: '#9CA3AF', fontSize: 11 }
+              }}
+            />
             <Tooltip 
               contentStyle={{
                 backgroundColor: "#1e293b",
@@ -704,10 +823,18 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
                 borderRadius: "8px",
                 color: "#fff",
               }}
-              formatter={(value) => [value.toFixed(2), 'Avg MOS Score']}
+              formatter={(value) => [
+                currentQualityMetric.format(value),
+                `Avg ${currentQualityMetric.label}`
+              ]}
             />
             <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar dataKey="mos" fill="#fbbf24" name="Avg MOS Score" radius={[8, 8, 0, 0]} />
+            <Bar 
+              dataKey={currentQualityMetric.key} 
+              fill={currentQualityMetric.color} 
+              name={`Avg ${currentQualityMetric.label}`} 
+              radius={[8, 8, 0, 0]} 
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -731,7 +858,15 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
               height={80} 
               tick={{ fill: "#9CA3AF", fontSize: 10 }} 
             />
-            <YAxis tick={{ fill: "#9CA3AF", fontSize: 12 }} />
+            <YAxis 
+              tick={{ fill: "#9CA3AF", fontSize: 12 }}
+              label={{
+                value: 'Throughput (Mbps)',
+                angle: -90,
+                position: 'insideLeft',
+                style: { fill: '#9CA3AF', fontSize: 11 }
+              }}
+            />
             <Tooltip 
               contentStyle={{
                 backgroundColor: "#1e293b",
@@ -739,7 +874,7 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
                 borderRadius: "8px",
                 color: "#fff",
               }}
-              formatter={(value) => [`${value.toFixed(2)} Mbps`]} 
+              formatter={(value, name) => [`${value?.toFixed(2) || 0} Mbps`, name]} 
             />
             <Legend wrapperStyle={{ fontSize: "12px" }} />
             <Bar dataKey="dl" fill="#06b6d4" name="Avg Download (Mbps)" radius={[8, 8, 0, 0]} />
@@ -748,15 +883,34 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
         </ResponsiveContainer>
       </div>
 
-      {/* Latency Comparison */}
+      {/* Network Performance Comparison Chart */}
       <div 
         ref={chartRefs?.qoeChart}
         className="bg-slate-900 rounded-lg p-4 border border-slate-700"
       >
-        <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-          <Signal className="h-4 w-4" />
-          Latency Comparison (Average)
-        </h4>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <Signal className="h-4 w-4" />
+            Network Performance Comparison (Average)
+          </h4>
+          
+          {/* Metric Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">Metric:</span>
+            <select
+              value={selectedPerformanceMetric}
+              onChange={(e) => setSelectedPerformanceMetric(e.target.value)}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 hover:border-slate-500 transition-colors"
+            >
+              {Object.entries(PERFORMANCE_METRICS).map(([key, config]) => (
+                <option key={key} value={key}>
+                  {config.icon} {config.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -767,7 +921,16 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
               height={80} 
               tick={{ fill: "#9CA3AF", fontSize: 10 }} 
             />
-            <YAxis tick={{ fill: "#9CA3AF", fontSize: 12 }} />
+            <YAxis 
+              domain={currentPerformanceMetric.domain}
+              tick={{ fill: "#9CA3AF", fontSize: 12 }}
+              label={{
+                value: `${currentPerformanceMetric.label} ${currentPerformanceMetric.unit ? `(${currentPerformanceMetric.unit})` : ''}`,
+                angle: -90,
+                position: 'insideLeft',
+                style: { fill: '#9CA3AF', fontSize: 11 }
+              }}
+            />
             <Tooltip 
               contentStyle={{
                 backgroundColor: "#1e293b",
@@ -775,10 +938,18 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
                 borderRadius: "8px",
                 color: "#fff",
               }}
-              formatter={(value) => [`${value.toFixed(1)} ms`, 'Avg Latency']} 
+              formatter={(value) => [
+                currentPerformanceMetric.format(value),
+                `Avg ${currentPerformanceMetric.label}`
+              ]} 
             />
             <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar dataKey="latency" fill="#a855f7" name="Avg Latency (ms)" radius={[8, 8, 0, 0]} />
+            <Bar 
+              dataKey={currentPerformanceMetric.key} 
+              fill={currentPerformanceMetric.color} 
+              name={`Avg ${currentPerformanceMetric.label}`} 
+              radius={[8, 8, 0, 0]} 
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -183,7 +183,7 @@ const UnifiedMapSidebar = ({
 }) => {
   const sideClasses = useMemo(() => {
     const base =
-      "fixed top-0 left-0 h-full z-50 w-[90vw] sm:w-[390px] bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out overflow-hidden";
+      "fixed top-14 left-0 h-[calc(100vh-3.5rem)] z-50 w-[90vw] sm:w-[390px] bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out overflow-hidden";
     return open ? `${base} translate-x-0` : `${base} -translate-x-full`;
   }, [open]);
 
@@ -254,7 +254,7 @@ const updateDataFilter = useCallback((filterType, value) => {
     []
   );
   const handleColorByChange = useCallback((value) => {
-  console.log('🎨 Layer Color changed to:', value, 'Type:', typeof value);
+  console.log(' Layer Color changed to:', value, 'Type:', typeof value);
   
   if (value === "metric") {
     console.log('  → Setting colorBy to NULL (use metric colors)');
@@ -594,7 +594,6 @@ const updateDataFilter = useCallback((filterType, value) => {
                       <SelectItem value="dl_tpt">DL Throughput</SelectItem>
                       <SelectItem value="ul_tpt">UL Throughput</SelectItem>
                       <SelectItem value="mos">MOS</SelectItem>
-                      <SelectItem value="lte_bler">LTE BLER</SelectItem>
                       <SelectItem value="pci">PCI</SelectItem>
                     </SelectContent>
                   </Select>

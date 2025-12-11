@@ -38,33 +38,59 @@ const getTechColor = (tech, index) => {
   return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
 };
 
-// Helper function to check if a value is invalid/unknown
-const isInvalidValue = (value) => {
-  if (value === null || value === undefined) return true;
-  if (typeof value === 'number' && (value === 0 || isNaN(value))) return true;
+// Helper function to check if operator is one of the allowed ones (Airtel, Jio, Vi/Vodafone)
+const isAllowedOperator = (name) => {
+  if (!name || typeof name !== 'string') return false;
+  const cleanName = name.toLowerCase().trim();
   
-  const strValue = String(value).toLowerCase().trim();
-  return (
-    strValue === '' ||
-    strValue === 'unknown' ||
-    strValue === 'null' ||
-    strValue === 'undefined' ||
-    strValue === 'n/a' ||
-    strValue === 'na' ||
-    strValue === '-' ||
-    strValue === '000 000' ||
-    strValue === '000000' ||
-    strValue === '0 0 0' ||
-    strValue === '000' ||
-    strValue === '00' ||
-    strValue === '0' ||
-    /^0+[\s]*0*$/.test(strValue) ||
-    /^[\s0\-]+$/.test(strValue) ||
-    strValue.includes('unknown')
-  );
+  if (cleanName.includes('air') || cleanName.includes('airtel') || cleanName.includes('bharti')) {
+    return true;
+  }
+  if (cleanName.includes('jio') || cleanName.includes('reliance')) {
+    return true;
+  }
+  if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
+    return true;
+  }
+  
+  return false;
 };
 
-// Helper function to validate names (operators/technologies)
+// Get operator brand name for display
+const getOperatorBrand = (name) => {
+  if (!name || typeof name !== 'string') return name;
+  const cleanName = name.toLowerCase().trim();
+  
+  if (cleanName.includes('air') || cleanName.includes('airtel') || cleanName.includes('bharti')) {
+    return 'Airtel';
+  }
+  if (cleanName.includes('jio') || cleanName.includes('reliance')) {
+    return 'Jio';
+  }
+  if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
+    return 'Vi';
+  }
+  return name;
+};
+
+// Get operator color
+const getOperatorColor = (name) => {
+  if (!name || typeof name !== 'string') return '#6B7280';
+  const cleanName = name.toLowerCase().trim();
+  
+  if (cleanName.includes('air') || cleanName.includes('airtel') || cleanName.includes('bharti')) {
+    return '#E60000';
+  }
+  if (cleanName.includes('jio') || cleanName.includes('reliance')) {
+    return '#0A2885';
+  }
+  if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
+    return '#6B21A8';
+  }
+  return '#6B7280';
+};
+
+// Helper function to validate names
 const isValidName = (name) => {
   if (!name || typeof name !== 'string') return false;
   const cleanName = name.toLowerCase().trim();
@@ -78,7 +104,6 @@ const isValidName = (name) => {
     cleanName !== '-' &&
     cleanName !== '000 000' &&
     cleanName !== '000000' &&
-    cleanName !== '0 0 0' &&
     !/^0+[\s]*0*$/.test(cleanName) &&
     !/^[\s0\-]+$/.test(cleanName) &&
     !cleanName.includes('unknown') &&
@@ -96,13 +121,13 @@ const METRICS = {
   samples: { 
     label: 'Sample Count', 
     unit: 'samples',
-    yAxisLabel: 'Number of Samples',
+    yAxisLabel: 'Samples',
     format: (val) => formatNumber(val),
     icon: Activity,
     reversed: false
   },
   rsrp: { 
-    label: 'RSRP (Signal Strength)', 
+    label: 'RSRP', 
     unit: 'dBm',
     yAxisLabel: 'RSRP (dBm)',
     format: (val) => `${val?.toFixed(1) || 0} dBm`,
@@ -110,7 +135,7 @@ const METRICS = {
     reversed: true
   },
   rsrq: { 
-    label: 'RSRQ (Signal Quality)', 
+    label: 'RSRQ', 
     unit: 'dB',
     yAxisLabel: 'RSRQ (dB)',
     format: (val) => `${val?.toFixed(1) || 0} dB`,
@@ -118,7 +143,7 @@ const METRICS = {
     reversed: true
   },
   sinr: { 
-    label: 'SINR (Signal to Noise)', 
+    label: 'SINR', 
     unit: 'dB',
     yAxisLabel: 'SINR (dB)',
     format: (val) => `${val?.toFixed(1) || 0} dB`,
@@ -126,7 +151,7 @@ const METRICS = {
     reversed: false
   },
   mos: { 
-    label: 'MOS (Mean Opinion Score)', 
+    label: 'MOS', 
     unit: '',
     yAxisLabel: 'MOS Score',
     format: (val) => val?.toFixed(2) || '0',
@@ -158,17 +183,17 @@ const METRICS = {
     reversed: false
   },
   dlTpt: { 
-    label: 'Download Throughput', 
+    label: 'Download Speed', 
     unit: 'Mbps',
-    yAxisLabel: 'Download Throughput (Mbps)',
+    yAxisLabel: 'Download (Mbps)',
     format: (val) => `${val?.toFixed(2) || 0} Mbps`,
     icon: TrendingUp,
     reversed: false
   },
   ulTpt: { 
-    label: 'Upload Throughput', 
+    label: 'Upload Speed', 
     unit: 'Mbps',
-    yAxisLabel: 'Upload Throughput (Mbps)',
+    yAxisLabel: 'Upload (Mbps)',
     format: (val) => `${val?.toFixed(2) || 0} Mbps`,
     icon: TrendingUp,
     reversed: false
@@ -185,11 +210,9 @@ const OperatorNetworkChart = () => {
 
   const { data: allData, isLoading } = useOperatorMetrics(selectedMetric, {});
 
-  // Filter out invalid technologies (EDGE, unknown, 000 000, etc.)
+  // Filter out invalid technologies
   const availableTechnologies = useMemo(() => {
-    if (!apiNetworks || !Array.isArray(apiNetworks)) {
-      return [];
-    }
+    if (!apiNetworks || !Array.isArray(apiNetworks)) return [];
     return apiNetworks.filter(tech => 
       isValidName(tech) &&
       !tech.toLowerCase().includes('edge') && 
@@ -197,32 +220,35 @@ const OperatorNetworkChart = () => {
     );
   }, [apiNetworks]);
 
-  // Filter out invalid operators (unknown, 000 000, etc.)
+  // Filter operators to only show Airtel, Jio, and Vi/Vodafone
   const availableOperators = useMemo(() => {
-    if (!apiOperators || !Array.isArray(apiOperators)) {
-      return [];
-    }
-    return apiOperators.filter(operator => isValidName(operator));
+    if (!apiOperators || !Array.isArray(apiOperators)) return [];
+    return apiOperators.filter(operator => 
+      isValidName(operator) && isAllowedOperator(operator)
+    );
   }, [apiOperators]);
 
-  // Client-side filtering with invalid data removal
+  // Client-side filtering - only showing allowed operators
   const filteredData = useMemo(() => {
     if (!allData || allData.length === 0) return [];
 
-    // Step 1: Filter out invalid operator names
-    let filtered = allData.filter(item => isValidName(item.name));
+    let filtered = allData.filter(item => 
+      isValidName(item.name) && isAllowedOperator(item.name)
+    );
 
-    // Step 2: Clean each data item - remove invalid technology keys and values
     filtered = filtered.map(item => {
-      const cleanItem = { name: item.name };
+      const cleanItem = { 
+        name: item.name,
+        displayName: getOperatorBrand(item.name),
+        operatorColor: getOperatorColor(item.name)
+      };
       
       Object.keys(item).forEach(key => {
-        if (key === 'name' || key === 'total') return;
+        if (key === 'name' || key === 'total' || key === 'displayName' || key === 'operatorColor') return;
         if (!isValidName(key)) return;
         if (key.toLowerCase().includes('edge')) return;
         
         const value = item[key];
-        // Only include valid numeric values > 0
         if (isValidDataValue(value)) {
           cleanItem[key] = value;
         }
@@ -231,52 +257,53 @@ const OperatorNetworkChart = () => {
       return cleanItem;
     });
 
-    // Step 3: Filter by selected operators
     if (selectedOperators.length > 0) {
       filtered = filtered.filter(item => selectedOperators.includes(item.name));
     }
 
-    // Step 4: Filter by selected technologies
     if (selectedTechnologies.length > 0) {
       filtered = filtered.map(item => {
-        const newItem = { name: item.name };
+        const newItem = { 
+          name: item.name,
+          displayName: item.displayName,
+          operatorColor: item.operatorColor
+        };
         selectedTechnologies.forEach(tech => {
           if (isValidDataValue(item[tech])) {
             newItem[tech] = item[tech];
           }
         });
         return newItem;
-      }).filter(item => Object.keys(item).length > 1);
+      }).filter(item => Object.keys(item).filter(k => !['name', 'displayName', 'operatorColor'].includes(k)).length > 0);
     }
 
-    // Step 5: Calculate totals and filter out empty items
     filtered = filtered.map(item => {
-      const techs = Object.keys(item).filter(k => k !== 'name' && k !== 'total');
+      const techs = Object.keys(item).filter(k => !['name', 'total', 'displayName', 'operatorColor'].includes(k));
       const validValues = techs.filter(tech => isValidDataValue(item[tech]));
       const total = validValues.length > 0 
         ? validValues.reduce((sum, tech) => sum + item[tech], 0) / validValues.length
         : 0;
       return { ...item, total };
     }).filter(item => {
-      const techs = Object.keys(item).filter(k => k !== 'name' && k !== 'total');
+      const techs = Object.keys(item).filter(k => !['name', 'total', 'displayName', 'operatorColor'].includes(k));
       return techs.some(tech => isValidDataValue(item[tech]));
     });
 
     return filtered;
   }, [allData, selectedOperators, selectedTechnologies]);
 
- const technologyTypes = useMemo(() => {
-  if (!filteredData?.length) return [];
-
-  const techs = new Set();
-  filteredData.forEach(item => {
-    Object.entries(item).forEach(([key, value]) => {
-      if (key !== "name" && value > 0) techs.add(key);   
+  const technologyTypes = useMemo(() => {
+    if (!filteredData?.length) return [];
+    const techs = new Set();
+    filteredData.forEach(item => {
+      Object.entries(item).forEach(([key, value]) => {
+        if (!['name', 'displayName', 'operatorColor', 'total'].includes(key) && value > 0) {
+          techs.add(key);
+        }
+      });
     });
-  });
-  return [...techs];
-}, [filteredData]);
-
+    return [...techs];
+  }, [filteredData]);
 
   const handleMetricChange = (value) => {
     setSelectedMetric(value);
@@ -285,18 +312,14 @@ const OperatorNetworkChart = () => {
 
   const toggleOperator = (operator) => {
     setSelectedOperators(prev => 
-      prev.includes(operator)
-        ? prev.filter(op => op !== operator)
-        : [...prev, operator]
+      prev.includes(operator) ? prev.filter(op => op !== operator) : [...prev, operator]
     );
     setShowSettings(false);
   };
 
   const toggleTechnology = (tech) => {
     setSelectedTechnologies(prev => 
-      prev.includes(tech)
-        ? prev.filter(t => t !== tech)
-        : [...prev, tech]
+      prev.includes(tech) ? prev.filter(t => t !== tech) : [...prev, tech]
     );
     setShowSettings(false);
   };
@@ -317,16 +340,12 @@ const OperatorNetworkChart = () => {
     const metricConfig = METRICS[selectedMetric];
     const headers = ['Operator', ...technologyTypes, `Average ${metricConfig.label}`];
     const rows = filteredData.map(item => [
-      item.name,
+      item.displayName || item.name,
       ...technologyTypes.map(tech => item[tech] || ''),
       item.total || ''
     ]);
 
-    const csv = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
+    const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -336,79 +355,88 @@ const OperatorNetworkChart = () => {
   };
 
   const formatYAxis = (value) => {
-    if (selectedMetric === 'samples') {
-      return formatNumber(value);
-    }
+    if (selectedMetric === 'samples') return formatNumber(value);
     return value?.toFixed(1) || '0';
   };
 
-  // Enhanced Custom Tooltip with high z-index
+  // Simple, Compact Tooltip with Large Fonts
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload || !payload.length) return null;
 
     const metricConfig = METRICS[selectedMetric];
-    // Filter out entries with no valid data
     const validPayload = payload.filter(p => isValidDataValue(p.value));
-
     if (validPayload.length === 0) return null;
+
+    const currentOperator = filteredData.find(item => item.name === label || item.displayName === label);
+    const operatorColor = currentOperator?.operatorColor || '#3B82F6';
+    const displayName = currentOperator?.displayName || label;
+
+    const total = selectedMetric === 'samples'
+      ? validPayload.reduce((sum, p) => sum + (p.value || 0), 0)
+      : validPayload.reduce((sum, p) => sum + (p.value || 0), 0) / validPayload.length;
 
     return (
       <div 
-        className="bg-white rounded-xl shadow-2xl border border-gray-200 p-4 min-w-[240px] pointer-events-none"
+        className="bg-white rounded-lg shadow-xl border-2 p-3"
         style={{ 
+          borderColor: operatorColor,
+          minWidth: '180px',
           zIndex: 99999,
-          position: 'relative',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
         }}
       >
-        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
-          <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-pulse" />
-          <p className="font-bold text-gray-900 text-base">{label}</p>
+        {/* Operator Name */}
+        <div 
+          className="text-lg font-bold mb-2 pb-2 border-b"
+          style={{ color: operatorColor, borderColor: `${operatorColor}30` }}
+        >
+          {displayName}
         </div>
-        <div className="space-y-2">
+
+        {/* Technology Values */}
+        <div className="space-y-1.5">
           {validPayload
             .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
             .map((entry, index) => (
-              <div 
-                key={index} 
-                className="flex items-center justify-between gap-4 py-1.5 px-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-              >
+              <div key={index} className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div
-                    className="w-4 h-4 rounded shadow-sm"
+                    className="w-3 h-3 rounded"
                     style={{ backgroundColor: entry.color }}
                   />
-                  <span className="text-sm text-gray-700 font-medium">{entry.name}</span>
+                  <span className="text-base font-semibold text-gray-700">
+                    {entry.name}
+                  </span>
                 </div>
-                <span className="text-sm font-bold text-gray-900">
+                <span className="text-base font-bold text-gray-900">
                   {metricConfig.format(entry.value)}
                 </span>
               </div>
             ))}
         </div>
-        <div className="border-t border-gray-100 mt-3 pt-3">
-          <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg px-3 py-2.5">
-            <span className="text-sm text-gray-600 font-semibold">
-              {selectedMetric === 'samples' ? '📊 Total:' : '📈 Average:'}
-            </span>
-            <span className="text-lg font-bold text-blue-600">
-              {metricConfig.format(
-                selectedMetric === 'samples'
-                  ? validPayload.reduce((sum, p) => sum + (p.value || 0), 0)
-                  : validPayload.reduce((sum, p) => sum + (p.value || 0), 0) / validPayload.length
-              )}
-            </span>
-          </div>
+
+        {/* Total/Average */}
+        <div 
+          className="mt-2 pt-2 border-t flex justify-between items-center"
+          style={{ borderColor: `${operatorColor}30` }}
+        >
+          <span className="text-base font-semibold text-gray-600">
+            {selectedMetric === 'samples' ? 'Total' : 'Avg'}
+          </span>
+          <span 
+            className="text-lg font-bold"
+            style={{ color: operatorColor }}
+          >
+            {metricConfig.format(total)}
+          </span>
         </div>
       </div>
     );
   };
 
-  // Custom Legend
+  // Simple Legend
   const CustomLegend = ({ payload }) => {
     if (!payload || payload.length === 0) return null;
     
-    // Filter legend to only show technologies with data
     const validLegendItems = payload.filter(entry => {
       return filteredData.some(item => isValidDataValue(item[entry.value]));
     });
@@ -416,50 +444,34 @@ const OperatorNetworkChart = () => {
     if (validLegendItems.length === 0) return null;
     
     return (
-      <div className="flex flex-wrap justify-center gap-3 mt-4 pt-4 border-t border-gray-100">
+      <div className="flex flex-wrap justify-center gap-4 mt-4 pt-3 border-t border-gray-200">
         {validLegendItems.map((entry, index) => (
-          <div 
-            key={index}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 hover:bg-gray-100 transition-all cursor-default"
-          >
+          <div key={index} className="flex items-center gap-2">
             <div 
-              className="w-4 h-4 rounded shadow-sm"
+              className="w-4 h-4 rounded"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-sm font-semibold text-gray-700">{entry.value}</span>
+            <span className="text-sm font-bold text-gray-700">{entry.value}</span>
           </div>
         ))}
       </div>
     );
   };
 
-  // Custom Bar Shape - returns null if no valid data
   const CustomBar = (props) => {
     const { x, y, width, height, fill, value } = props;
-    
-    // Don't render bar if value is invalid
-    if (!isValidDataValue(value) || height <= 0) {
-      return null;
-    }
+    if (!isValidDataValue(value) || height <= 0) return null;
 
     return (
-      <g>
-        <defs>
-          <linearGradient id={`gradient-${fill?.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={fill} stopOpacity={1} />
-            <stop offset="100%" stopColor={fill} stopOpacity={0.8} />
-          </linearGradient>
-        </defs>
-        <rect
-          x={x}
-          y={y}
-          width={width}
-          height={height}
-          fill={`url(#gradient-${fill?.replace('#', '')})`}
-          rx={4}
-          ry={4}
-        />
-      </g>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={fill}
+        rx={4}
+        ry={4}
+      />
     );
   };
 
@@ -467,60 +479,39 @@ const OperatorNetworkChart = () => {
   const isReversedAxis = currentMetric.reversed;
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-      {/* Enhanced Header */}
-      <div className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-indigo-50/50 p-6 border-b border-gray-100">
+    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+      {/* Header */}
+      <div className="bg-gray-50 p-5 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-200">
-              <BarChart3 className="text-white" size={24} />
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-600 rounded-lg">
+              <BarChart3 className="text-white" size={22} />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900">
-                Operator Distribution
+              <h3 className="text-lg font-bold text-gray-900">
+                Operator Comparison
               </h3>
-              <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <p className="text-sm text-gray-500 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
                 {currentMetric.label}
-                {filteredData.length > 0 && (
-                  <span className="text-gray-400">• {filteredData.length} operators</span>
-                )}
               </p>
             </div>
-            {hasActiveFilters && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
-                <Filter size={14} className="text-blue-600" />
-                <span className="text-xs font-semibold text-blue-700">
-                  {(selectedOperators.length > 0 ? 1 : 0) + 
-                   (selectedTechnologies.length > 0 ? 1 : 0) + 
-                   (selectedMetric !== 'samples' ? 1 : 0)} active
-                </span>
-                <button 
-                  onClick={clearAllFilters}
-                  className="ml-1 p-0.5 hover:bg-blue-100 rounded-full transition-colors"
-                >
-                  <X size={12} className="text-blue-600" />
-                </button>
-              </div>
-            )}
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleExport}
               disabled={!filteredData || filteredData.length === 0}
-              className="p-2.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-emerald-200 hover:shadow-md"
-              title="Export to CSV"
+              className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all disabled:opacity-50"
+              title="Export CSV"
             >
               <Download size={20} />
             </button>
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className={`p-2.5 rounded-xl transition-all border ${
-                showSettings 
-                  ? 'text-blue-600 bg-blue-50 border-blue-200 shadow-md' 
-                  : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50 border-transparent hover:border-blue-200 hover:shadow-md'
+              className={`p-2 rounded-lg transition-all ${
+                showSettings ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
               }`}
-              title="Filters & Settings"
+              title="Settings"
             >
               <Settings size={20} />
             </button>
@@ -528,21 +519,20 @@ const OperatorNetworkChart = () => {
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-5">
         {/* Settings Panel */}
         {showSettings && (
-          <div className="mb-6 p-5 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50 rounded-xl border border-gray-200 shadow-sm space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-200">
-              <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className="mb-5 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                 <Filter size={16} className="text-blue-600" />
-                Filters & Settings
+                Filters
               </h4>
               {hasActiveFilters && (
                 <button
                   onClick={clearAllFilters}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 font-semibold rounded-lg transition-all"
+                  className="text-xs text-red-600 hover:text-red-700 font-semibold"
                 >
-                  <X size={12} />
                   Clear All
                 </button>
               )}
@@ -550,206 +540,132 @@ const OperatorNetworkChart = () => {
 
             {/* Metric Selection */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2.5">
-                <Activity size={14} className="text-blue-600" />
-                Select Metric
+              <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                Metric
               </label>
               <select
                 value={selectedMetric}
                 onChange={(e) => handleMetricChange(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium shadow-sm hover:border-gray-400 transition-colors"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white font-medium"
               >
                 {Object.entries(METRICS).map(([key, config]) => (
-                  <option key={key} value={key}>
-                    {config.label}
-                  </option>
+                  <option key={key} value={key}>{config.label}</option>
                 ))}
               </select>
             </div>
 
             {/* Operator Filter */}
             <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <TrendingUp size={14} className="text-green-600" />
-                  Operators 
-                  {selectedOperators.length > 0 && (
-                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                      {selectedOperators.length}
-                    </span>
-                  )}
-                </label>
-                {selectedOperators.length > 0 && (
-                  <button
-                    onClick={() => setSelectedOperators([])}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-semibold hover:underline"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+              <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                Operators
+              </label>
+              <div className="flex flex-wrap gap-2">
                 {metaLoading ? (
-                  <div className="w-full flex items-center justify-center py-2">
-                    <Spinner />
-                  </div>
+                  <Spinner />
                 ) : availableOperators.length > 0 ? (
-                  availableOperators.map(operator => (
-                    <button
-                      key={operator}
-                      onClick={() => toggleOperator(operator)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                        selectedOperators.length === 0 || selectedOperators.includes(operator)
-                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:shadow-lg'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
-                    >
-                      {operator}
-                    </button>
-                  ))
+                  availableOperators.map(operator => {
+                    const isSelected = selectedOperators.length === 0 || selectedOperators.includes(operator);
+                    const operatorColor = getOperatorColor(operator);
+                    const displayName = getOperatorBrand(operator);
+                    
+                    return (
+                      <button
+                        key={operator}
+                        onClick={() => toggleOperator(operator)}
+                        className="px-4 py-2 text-sm font-bold rounded-lg transition-all"
+                        style={isSelected ? {
+                          backgroundColor: operatorColor,
+                          color: '#fff',
+                        } : {
+                          backgroundColor: '#E5E7EB',
+                          color: '#6B7280',
+                        }}
+                      >
+                        {displayName}
+                      </button>
+                    );
+                  })
                 ) : (
-                  <span className="text-sm text-gray-500 w-full text-center py-2">No operators available</span>
+                  <span className="text-sm text-gray-500">No operators</span>
                 )}
               </div>
             </div>
 
             {/* Technology Filter */}
             <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <Radio size={14} className="text-purple-600" />
-                  Technology 
-                  {selectedTechnologies.length > 0 && (
-                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">
-                      {selectedTechnologies.length}
-                    </span>
-                  )}
-                </label>
-                {selectedTechnologies.length > 0 && (
-                  <button
-                    onClick={() => setSelectedTechnologies([])}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-semibold hover:underline"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+              <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                Technology
+              </label>
+              <div className="flex flex-wrap gap-2">
                 {metaLoading ? (
-                  <div className="w-full flex items-center justify-center py-2">
-                    <Spinner />
-                  </div>
+                  <Spinner />
                 ) : availableTechnologies.length > 0 ? (
                   availableTechnologies.map(tech => (
                     <button
                       key={tech}
                       onClick={() => toggleTechnology(tech)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-all ${
                         selectedTechnologies.length === 0 || selectedTechnologies.includes(tech)
-                          ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md hover:shadow-lg'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-200 text-gray-500'
                       }`}
                     >
                       {tech}
                     </button>
                   ))
                 ) : (
-                  <span className="text-sm text-gray-500 w-full text-center py-2">No technologies available</span>
+                  <span className="text-sm text-gray-500">No technologies</span>
                 )}
               </div>
             </div>
-
-            {/* Active Filters Summary */}
-            {hasActiveFilters && (
-              <div className="pt-3 border-t border-gray-200">
-                <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
-                  Active Filters
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedMetric !== 'samples' && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs rounded-lg font-semibold border border-indigo-200">
-                      <Activity size={12} />
-                      {METRICS[selectedMetric].label}
-                    </span>
-                  )}
-                  {selectedOperators.map(op => (
-                    <span key={op} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 text-xs rounded-lg font-semibold border border-green-200">
-                      {op}
-                      <button onClick={() => toggleOperator(op)} className="hover:text-green-900">
-                        <X size={12} />
-                      </button>
-                    </span>
-                  ))}
-                  {selectedTechnologies.map(tech => (
-                    <span key={tech} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 text-xs rounded-lg font-semibold border border-purple-200">
-                      {tech}
-                      <button onClick={() => toggleTechnology(tech)} className="hover:text-purple-900">
-                        <X size={12} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {/* Loading State */}
         {isLoading && (
-          <div className="h-[420px] flex items-center justify-center bg-gray-50 rounded-xl">
+          <div className="h-[400px] flex items-center justify-center bg-gray-50 rounded-xl">
             <div className="text-center">
               <Spinner />
-              <p className="text-sm text-gray-500 mt-3">Loading data...</p>
+              <p className="text-sm text-gray-500 mt-3">Loading...</p>
             </div>
           </div>
         )}
 
         {/* Chart */}
         {!isLoading && filteredData && filteredData.length > 0 && technologyTypes.length > 0 && (
-          <div 
-            className="bg-gradient-to-br from-gray-50/50 to-white rounded-xl p-4 border border-gray-100"
-            style={{ position: 'relative', zIndex: 1 }}
-          >
-            <ResponsiveContainer width="100%" height={420}>
+          <div className="bg-gray-50 rounded-xl p-4">
+            <ResponsiveContainer width="100%" height={400}>
               <BarChart
                 data={filteredData}
-                margin={{ top: 20, right: 30, left: 60, bottom: 80 }}
-                barGap={0}
-                barCategoryGap="20%"
+                margin={{ top: 20, right: 30, left: 50, bottom: 60 }}
+                barGap={2}
+                barCategoryGap="25%"
               >
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  vertical={false} 
-                  stroke="#e5e7eb" 
-                />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                 <XAxis
-                  dataKey="name"
-                  tick={{ fill: '#374151', fontSize: 12, fontWeight: 600 }}
-                  angle={-30}
-                  textAnchor="end"
-                  height={90}
-                  axisLine={{ stroke: '#d1d5db' }}
-                  tickLine={{ stroke: '#d1d5db' }}
+                  dataKey="displayName"
+                  tick={{ fill: '#111827', fontSize: 14, fontWeight: 700 }}
+                  axisLine={{ stroke: '#D1D5DB' }}
+                  tickLine={{ stroke: '#D1D5DB' }}
                 />
                 <YAxis
                   reversed={isReversedAxis}
-                  tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 500 }}
+                  tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 500 }}
                   tickFormatter={formatYAxis}
-                  axisLine={{ stroke: '#d1d5db' }}
-                  tickLine={{ stroke: '#d1d5db' }}
+                  axisLine={{ stroke: '#D1D5DB' }}
+                  tickLine={{ stroke: '#D1D5DB' }}
                   label={{ 
-                    value: currentMetric.yAxisLabel + (isReversedAxis ? ' ↑' : ''), 
+                    value: currentMetric.yAxisLabel, 
                     angle: -90, 
                     position: 'insideLeft',
                     style: { fill: '#374151', fontSize: 12, fontWeight: 600 },
-                    offset: -5
+                    offset: 0
                   }}
                 />
                 <Tooltip 
                   content={<CustomTooltip />} 
-                  cursor={{ fill: 'rgba(59, 130, 246, 0.08)' }}
-                  wrapperStyle={{ zIndex: 99999, pointerEvents: 'none' }}
-                  allowEscapeViewBox={{ x: true, y: true }}
+                  cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
+                  wrapperStyle={{ zIndex: 99999 }}
                 />
                 <Legend content={<CustomLegend />} />
                 {technologyTypes.map((tech, idx) => (
@@ -759,20 +675,16 @@ const OperatorNetworkChart = () => {
                     name={tech}
                     fill={getTechColor(tech, idx)}
                     radius={[4, 4, 0, 0]}
-                    maxBarSize={45}
-                    // Hide bar segment if value is 0 or invalid
+                    maxBarSize={50}
                     shape={(props) => {
-                      const { value } = props;
-                      if (!isValidDataValue(value)) return null;
+                      if (!isValidDataValue(props.value)) return null;
                       return <CustomBar {...props} />;
                     }}
                   >
-                    {/* Use Cell to conditionally hide bars */}
                     {filteredData.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`}
                         fill={isValidDataValue(entry[tech]) ? getTechColor(tech, idx) : 'transparent'}
-                        stroke="none"
                       />
                     ))}
                   </Bar>
@@ -784,19 +696,19 @@ const OperatorNetworkChart = () => {
 
         {/* Empty State */}
         {!isLoading && (!filteredData || filteredData.length === 0 || technologyTypes.length === 0) && (
-          <div className="h-[420px] flex flex-col items-center justify-center text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-            <div className="p-5 bg-gray-100 rounded-full mb-4">
-              <Filter size={48} className="text-gray-400" />
-            </div>
-            <p className="text-xl font-bold text-gray-700">No data available</p>
-            <p className="text-sm mt-2 text-gray-500">Try adjusting your filters or clear them to see all data</p>
+          <div className="h-[400px] flex flex-col items-center justify-center text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+            <Filter size={40} className="text-gray-400 mb-3" />
+            <p className="text-lg font-bold text-gray-700">No data available</p>
+            <p className="text-sm mt-1 text-gray-500">
+              Showing Airtel, Jio & Vi only
+            </p>
             {hasActiveFilters && (
               <button
                 onClick={clearAllFilters}
-                className="mt-5 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg transition-all font-semibold flex items-center gap-2"
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold flex items-center gap-2"
               >
                 <X size={16} />
-                Clear All Filters
+                Clear Filters
               </button>
             )}
           </div>

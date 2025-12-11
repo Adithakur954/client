@@ -777,6 +777,35 @@ export const useParallelMetrics = (metrics = [], filters) => {
 // ============================================
 // ✅ HOOKS: APP DATA
 // ============================================
+// Helper function to parse duration "HH:MM:SS" to hours (decimal)
+const parseDurationToHours = (duration) => {
+  if (!duration || typeof duration !== 'string') return 0;
+  
+  const parts = duration.split(':');
+  if (parts.length !== 3) return 0;
+  
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  const seconds = parseInt(parts[2], 10) || 0;
+  
+  // Return total hours as decimal (e.g., 03:30:00 = 3.5 hours)
+  return parseFloat((hours + (minutes / 60) + (seconds / 3600)).toFixed(2));
+};
+
+// Helper to parse duration to minutes
+const parseDurationToMinutes = (duration) => {
+  if (!duration || typeof duration !== 'string') return 0;
+  
+  const parts = duration.split(':');
+  if (parts.length !== 3) return 0;
+  
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  const seconds = parseInt(parts[2], 10) || 0;
+  
+  return parseFloat(((hours * 60) + minutes + (seconds / 60)).toFixed(2));
+};
+
 export const useAppData = () => {
   const { data: rawData, ...rest } = useSWR(
     'appData',
@@ -784,21 +813,27 @@ export const useAppData = () => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM, fallbackData: [] }
   );
   
-  // ✅ Memoize processing
   const processedData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
     
-    return rawData.map(item => ({
-      appName: item?.appName || item?.AppName || 'Unknown',
-      avgDlTptMbps: toNumber(item?.avgDlTptMbps || item?.AvgDlTptMbps),
-      avgUlTptMbps: toNumber(item?.avgUlTptMbps || item?.AvgUlTptMbps),
-      avgMos: toNumber(item?.avgMos || item?.AvgMos),
-      sampleCount: toNumber(item?.sampleCount || item?.SampleCount),
-      avgRsrp: toNumber(item?.avgRsrp || item?.AvgRsrp),
-      avgRsrq: toNumber(item?.avgRsrq || item?.AvgRsrq),
-      avgSinr: toNumber(item?.avgSinr || item?.AvgSinr),
-      avgDuration: toNumber(item?.durationMinutes || item?.DurationMinutes) / 60,
-    }));
+    return rawData.map(item => {
+      const durationStr = item?.durationHHMMSS || item?.avgDuration || '00:00:00';
+      
+      return {
+        appName: item?.appName || item?.AppName || 'Unknown',
+        avgDlTptMbps: toNumber(item?.avgDlTptMbps || item?.AvgDlTptMbps),
+        avgUlTptMbps: toNumber(item?.avgUlTptMbps || item?.AvgUlTptMbps),
+        avgMos: toNumber(item?.avgMos || item?.AvgMos),
+        sampleCount: toNumber(item?.sampleCount || item?.SampleCount),
+        avgRsrp: toNumber(item?.avgRsrp || item?.AvgRsrp),
+        avgRsrq: toNumber(item?.avgRsrq || item?.AvgRsrq),
+        avgSinr: toNumber(item?.avgSinr || item?.AvgSinr),
+        // Convert duration to numeric (hours)
+        avgDuration: parseDurationToHours(durationStr),
+        // Keep original formatted string for tooltip display
+        avgDurationFormatted: durationStr,
+      };
+    });
   }, [rawData]);
   
   return { data: processedData, ...rest };

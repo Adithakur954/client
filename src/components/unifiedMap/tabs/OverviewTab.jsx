@@ -424,14 +424,6 @@ export const OverviewTab = ({
         <PCIReferenceCard topPCIs={topPCIs} />
       )}
 
-      {/* Session Duration */}
-      {duration && <SessionDurationCard duration={duration} />}
-
-      {/* Data Volume */}
-      {volume && (
-        <DataVolumeCard volume={volume} sessionWiseVolume={sessionWiseVolume} />
-      )}
-
       {/* Provider Volume by Technology */}
       {sessionIds.length > 0 && (
         <ProviderVolumeCard
@@ -442,6 +434,20 @@ export const OverviewTab = ({
           error={error}
         />
       )}
+
+      {/* Data Volume */}
+      {volume && (
+        <DataVolumeCard volume={volume} sessionWiseVolume={sessionWiseVolume} />
+      )}
+
+      
+
+      {/* Session Duration */}
+      {duration && <SessionDurationCard duration={duration} />}
+
+      
+
+      
     </div>
   );
 };
@@ -571,6 +577,244 @@ const SessionDurationCard = ({ duration }) => (
   </div>
 );
 
+const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds, error }) => {
+  const [showDetails, setShowDetails] = useState(true);
+
+  const getTechBadgeColor = (tech) => {
+    const techBadgeColors = {
+      "2G": "bg-orange-500/20 border-orange-500/30 text-orange-400",
+      "3G": "bg-yellow-500/20 border-yellow-500/30 text-yellow-400",
+      "4G": "bg-blue-500/20 border-blue-500/30 text-blue-400",
+      "5G": "bg-purple-500/20 border-purple-500/30 text-purple-400",
+      "LTE": "bg-blue-500/20 border-blue-500/30 text-blue-400",
+      "WCDMA": "bg-yellow-500/20 border-yellow-500/30 text-yellow-400",
+      "GSM": "bg-orange-500/20 border-orange-500/30 text-orange-400",
+      "NR": "bg-purple-500/20 border-purple-500/30 text-purple-400",
+    };
+    return techBadgeColors[tech?.toUpperCase()] || "bg-slate-700 border-slate-600 text-slate-400";
+  };
+
+  const getProviderIcon = (provider) => {
+    const providerLower = provider?.toLowerCase() || "";
+    if (providerLower.includes("jio")) return "🔵";
+    if (providerLower.includes("airtel")) return "🔴";
+    if (providerLower.includes("vodafone") || providerLower.includes("vi")) return "🟣";
+    if (providerLower.includes("bsnl")) return "🟢";
+    return "📶";
+  };
+
+  // ✅ Check if provider is a known/valid provider
+  const isKnownProvider = (provider) => {
+    if (!provider || typeof provider !== 'string') return false;
+    
+    const providerLower = provider.toLowerCase().trim();
+    
+    // List of known providers - only these will be shown
+    const knownProviders = [
+      'jio',
+      'airtel', 
+      'vi',
+      'vodafone',
+      'bsnl'
+    ];
+    
+    // Check if provider name includes any known provider
+    return knownProviders.some(known => providerLower.includes(known));
+  };
+
+  // ✅ Filter out entries with zero values AND unknown providers
+  const filteredProviderVolume = useMemo(() => {
+    if (!providerVolume || !Array.isArray(providerVolume)) return [];
+    
+    return providerVolume.filter(item => {
+      // Filter 1: Check if provider is known (Jio, Airtel, Vi, Vodafone, BSNL)
+      if (!isKnownProvider(item.provider)) {
+        return false;
+      }
+
+      // Filter 2: Check if values are greater than 0
+      const downloadValue = parseFloat(item.downloadGb) || 0;
+      const uploadValue = parseFloat(item.uploadGb) || 0;
+      const totalValue = parseFloat(item.totalGb) || 0;
+      
+      // Only include if at least one value is greater than 0
+      return downloadValue > 0 || uploadValue > 0 || totalValue > 0;
+    });
+  }, [providerVolume]);
+
+  // ✅ Filter technology summary by known providers
+  const filteredTechSummary = useMemo(() => {
+    if (!summaryStats?.byTech) return {};
+    
+    const filtered = {};
+    
+    Object.entries(summaryStats.byTech).forEach(([tech, data]) => {
+      const dlValue = parseFloat(data.downloadKb) || 0;
+      const ulValue = parseFloat(data.uploadKb) || 0;
+      
+      // Only include if has non-zero values
+      if (dlValue > 0 || ulValue > 0) {
+        filtered[tech] = data;
+      }
+    });
+    
+    return filtered;
+  }, [summaryStats]);
+
+  const hasValidData = filteredProviderVolume && filteredProviderVolume.length > 0;
+  const hasTechData = Object.keys(filteredTechSummary).length > 0;
+
+  return (
+    <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+      <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+        <Wifi className="h-4 w-4" />
+        Provider Volume by Technology
+        <span className="text-xs text-slate-400 font-normal ml-2">
+          ({sessionIds.length} session{sessionIds.length > 1 ? "s" : ""})
+        </span>
+      </h4>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
+            <span className="text-slate-400 text-sm">Loading provider volume data...</span>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+            <div className="text-slate-400 text-sm">Failed to load provider volume data</div>
+            <div className="text-xs text-slate-500 mt-1">{error}</div>
+          </div>
+        </div>
+      ) : !hasValidData ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <Wifi className="h-8 w-8 text-slate-600 mx-auto mb-2" />
+            <div className="text-slate-400 text-sm">No valid provider volume data available</div>
+            <div className="text-xs text-slate-500 mt-1">
+              Only showing data for: Jio, Airtel, Vi/Vodafone, BSNL
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Detailed Table */}
+          <div className="overflow-x-auto scrollbar-hide bg-slate-800/50 rounded">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-700 bg-slate-800">
+                  <th className="text-left px-2 py-2 text-slate-400 font-medium">Provider</th>
+                  <th className="text-left px-2 py-2 text-slate-400 font-medium">Tech</th>
+                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      <Download className="h-3 w-3" />
+                      DL (GB)
+                    </div>
+                  </th>
+                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      <Upload className="h-3 w-3" />
+                      UL (GB)
+                    </div>
+                  </th>
+                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      <Gauge className="h-3 w-3" />
+                      Avg DL
+                    </div>
+                  </th>
+                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      <Gauge className="h-3 w-3" />
+                      Avg UL
+                    </div>
+                  </th>
+                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      <Timer className="h-3 w-3" />
+                      Duration
+                    </div>
+                  </th>
+                  <th className="text-right px-2 py-2 text-slate-400 font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProviderVolume.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="px-2 py-8 text-center text-slate-400 text-sm">
+                      No data available for known providers
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProviderVolume.map((item, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-b border-slate-800 hover:bg-slate-700/30 transition-colors"
+                    >
+                      <td className="px-2 py-2 text-slate-300">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">{getProviderIcon(item.provider)}</span>
+                          <span className="capitalize font-medium">{item.provider}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${getTechBadgeColor(item.technology)}`}>
+                          {item.technology}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-right text-blue-400 font-medium">
+                        {item.downloadGb}
+                      </td>
+                      <td className="px-2 py-2 text-right text-green-400 font-medium">
+                        {item.uploadGb}
+                      </td>
+                      <td className="px-2 py-2 text-right text-cyan-400 font-medium whitespace-nowrap">
+                        {item.avgDlSpeedFormatted}
+                      </td>
+                      <td className="px-2 py-2 text-right text-teal-400 font-medium whitespace-nowrap">
+                        {item.avgUlSpeedFormatted}
+                      </td>
+                      <td className="px-2 py-2 text-right text-orange-400 font-medium whitespace-nowrap">
+                        {item.durationFormatted}
+                      </td>
+                      <td className="px-2 py-2 text-right text-slate-200 font-bold">
+                        {item.totalGb}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Technology Summary Pills */}
+          {hasTechData && (
+            <div className="mt-4 pt-3 border-t border-slate-700">
+              <h5 className="text-xs font-semibold text-slate-400 mb-2">By Technology</h5>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(filteredTechSummary).map(([tech, data]) => (
+                  <div
+                    key={tech}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${getTechBadgeColor(tech)}`}
+                  >
+                    <span className="font-medium">{tech}</span>
+                    <span className="text-xs opacity-70">
+                      ↓{formatBytes(data.downloadKb, "GB")} | ↑{formatBytes(data.uploadKb, "GB")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
 const DataVolumeCard = ({ volume, sessionWiseVolume }) => (
   <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
     <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
@@ -623,177 +867,6 @@ const DataVolumeCard = ({ volume, sessionWiseVolume }) => (
   </div>
 );
 
-const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds, error }) => {
-  const [showDetails, setShowDetails] = useState(true);
 
-  const getTechBadgeColor = (tech) => {
-    const techBadgeColors = {
-      "2G": "bg-orange-500/20 border-orange-500/30 text-orange-400",
-      "3G": "bg-yellow-500/20 border-yellow-500/30 text-yellow-400",
-      "4G": "bg-blue-500/20 border-blue-500/30 text-blue-400",
-      "5G": "bg-purple-500/20 border-purple-500/30 text-purple-400",
-      "LTE": "bg-blue-500/20 border-blue-500/30 text-blue-400",
-      "WCDMA": "bg-yellow-500/20 border-yellow-500/30 text-yellow-400",
-      "GSM": "bg-orange-500/20 border-orange-500/30 text-orange-400",
-      "NR": "bg-purple-500/20 border-purple-500/30 text-purple-400",
-    };
-    return techBadgeColors[tech?.toUpperCase()] || "bg-slate-700 border-slate-600 text-slate-400";
-  };
-
-  const getProviderIcon = (provider) => {
-    const providerLower = provider?.toLowerCase() || "";
-    if (providerLower.includes("jio")) return "🔵";
-    if (providerLower.includes("airtel")) return "🔴";
-    if (providerLower.includes("vodafone") || providerLower.includes("vi")) return "🟣";
-    if (providerLower.includes("bsnl")) return "🟢";
-    return "📶";
-  };
-
-  const hasValidData = providerVolume && providerVolume.length > 0;
-  const hasTechData = summaryStats?.byTech && Object.keys(summaryStats.byTech).length > 0;
-
-  return (
-    <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-      <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-        <Wifi className="h-4 w-4" />
-        Provider Volume by Technology
-        <span className="text-xs text-slate-400 font-normal ml-2">
-          ({sessionIds.length} session{sessionIds.length > 1 ? "s" : ""})
-        </span>
-      </h4>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
-            <span className="text-slate-400 text-sm">Loading provider volume data...</span>
-          </div>
-        </div>
-      ) : error ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
-            <div className="text-slate-400 text-sm">Failed to load provider volume data</div>
-            <div className="text-xs text-slate-500 mt-1">{error}</div>
-          </div>
-        </div>
-      ) : !hasValidData ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <Wifi className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-            <div className="text-slate-400 text-sm">No valid provider volume data available</div>
-            <div className="text-xs text-slate-500 mt-1">Sessions: {sessionIds.join(", ")}</div>
-          </div>
-        </div>
-      ) : (
-        <>
-          
-
-          {/* Detailed Table */}
-          <div className="overflow-x-auto scrollbar-hide bg-slate-800/50 rounded">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-700 bg-slate-800">
-                  <th className="text-left px-2 py-2 text-slate-400 font-medium">Provider</th>
-                  <th className="text-left px-2 py-2 text-slate-400 font-medium">Tech</th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <Download className="h-3 w-3" />
-                      DL (GB)
-                    </div>
-                  </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <Upload className="h-3 w-3" />
-                      UL (GB)
-                    </div>
-                  </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <Gauge className="h-3 w-3" />
-                      Avg DL
-                    </div>
-                  </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <Gauge className="h-3 w-3" />
-                      Avg UL
-                    </div>
-                  </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <Timer className="h-3 w-3" />
-                      Duration
-                    </div>
-                  </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {providerVolume.map((item, idx) => (
-                  <tr
-                    key={idx}
-                    className="border-b border-slate-800 hover:bg-slate-700/30 transition-colors"
-                  >
-                    <td className="px-2 py-2 text-slate-300">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm">{getProviderIcon(item.provider)}</span>
-                        <span className="capitalize font-medium">{item.provider}</span>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${getTechBadgeColor(item.technology)}`}>
-                        {item.technology}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-right text-blue-400 font-medium">
-                      {item.downloadGb}
-                    </td>
-                    <td className="px-2 py-2 text-right text-green-400 font-medium">
-                      {item.uploadGb}
-                    </td>
-                    <td className="px-2 py-2 text-right text-cyan-400 font-medium whitespace-nowrap">
-                      {item.avgDlSpeedFormatted}
-                    </td>
-                    <td className="px-2 py-2 text-right text-teal-400 font-medium whitespace-nowrap">
-                      {item.avgUlSpeedFormatted}
-                    </td>
-                    <td className="px-2 py-2 text-right text-orange-400 font-medium whitespace-nowrap">
-                      {item.durationFormatted}
-                    </td>
-                    <td className="px-2 py-2 text-right text-slate-200 font-bold">
-                      {item.totalGb}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-             
-            </table>
-          </div>
-
-          {/* Technology Summary Pills */}
-          {hasTechData && (
-            <div className="mt-4 pt-3 border-t border-slate-700">
-              <h5 className="text-xs font-semibold text-slate-400 mb-2">By Technology</h5>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(summaryStats.byTech).map(([tech, data]) => (
-                  <div
-                    key={tech}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${getTechBadgeColor(tech)}`}
-                  >
-                    <span className="font-medium">{tech}</span>
-                    <span className="text-xs opacity-70">
-                      ↓{formatBytes(data.downloadKb, "GB")} | ↑{formatBytes(data.uploadKb, "GB")} GB
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-};
 
 export default OverviewTab;

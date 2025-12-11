@@ -26,9 +26,7 @@ const METRIC_CONFIG = [
 ];
 
 function AppChart() {
-  // ============================================
-  // SWR HOOK - SINGLE SOURCE OF TRUTH
-  // ============================================
+ 
   const { 
     data: chartData, 
     isLoading, 
@@ -39,7 +37,7 @@ function AppChart() {
 
   
 
-  // Ensure data is always an array
+  
   const data = useMemo(() => {
     if (!chartData) {
       console.warn('⚠️ [AppChart] chartData is null/undefined');

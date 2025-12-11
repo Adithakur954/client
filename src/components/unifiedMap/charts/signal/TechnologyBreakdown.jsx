@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { ChartContainer } from "../../common/ChartContainer";
 import { EmptyState } from "../../common/EmptyState";
-import { CHART_CONFIG, COLORS } from "@/utils/constants";
+import { CHART_CONFIG, getTechnologyColor } from "@/utils/constants"; // ✅ Import helper function
 import { filterValidData } from "@/utils/analyticsHelpers";
 
 export const TechnologyBreakdown = React.forwardRef(({ locations }, ref) => {
@@ -74,14 +74,13 @@ export const TechnologyBreakdown = React.forwardRef(({ locations }, ref) => {
             {validData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={COLORS.TECH_COLORS[entry.name] || "#6b7280"}
+                fill={getTechnologyColor(entry.name)} // ✅ Use fuzzy matching function
               />
             ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
 
-      {/* Details */}
       <div className="space-y-1 mt-3">
         {validData.map((item, idx) => (
           <div key={idx} className="bg-slate-800 p-2 rounded text-xs hover:bg-slate-750 transition-colors">
@@ -89,15 +88,15 @@ export const TechnologyBreakdown = React.forwardRef(({ locations }, ref) => {
               <div className="flex items-center gap-2">
                 <div
                   className="w-3 h-3 rounded"
-                  style={{ backgroundColor: COLORS.TECH_COLORS[item.name] || "#6b7280" }}
+                  style={{ backgroundColor: getTechnologyColor(item.name) }} // ✅ Use fuzzy matching
                 />
                 <span className="text-white font-semibold">{item.name}</span>
               </div>
-              <span className="text-slate-300">{item.count} Samples</span>
+              <span className="text-slate-300">{item.count.toLocaleString()} Samples</span>
             </div>
             <div className="ml-5 text-slate-400 text-[10px]">
-              RSRP: <span className="text-blue-400">{item.avgRsrp}</span> | 
-              SINR: <span className="text-green-400">{item.avgSinr}</span>
+              RSRP: <span className="text-blue-400">{item.avgRsrp} dBm</span> | 
+              SINR: <span className="text-green-400">{item.avgSinr} dB</span>
             </div>
           </div>
         ))}
