@@ -1,3 +1,4 @@
+// src/pages/DriveTestSessionsPage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '../api/apiEndpoints';
 import { toast } from 'react-toastify';
@@ -26,7 +27,6 @@ const DriveTestSessionsPage = () => {
         try {
             setLoading(true);
             const data = await adminApi.getSessions();
-           
             setSessions(Array.isArray(data) ? data : []);
         } catch (error) {
             toast.error(`Failed to fetch sessions: ${error.message}`);
@@ -51,9 +51,10 @@ const DriveTestSessionsPage = () => {
         }
     };
 
+    // ✅ FIX: Changed URL parameter to 'sessionId' (matches SessionMapDebug)
     const handleViewOnMap = (sessionId) => {
-       
-        navigate(`/map?session=${encodeURIComponent(String(sessionId))}`);
+        console.log("🗺️ Navigating to map for session:", sessionId);
+        navigate(`/debug-map?sessionId=${encodeURIComponent(String(sessionId))}`);
     };
 
     const formatDate = (dateString) => {
@@ -83,7 +84,6 @@ const DriveTestSessionsPage = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            
                             <TableHead>User Details</TableHead>
                             <TableHead>Start Time - End Time</TableHead>
                             <TableHead>Start Location</TableHead>
@@ -97,25 +97,23 @@ const DriveTestSessionsPage = () => {
                     <TableBody>
                         {currentSessions.map((session) => (
                             <TableRow key={session.id}>
-                                
-
                                 <TableCell className="whitespace-normal break-words max-w-[200px]">
                                     <div className="font-medium">{session.CreatedBy || 'Unknown User'} ({session.mobile || 'N/A'})</div>
                                     <div className="text-sm text-muted-foreground">
                                         {session.make}, {session.model}, {session.os}, {session.operator_name}
                                     </div>
                                 </TableCell>
-                                <TableCell className="whitespace-normal break-words max-w-[200px]"><div>{formatDate(session.start_time)}</div>
-<div>{formatDate(session.end_time)}</div></TableCell>
-                                <TableCell className="whitespace-normal break-words max-w-[200px]">{session.start_address
-}</TableCell>
-                                <TableCell className="whitespace-normal break-words max-w-[200px]">{session.end_address
-}</TableCell>
+                                <TableCell className="whitespace-normal break-words max-w-[200px]">
+                                    <div>{formatDate(session.start_time)}</div>
+                                    <div>{formatDate(session.end_time)}</div>
+                                </TableCell>
+                                <TableCell className="whitespace-normal break-words max-w-[200px]">{session.start_address}</TableCell>
+                                <TableCell className="whitespace-normal break-words max-w-[200px]">{session.end_address}</TableCell>
                                 <TableCell className="whitespace-normal break-words max-w-[200px]">{session.distance_km || 'N/A'}</TableCell>
-                                <TableCell className="font-medium whitespace-normal break-words max-w-[200px]"><div>{session.capture_frequency}, {session.operator_name}
- </div></TableCell>
+                                <TableCell className="font-medium whitespace-normal break-words max-w-[200px]">
+                                    <div>{session.capture_frequency}, {session.operator_name}</div>
+                                </TableCell>
                                 <TableCell className="font-medium whitespace-normal break-words max-w-[200px]">{session.notes || 'No Remarks'}</TableCell>
-                                
                                 <TableCell className="text-right">
                                     <Button variant="outline" size="sm" onClick={() => handleViewOnMap(session.id)}>
                                         <Map className="h-4 w-4 mr-2" />

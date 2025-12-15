@@ -1,4 +1,3 @@
-// src/components/dashboard/charts/HandsetPerformanceChart.jsx
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { 
   ResponsiveContainer, 
@@ -17,9 +16,6 @@ import { TOOLTIP_STYLE } from '@/components/constants/dashboardConstants';
 import { useHandsetPerformance } from '@/hooks/useDashboardData.js';
 import { getRSRPPointColor } from '@/utils/chartUtils';
 
-// ============================================
-// CONSTANTS
-// ============================================
 const CHART_Y_MIN = -120;
 const CHART_Y_MAX = -60;
 
@@ -30,9 +26,6 @@ const SIGNAL_QUALITY_RANGES = [
   { y1: -105, y2: -120, fill: '#EF4444', fillOpacity: 0.08, label: 'Poor' },
 ];
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
 const getSignalQuality = (value) => {
   if (!value || isNaN(value)) return 'Unknown';
   if (value >= -85) return 'Excellent';
@@ -41,9 +34,6 @@ const getSignalQuality = (value) => {
   return 'Poor';
 };
 
-// ============================================
-// CUSTOM RENDERERS (Memoized)
-// ============================================
 const LollipopDot = memo((props) => {
   const { cx, cy, payload } = props;
   
@@ -110,14 +100,6 @@ const LollipopStick = memo((props) => {
 });
 LollipopStick.displayName = 'LollipopStick';
 
-// ============================================
-// CUSTOM TOOLTIP (Memoized)
-// ============================================
-// src/components/dashboard/charts/HandsetPerformanceChart.jsx
-
-// ============================================
-// CUSTOM TOOLTIP (Enhanced with new metrics)
-// ============================================
 const CustomTooltip = memo(({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
 
@@ -138,7 +120,6 @@ const CustomTooltip = memo(({ active, payload, label }) => {
         {label}
       </p>
       <div className="space-y-1">
-        {/* RSRP */}
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-gray-600">Avg RSRP:</span>
           <span className="text-sm font-bold" style={{ color }}>
@@ -146,7 +127,6 @@ const CustomTooltip = memo(({ active, payload, label }) => {
           </span>
         </div>
         
-        {/* RSRQ - NEW */}
         {avgRsrq !== undefined && avgRsrq !== 0 && (
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-gray-600">Avg RSRQ:</span>
@@ -156,7 +136,6 @@ const CustomTooltip = memo(({ active, payload, label }) => {
           </div>
         )}
         
-        {/* SINR - NEW */}
         {avgSinr !== undefined && (
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-gray-600">Avg SINR:</span>
@@ -166,7 +145,6 @@ const CustomTooltip = memo(({ active, payload, label }) => {
           </div>
         )}
         
-        {/* Samples */}
         {samples !== undefined && (
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-gray-600">Samples:</span>
@@ -195,13 +173,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 });
 CustomTooltip.displayName = 'CustomTooltip';
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
 const HandsetPerformanceChart = () => {
-  // ============================================
-  // DATA FETCHING
-  // ============================================
   const { 
     data: rawData, 
     isLoading, 
@@ -209,79 +181,43 @@ const HandsetPerformanceChart = () => {
     mutate 
   } = useHandsetPerformance();
 
-  // ✅ Debug logging
-  console.group('📱 HandsetPerformanceChart Render');
-  console.log('isLoading:', isLoading);
-  console.log('error:', error);
-  console.log('rawData:', rawData);
-  console.log('rawData length:', rawData?.length);
-  console.groupEnd();
-
-  // ============================================
-  // LOCAL FILTER STATES
-  // ============================================
   const [topN, setTopN] = useState(10);
   const [minSamples, setMinSamples] = useState(0);
   const [sortBy, setSortBy] = useState('avg');
 
-  // ============================================
-  // ENSURE DATA IS ARRAY
-  // ============================================
   const data = useMemo(() => {
     if (!rawData || !Array.isArray(rawData)) {
-      console.warn('⚠️ Handset data is not an array:', rawData);
       return [];
     }
-    console.log('✅ Handset data validated:', rawData.length, 'items');
     return rawData;
   }, [rawData]);
 
-  // ============================================
-  // CHART DATA PREPARATION
-  // ============================================
   const chartData = useMemo(() => {
-    const startTime = performance.now();
-    
     if (!data || data.length === 0) {
-      console.log('⚠️ No data to process');
       return [];
     }
     
-    console.log('🔄 Processing handset chart data...');
-    console.log('Filters:', { topN, minSamples, sortBy });
-    
-    // Apply filters
     let filtered = data.filter(item => {
       const hasMinSamples = (item.Samples || 0) >= minSamples;
       const hasValidAvg = item.Avg !== undefined && item.Avg !== null && !isNaN(item.Avg);
       return hasMinSamples && hasValidAvg;
     });
     
-    console.log('After filtering:', filtered.length, 'items');
-    
-    // Sort
     if (sortBy === 'avg') {
       filtered.sort((a, b) => (b.Avg || 0) - (a.Avg || 0));
     } else {
       filtered.sort((a, b) => (b.Samples || 0) - (a.Samples || 0));
     }
     
-    // Take top N
     const result = filtered.slice(0, topN).map((item, index) => ({
       ...item,
       BaselineValue: CHART_Y_MIN,
       index,
     }));
     
-    const endTime = performance.now();
-    console.log(`✅ Chart data processed in ${(endTime - startTime).toFixed(2)}ms:`, result.length, 'items');
-    
     return result;
   }, [data, topN, minSamples, sortBy]);
 
-  // ============================================
-  // STATISTICS
-  // ============================================
   const stats = useMemo(() => {
     if (chartData.length === 0) return null;
     
@@ -300,18 +236,13 @@ const HandsetPerformanceChart = () => {
     };
   }, [chartData]);
 
-  // ============================================
-  // CALLBACKS
-  // ============================================
   const handleReset = useCallback(() => {
-    console.log('🔄 Resetting filters');
     setTopN(10);
     setMinSamples(0);
     setSortBy('avg');
   }, []);
 
   const handleRefresh = useCallback(() => {
-    console.log('🔄 Refreshing handset data');
     mutate();
   }, [mutate]);
 
@@ -327,12 +258,8 @@ const HandsetPerformanceChart = () => {
     setSortBy(e.target.value);
   }, []);
 
-  // ============================================
-  // SETTINGS RENDER
-  // ============================================
   const settingsRender = useCallback(() => (
     <div className="space-y-4">
-      {/* Stats Summary */}
       {stats && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
           <div className="flex items-center justify-between text-xs">
@@ -354,7 +281,6 @@ const HandsetPerformanceChart = () => {
         </div>
       )}
 
-      {/* Top N Selector */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
           Show Top Handsets
@@ -373,7 +299,6 @@ const HandsetPerformanceChart = () => {
         </select>
       </div>
 
-      {/* Min Samples Filter */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
           Minimum Samples
@@ -390,7 +315,6 @@ const HandsetPerformanceChart = () => {
         <p className="text-xs text-gray-500">Only show handsets with at least this many samples</p>
       </div>
 
-      {/* Sort By */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
           Sort By
@@ -405,7 +329,6 @@ const HandsetPerformanceChart = () => {
         </select>
       </div>
 
-      {/* Info */}
       <div className="pt-3 border-t border-gray-200">
         <div className="text-xs text-gray-600 space-y-1">
           <div className="flex justify-between">
@@ -423,7 +346,6 @@ const HandsetPerformanceChart = () => {
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div className="flex gap-2">
         <button
           onClick={handleReset}
@@ -446,9 +368,6 @@ const HandsetPerformanceChart = () => {
     </div>
   ), [stats, topN, minSamples, sortBy, data.length, chartData.length, isLoading, handleTopNChange, handleMinSamplesChange, handleSortByChange, handleReset, handleRefresh]);
 
-  // ============================================
-  // RENDER
-  // ============================================
   return (
     <ChartCard
       title="Handset Performance Analysis"
@@ -482,7 +401,6 @@ const HandsetPerformanceChart = () => {
             data={chartData}
             margin={{ top: 20, right: 20, left: 60, bottom: 80 }}
           >
-            {/* Background reference areas */}
             {SIGNAL_QUALITY_RANGES.map((range, idx) => (
               <ReferenceArea
                 key={`ref-area-${idx}`}
@@ -529,7 +447,6 @@ const HandsetPerformanceChart = () => {
               cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
             />
 
-            {/* Lollipop sticks */}
             <Bar
               dataKey="Avg"
               fill="transparent"
@@ -543,7 +460,6 @@ const HandsetPerformanceChart = () => {
               ))}
             </Bar>
 
-            {/* Lollipop dots */}
             <Scatter
               dataKey="Avg"
               fill="#8884d8"
@@ -560,5 +476,4 @@ const HandsetPerformanceChart = () => {
   );
 };
 
-// ✅ Memoize the entire component
 export default memo(HandsetPerformanceChart);

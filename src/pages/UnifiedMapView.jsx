@@ -396,7 +396,7 @@ const parseLogEntry = (log, sessionId) => {
     ul_tpt: parseFloat(log.ul_tpt ?? log.ul_thpt ?? log.UL ?? log.ul_throughput ?? log.UlThpt) || null,
     mos: parseFloat(log.mos ?? log.MOS ?? log.Mos) || null,
     lte_bler: parseFloat(log.lte_bler_json ?? log.LTE_BLER ?? log.LteBler) || null,
-    provider: String(log.provider ?? log.Provider ?? log.operator ?? log.Operator ?? "").trim(),
+    provider: String(log.m_alpha_long ?? log.Provider ?? log.operator ?? log.Operator ?? "").trim(),
     technology: String(log.network ?? log.technology ?? log.Network ?? log.Technology ?? "").trim(),
     band: String(log.band ?? log.Band ?? "").trim(),
     pci: parseInt(log.pci ?? log.PCI ?? log.Pci) || null,
@@ -482,6 +482,9 @@ const useThresholdSettings = () => {
 
   return { thresholds, loading, error };
 };
+
+
+
 
 /**
  * Hook to fetch sample network log data
@@ -1448,6 +1451,45 @@ const UnifiedMapView = () => {
       };
     });
   }, [areaEnabled, areaData, filteredLocations, selectedMetric, baseThresholds, colorBy]);
+
+  useEffect(() => {
+    if (locations.length > 0) {
+      console.group('🗺️ FINAL LOCATIONS IN MAP VIEW');
+      console.log('Total locations:', locations.length);
+      console.log('Source:', dataToggle);
+      console.log('colorBy setting:', colorBy);
+      
+      // Sample first 3
+      console.log('Sample data (first 3):', locations.slice(0, 3));
+      
+      // Provider distribution
+      const providerCounts = {};
+      locations.forEach(loc => {
+        const p = loc.provider || '(empty)';
+        providerCounts[p] = (providerCounts[p] || 0) + 1;
+      });
+      console.log('Provider distribution:', providerCounts);
+      
+      console.groupEnd();
+    }
+  }, [locations, dataToggle, colorBy]);
+
+  // ✅ DEBUG: Monitor colorBy changes
+  useEffect(() => {
+    if (colorBy) {
+      console.log(`🎨 COLOR MODE CHANGED: "${colorBy}"`);
+      if (locations.length > 0) {
+        const sampleLoc = locations[0];
+        console.log(`Sample location for colorBy="${colorBy}":`, {
+          provider: sampleLoc.provider,
+          technology: sampleLoc.technology,
+          band: sampleLoc.band,
+          allKeys: Object.keys(sampleLoc),
+        });
+      }
+    }
+  }, [colorBy, locations]);
+
 
   // All best network polygons
   const allBestNetworkPolygons = useMemo(() => {

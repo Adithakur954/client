@@ -229,11 +229,11 @@ const SortControl = ({ sortConfig, onSortChange, options }) => {
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 rounded transition-colors"
+          className="flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium bg-slate-800 text-white hover:bg-slate-700 rounded transition-colors"
         >
-          <Filter className="h-3 w-3" />
+          <Filter className="h-3.5 w-3.5" />
           <span>Sort: {options[sortConfig.key]?.label || 'Samples'}</span>
-          <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
 
         {isOpen && (
@@ -247,15 +247,15 @@ const SortControl = ({ sortConfig, onSortChange, options }) => {
                 <button
                   key={key}
                   onClick={() => handleSortClick(key)}
-                  className={`w-full flex items-center justify-between px-3 py-1.5 text-[10px] hover:bg-slate-700 transition-colors ${
-                    sortConfig.key === key ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
+                  className={`w-full flex items-center justify-between px-3 py-1.5 text-[12px] hover:bg-slate-700 transition-colors ${
+                    sortConfig.key === key ? 'text-blue-400 bg-slate-700/50' : 'text-white'
                   }`}
                 >
                   <span>{option.label}</span>
                   {sortConfig.key === key && (
                     sortConfig.direction === 'desc' 
-                      ? <ArrowDown className="h-3 w-3" />
-                      : <ArrowUp className="h-3 w-3" />
+                      ? <ArrowDown className="h-3.5 w-3.5" />
+                      : <ArrowUp className="h-3.5 w-3.5" />
                   )}
                 </button>
               ))}
@@ -267,7 +267,7 @@ const SortControl = ({ sortConfig, onSortChange, options }) => {
       {/* Direction Toggle Button */}
       <button
         onClick={toggleDirection}
-        className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+        className={`flex items-center gap-1 px-2 py-1 text-[12px] font-medium rounded transition-colors ${
           sortConfig.direction === 'desc' 
             ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30'
             : 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
@@ -276,12 +276,12 @@ const SortControl = ({ sortConfig, onSortChange, options }) => {
       >
         {sortConfig.direction === 'desc' ? (
           <>
-            <SortDesc className="h-3 w-3" />
+            <SortDesc className="h-3.5 w-3.5" />
             <span>High→Low</span>
           </>
         ) : (
           <>
-            <SortAsc className="h-3 w-3" />
+            <SortAsc className="h-3.5 w-3.5" />
             <span>Low→High</span>
           </>
         )}
@@ -313,17 +313,17 @@ const QuickSortChips = ({ sortConfig, onSortChange, options, showAll = false }) 
                 onSortChange({ key, direction: 'desc' });
               }
             }}
-            className={`flex items-center gap-1 px-2 py-0.5 text-[9px] font-medium rounded transition-all ${
+            className={`flex items-center gap-1 px-2 py-0.5 text-[13px] font-medium rounded transition-all ${
               isActive
                 ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+                : 'bg-slate-800 text-white hover:bg-slate-700'
             }`}
           >
             <span>{option.label}</span>
             {isActive && (
               sortConfig.direction === 'desc' 
-                ? <ArrowDown className="h-2.5 w-2.5" />
-                : <ArrowUp className="h-2.5 w-2.5" />
+                ? <ArrowDown className="h-3 w-3" />
+                : <ArrowUp className="h-3 w-3" />
             )}
           </button>
         );
@@ -740,13 +740,13 @@ export const PciColorLegend = React.forwardRef(({ locations }, ref) => {
   const ViewModeButton = ({ mode, icon: Icon, label }) => (
     <button
       onClick={() => setViewMode(mode)}
-      className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium transition-all rounded ${
+      className={`flex items-center gap-1 px-2 py-1 text-[12px] font-medium transition-all rounded ${
         viewMode === mode
           ? "bg-blue-600 text-white"
-          : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300"
+          : "bg-slate-800 text-white hover:bg-slate-700"
       }`}
     >
-      {Icon && <Icon className="h-3 w-3" />}
+      {Icon && <Icon className="h-3.5 w-3.5" />}
       {label}
     </button>
   );
@@ -814,7 +814,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
           onSortChange={onSortChange} 
           options={SORT_OPTIONS}
         />
-        <div className="text-[15px] text-white">
+        <div className="text-[17px] text-white font-medium">
           {pciColorMap.length} PCIs
         </div>
       </div>
@@ -844,15 +844,15 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-white text-xs">PCI {item.pci}</span>
-                  <span className="text-[15px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                  <span className="font-bold text-white text-[14px]">PCI {item.pci}</span>
+                  <span className="text-[13px] px-1.5 py-0.5 rounded bg-slate-700 text-white">
                     {item.count} samples
                   </span>
                 </div>
                 
                 <div className="flex items-center gap-2 mt-0.5">
                   <span 
-                    className="text-[15px] px-1 py-0.5 rounded"
+                    className="text-[13px] px-1 py-0.5 rounded"
                     style={{ 
                       backgroundColor: `${getProviderColor(item.dominantProvider)}20`,
                       color: getProviderColor(item.dominantProvider)
@@ -861,7 +861,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
                     {item.dominantProvider}
                   </span>
                   <span 
-                    className="text-[12px] px-1 py-0.5 rounded"
+                    className="text-[13px] px-1 py-0.5 rounded"
                     style={{ 
                       backgroundColor: `${getTechnologyColor(item.dominantTechnology)}20`,
                       color: getTechnologyColor(item.dominantTechnology)
@@ -869,7 +869,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
                   >
                     {item.dominantTechnology}
                   </span>
-                  <span className="text-[12px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                  <span className="text-[13px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-400">
                     B{item.dominantBand}
                   </span>
                 </div>
@@ -878,7 +878,7 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
               {/* Quick Stats */}
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 {item.avgRsrp?.avg && (
-                  <span className={`text-[11px] px-1.5 py-0.5 rounded ${
+                  <span className={`text-[13px] px-1.5 py-0.5 rounded ${
                     parseFloat(item.avgRsrp.avg) >= -90 ? "text-green-400 bg-green-500/10" : 
                     parseFloat(item.avgRsrp.avg) >= -105 ? "text-yellow-400 bg-yellow-500/10" : 
                     "text-red-400 bg-red-500/10"
@@ -887,11 +887,11 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
                   </span>
                 )}
                 {item.avgDl?.avg && (
-                  <span className="text-[12px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                  <span className="text-[13px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
                     {item.avgDl.avg}Mbps
                   </span>
                 )}
-                <span className="text-slate-400 text-xs">
+                <span className="text-white text-[14px]">
                   {expandedPci === item.pci ? '▲' : '▼'}
                 </span>
               </div>
@@ -929,22 +929,22 @@ const PCIColorMapView = ({ pciColorMap, selectedPci, onSelectPci, sortConfig, on
 
                 {/* Cell IDs */}
                 {item.cellIds.length > 0 && (
-                  <div className="text-[11px]">
-                    <span className="text-slate-400">Cell IDs: </span>
+                  <div className="text-[13px]">
+                    <span className="text-white">Cell IDs: </span>
                     <span className="text-cyan-400">{item.cellIds.slice(0, 5).join(', ')}</span>
                     {item.cellIds.length > 5 && (
-                      <span className="text-slate-500"> +{item.cellIds.length - 5} more</span>
+                      <span className="text-white"> +{item.cellIds.length - 5} more</span>
                     )}
                   </div>
                 )}
 
                 {/* NodeB IDs */}
                 {item.nodebIds.length > 0 && (
-                  <div className="text-[11px]">
-                    <span className="text-slate-400">NodeB IDs: </span>
+                  <div className="text-[13px]">
+                    <span className="text-white">NodeB IDs: </span>
                     <span className="text-orange-400">{item.nodebIds.slice(0, 5).join(', ')}</span>
                     {item.nodebIds.length > 5 && (
-                      <span className="text-slate-500"> +{item.nodebIds.length - 5} more</span>
+                      <span className="text-white"> +{item.nodebIds.length - 5} more</span>
                     )}
                   </div>
                 )}
@@ -971,8 +971,8 @@ const MetricMiniCard = ({ label, value, unit, color }) => {
 
   return (
     <div className="bg-slate-800 rounded p-1.5 text-center">
-      <div className="text-[8px] text-slate-500">{label}</div>
-      <div className={`text-[11px] font-bold ${colors[color] || 'text-white'}`}>
+      <div className="text-[10px] text-white">{label}</div>
+      <div className={`text-[13px] font-bold ${colors[color] || 'text-white'}`}>
         {value != null ? `${value}${unit ? ` ${unit}` : ''}` : 'N/A'}
       </div>
     </div>
@@ -985,7 +985,7 @@ const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
 
   if (!providerData?.length) {
     return (
-      <div className="text-center py-4 text-slate-400 text-sm">
+      <div className="text-center py-4 text-white text-[16px]">
         No provider data available
       </div>
     );
@@ -1000,7 +1000,7 @@ const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
           onSortChange={onSortChange} 
           options={PROVIDER_SORT_OPTIONS}
         />
-        <div className="text-[9px] text-slate-500">
+        <div className="text-[13px] text-white">
           {providerData.length} providers
         </div>
       </div>
@@ -1026,23 +1026,23 @@ const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
             >
               <div className="flex items-center gap-2">
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="w-3.5 h-3.5 rounded-full"
                   style={{ backgroundColor: provider.color }}
                 />
-                <span className="font-semibold text-white text-xs">{provider.name}</span>
-                <span className="text-[10px] text-slate-400">
+                <span className="font-semibold text-white text-[14px]">{provider.name}</span>
+                <span className="text-[12px] text-white">
                   ({provider.pciCount} PCIs)
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">
+                <span className="text-[13px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">
                   {provider.totalCount} samples
                 </span>
-                <span className="text-[9px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">
+                <span className="text-[13px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">
                   {provider.cellCount} cells
                 </span>
                 <span 
-                  className="text-[9px] px-1.5 py-0.5 rounded"
+                  className="text-[13px] px-1.5 py-0.5 rounded"
                   style={{
                     backgroundColor: `${getTechnologyColor(provider.dominantTechnology)}20`,
                     color: getTechnologyColor(provider.dominantTechnology)
@@ -1050,7 +1050,7 @@ const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
                 >
                   {provider.dominantTechnology}
                 </span>
-                <span className="text-slate-400 text-xs">
+                <span className="text-white text-[14px]">
                   {expandedProvider === provider.name ? "▲" : "▼"}
                 </span>
               </div>
@@ -1080,32 +1080,32 @@ const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
             {/* Expanded PCI List */}
             {expandedProvider === provider.name && (
               <div className="border-t border-slate-700 bg-slate-900/50 p-2">
-                <div className="text-[10px] text-slate-400 mb-1.5 font-medium">
+                <div className="text-[12px] text-white mb-1.5 font-medium">
                   PCIs for {provider.name}
                 </div>
                 <div className="max-h-[180px] overflow-y-auto scrollbar-hide">
-                  <table className="w-full text-[10px]">
+                  <table className="w-full text-[12px]">
                     <thead className="sticky top-0 bg-slate-900">
                       <tr className="border-b border-slate-700">
-                        <th className="text-left p-1 text-slate-400">PCI</th>
-                        <th className="text-center p-1 text-slate-400">Samples</th>
-                        <th className="text-center p-1 text-slate-400">Cells</th>
-                        <th className="text-center p-1 text-slate-400">Tech</th>
-                        <th className="text-center p-1 text-slate-400">Band</th>
-                        <th className="text-center p-1 text-slate-400">RSRP</th>
-                        <th className="text-center p-1 text-slate-400">DL</th>
-                        <th className="text-center p-1 text-slate-400">MOS</th>
+                        <th className="text-left p-1 text-white font-medium">PCI</th>
+                        <th className="text-center p-1 text-white font-medium">Samples</th>
+                        <th className="text-center p-1 text-white font-medium">Cells</th>
+                        <th className="text-center p-1 text-white font-medium">Tech</th>
+                        <th className="text-center p-1 text-white font-medium">Band</th>
+                        <th className="text-center p-1 text-white font-medium">RSRP</th>
+                        <th className="text-center p-1 text-white font-medium">DL</th>
+                        <th className="text-center p-1 text-white font-medium">MOS</th>
                       </tr>
                     </thead>
                     <tbody>
                       {provider.pcis.slice(0, 20).map((pci, pidx) => (
                         <tr key={pidx} className="border-b border-slate-800 hover:bg-slate-800/30">
                           <td className="p-1 font-medium text-white">{pci.pci}</td>
-                          <td className="p-1 text-center text-slate-300">{pci.count}</td>
+                          <td className="p-1 text-center text-white">{pci.count}</td>
                           <td className="p-1 text-center text-cyan-400">{pci.cellCount}</td>
                           <td className="p-1 text-center">
                             <span 
-                              className="text-[8px] px-1 py-0.5 rounded"
+                              className="text-[10px] px-1 py-0.5 rounded"
                               style={{
                                 backgroundColor: `${getTechnologyColor(pci.dominantTech)}20`,
                                 color: getTechnologyColor(pci.dominantTech)
@@ -1128,7 +1128,7 @@ const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
                     </tbody>
                   </table>
                   {provider.pcis.length > 20 && (
-                    <div className="text-center text-[9px] text-slate-500 mt-1">
+                    <div className="text-center text-[13px] text-white mt-1">
                       +{provider.pcis.length - 20} more PCIs
                     </div>
                   )}
@@ -1146,7 +1146,7 @@ const PCIByProviderView = ({ providerData, sortConfig, onSortChange }) => {
 const PCIByCellView = ({ cellData, sortConfig, onSortChange }) => {
   if (!cellData?.length) {
     return (
-      <div className="text-center py-4 text-slate-400 text-sm">
+      <div className="text-center py-4 text-white text-[16px]">
         No cell data available
       </div>
     );
@@ -1161,7 +1161,7 @@ const PCIByCellView = ({ cellData, sortConfig, onSortChange }) => {
           onSortChange={onSortChange} 
           options={CELL_SORT_OPTIONS}
         />
-        <div className="text-[9px] text-slate-500">
+        <div className="text-[13px] text-white">
           {cellData.length} cells
         </div>
       </div>
@@ -1184,18 +1184,18 @@ const PCIByCellView = ({ cellData, sortConfig, onSortChange }) => {
       {/* Cell Table */}
       <div className="bg-slate-800/50 rounded-lg overflow-hidden">
         <div className="max-h-[300px] overflow-y-auto scrollbar-hide">
-          <table className="w-full text-[10px]">
+          <table className="w-full text-[12px]">
             <thead className="sticky top-0 bg-slate-900 z-10">
               <tr className="border-b border-slate-700">
-                <th className="text-left p-2 text-slate-400 font-medium">NodeB</th>
-                <th className="text-center p-2 text-slate-400 font-medium">Cell</th>
-                <th className="text-center p-2 text-slate-400 font-medium">PCIs</th>
-                <th className="text-center p-2 text-slate-400 font-medium">Samples</th>
-                <th className="text-center p-2 text-slate-400 font-medium">Tech</th>
-                <th className="text-center p-2 text-slate-400 font-medium">Band</th>
-                <th className="text-center p-2 text-slate-400 font-medium">RSRP</th>
-                <th className="text-center p-2 text-slate-400 font-medium">DL</th>
-                <th className="text-center p-2 text-slate-400 font-medium">MOS</th>
+                <th className="text-left p-2 text-white font-medium">NodeB</th>
+                <th className="text-center p-2 text-white font-medium">Cell</th>
+                <th className="text-center p-2 text-white font-medium">PCIs</th>
+                <th className="text-center p-2 text-white font-medium">Samples</th>
+                <th className="text-center p-2 text-white font-medium">Tech</th>
+                <th className="text-center p-2 text-white font-medium">Band</th>
+                <th className="text-center p-2 text-white font-medium">RSRP</th>
+                <th className="text-center p-2 text-white font-medium">DL</th>
+                <th className="text-center p-2 text-white font-medium">MOS</th>
               </tr>
             </thead>
             <tbody>
@@ -1206,15 +1206,15 @@ const PCIByCellView = ({ cellData, sortConfig, onSortChange }) => {
                   <td className="p-2 text-center">
                     <span className="text-blue-400">{cell.pciCount}</span>
                     {cell.pciCount > 0 && (
-                      <span className="text-[8px] text-slate-500 ml-1">
+                      <span className="text-[10px] text-white ml-1">
                         ({cell.pcis.slice(0, 3).join(',')}{cell.pcis.length > 3 ? '...' : ''})
                       </span>
                     )}
                   </td>
-                  <td className="p-2 text-center text-slate-300">{cell.count}</td>
+                  <td className="p-2 text-center text-white">{cell.count}</td>
                   <td className="p-2 text-center">
                     <span 
-                      className="text-[8px] px-1 py-0.5 rounded"
+                      className="text-[10px] px-1 py-0.5 rounded"
                       style={{
                         backgroundColor: `${getTechnologyColor(cell.dominantTech)}20`,
                         color: getTechnologyColor(cell.dominantTech)
@@ -1237,7 +1237,7 @@ const PCIByCellView = ({ cellData, sortConfig, onSortChange }) => {
             </tbody>
           </table>
           {cellData.length > 50 && (
-            <div className="text-center text-[10px] text-slate-500 p-2 bg-slate-900">
+            <div className="text-center text-[12px] text-white p-2 bg-slate-900">
               Showing 50 of {cellData.length} cells
             </div>
           )}
@@ -1262,8 +1262,8 @@ const StatCard = ({ label, value, color }) => {
 
   return (
     <div className="bg-slate-800/50 rounded p-1.5 text-center">
-      <div className="text-[9px] text-slate-400 mb-0.5">{label}</div>
-      <div className={`text-lg font-bold ${colors[color] || 'text-white'}`}>
+      <div className="text-[13px] text-white mb-0.5">{label}</div>
+      <div className={`text-[20px] font-bold ${colors[color] || 'text-white'}`}>
         {value ?? 0}
       </div>
     </div>

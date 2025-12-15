@@ -71,10 +71,7 @@ export const getPciColor = (pciValue) => {
   return PCI_COLOR_PALETTE[Math.abs(Math.floor(numValue)) % PCI_COLOR_PALETTE.length];
 };
 
-/**
- * ✅ UNIFIED METRIC CONFIGURATION
- * thresholdKey MUST match the keys in the thresholds state object
- */
+
 export const METRIC_CONFIG = {
   rsrp: {
     thresholdKey: 'rsrp',
@@ -94,7 +91,7 @@ export const METRIC_CONFIG = {
     unit: 'dB',
     fields: ['sinr', 'SINR', 'Sinr', 'lte_sinr', 'LTE_SINR', 'nr_sinr'],
   },
-  dl_tpt: {
+  dl_thpt: {
     thresholdKey: 'dl_thpt',
     label: 'DL Throughput',
     unit: 'Mbps',
@@ -128,26 +125,14 @@ export const METRIC_CONFIG = {
 
 // ✅ Alias mappings
 const METRIC_ALIASES = {
-  'dl-throughput': 'dl_tpt',
-  'dl_throughput': 'dl_tpt',
-  'dl_thpt': 'dl_tpt',
-  'dlthpt': 'dl_tpt',
-  'dltpt': 'dl_tpt',
-  'download': 'dl_tpt',
-  'ul-throughput': 'ul_thpt',
-  'ul_throughput': 'ul_thpt',
-  'ul_tpt': 'ul_thpt',
-  'ultpt': 'ul_thpt',
-  'ulthpt': 'ul_thpt',
-  'upload': 'ul_thpt',
+  'dl_tpt': 'dl_thpt',     
+  'ul_tpt': 'ul_thpt',     
   'bler': 'lte_bler',
   'lte-bler': 'lte_bler',
   'mos_score': 'mos',
 };
 
-/**
- * Get metric configuration with proper threshold key
- */
+
 export const getMetricConfig = (metric) => {
   if (!metric) {
     return { ...METRIC_CONFIG.rsrp, key: 'rsrp' };

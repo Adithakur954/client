@@ -25,7 +25,8 @@ const ChartCard = ({
   operators = [],
   networks = [],
   showChartFilters = true,
-  error = null // ✅ Added error prop
+  error = null,
+  headerActions = null
 }) => {
   const cardRef = useRef(null);
   const [showTable, setShowTable] = useState(false);
@@ -44,7 +45,7 @@ const ChartCard = ({
       const dataUrl = await toPng(node, { 
         cacheBust: true, 
         pixelRatio: 2,
-        backgroundColor: '#ffffff' // ✅ Add white background
+        backgroundColor: '#ffffff'
       });
       
       const link = document.createElement('a');
@@ -80,7 +81,6 @@ const ChartCard = ({
     const keys = Array.from(
       dataset.reduce((set, row) => {
         Object.entries(row || {}).forEach(([k, v]) => {
-          // Skip objects, functions, and internal keys
           if (['object', 'function'].includes(typeof v) || k.startsWith('_')) return;
           set.add(k);
         });
@@ -101,7 +101,6 @@ const ChartCard = ({
     return count;
   }, [chartFilters]);
 
-  // ✅ Show skeleton during loading
   if (isLoading) {
     return <ChartCardSkeleton title={title} />;
   }
@@ -109,11 +108,11 @@ const ChartCard = ({
   return (
     <Card className="bg-white border border-gray-200 shadow-md hover:shadow-xl transition-shadow duration-300">
       <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white pb-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-              <ChartBar className="h-5 w-5 text-blue-600" />
-              {title}
+        <div className="flex justify-between items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2 truncate">
+              <ChartBar className="h-5 w-5 text-blue-600 flex-shrink-0" />
+              <span className="truncate">{title}</span>
             </CardTitle>
             {activeChartFiltersCount > 0 && (
               <div className="flex items-center gap-2 mt-2">
@@ -124,66 +123,72 @@ const ChartCard = ({
             )}
           </div>
           
-          {/* ✅ Only show menu if there's data or settings */}
-          {(dataset?.length > 0 || settings || showChartFilters) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                  <MoreVertical className="h-5 w-5 text-gray-600" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-white border border-gray-200 text-gray-800 w-56 shadow-lg">
-                {showChartFilters && (
-                  <>
-                    <DropdownMenuItem className="hover:bg-blue-50 cursor-pointer" onClick={() => setFilterSettingsOpen(true)}>
-                      <Filter className="h-4 w-4 mr-2 text-blue-600" />
-                      <span className="font-medium">Chart Filters</span>
-                      {activeChartFiltersCount > 0 && (
-                        <Badge variant="secondary" className="ml-auto text-xs">
-                          {activeChartFiltersCount}
-                        </Badge>
-                      )}
-                    </DropdownMenuItem>
-                    <div className="h-px bg-gray-200 my-1" />
-                  </>
-                )}
-                
-                {settings && (
-                  <>
-                    <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={() => setSettingsOpen(true)}>
-                      <SettingsIcon className="h-4 w-4 mr-2 text-gray-600" />
-                      Settings
-                    </DropdownMenuItem>
-                    <div className="h-px bg-gray-200 my-1" />
-                  </>
-                )}
-                
-                {dataset?.length > 0 && (
-                  <>
-                    <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={() => setShowTable(v => !v)}>
-                      <TableIcon className="h-4 w-4 mr-2 text-gray-600" />
-                      {showTable ? 'Show Chart' : 'Show Table'}
-                    </DropdownMenuItem>
-                    <div className="h-px bg-gray-200 my-1" />
-                    <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Export</div>
-                    <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={handleDownloadPNG}>
-                      <Download className="h-4 w-4 mr-2 text-gray-600" />
-                      Download PNG
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={handleDownloadCSV}>
-                      <Download className="h-4 w-4 mr-2 text-gray-600" />
-                      Download CSV
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {headerActions && (
+              <div className="flex items-center">
+                {headerActions}
+              </div>
+            )}
+            
+            {(dataset?.length > 0 || settings || showChartFilters) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                    <MoreVertical className="h-5 w-5 text-gray-600" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-white border border-gray-200 text-gray-800 w-56 shadow-lg">
+                  {showChartFilters && (
+                    <>
+                      <DropdownMenuItem className="hover:bg-blue-50 cursor-pointer" onClick={() => setFilterSettingsOpen(true)}>
+                        <Filter className="h-4 w-4 mr-2 text-blue-600" />
+                        <span className="font-medium">Chart Filters</span>
+                        {activeChartFiltersCount > 0 && (
+                          <Badge variant="secondary" className="ml-auto text-xs">
+                            {activeChartFiltersCount}
+                          </Badge>
+                        )}
+                      </DropdownMenuItem>
+                      <div className="h-px bg-gray-200 my-1" />
+                    </>
+                  )}
+                  
+                  {settings && (
+                    <>
+                      <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={() => setSettingsOpen(true)}>
+                        <SettingsIcon className="h-4 w-4 mr-2 text-gray-600" />
+                        Settings
+                      </DropdownMenuItem>
+                      <div className="h-px bg-gray-200 my-1" />
+                    </>
+                  )}
+                  
+                  {dataset?.length > 0 && (
+                    <>
+                      <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={() => setShowTable(v => !v)}>
+                        <TableIcon className="h-4 w-4 mr-2 text-gray-600" />
+                        {showTable ? 'Show Chart' : 'Show Table'}
+                      </DropdownMenuItem>
+                      <div className="h-px bg-gray-200 my-1" />
+                      <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Export</div>
+                      <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={handleDownloadPNG}>
+                        <Download className="h-4 w-4 mr-2 text-gray-600" />
+                        Download PNG
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="hover:bg-gray-50 cursor-pointer" onClick={handleDownloadCSV}>
+                        <Download className="h-4 w-4 mr-2 text-gray-600" />
+                        Download CSV
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </CardHeader>
 
       <CardContent className="h-[380px] relative p-6">
-        {/* ✅ Error State */}
         {error ? (
           <div className="flex flex-col items-center justify-center h-full text-red-400">
             <svg className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -231,7 +236,6 @@ const ChartCard = ({
           </div>
         )}
 
-        {/* Chart Filter Settings Dialog */}
         {showChartFilters && (
           <Dialog open={filterSettingsOpen} onOpenChange={setFilterSettingsOpen}>
             <DialogContent className="sm:max-w-lg">
@@ -259,7 +263,6 @@ const ChartCard = ({
           </Dialog>
         )}
 
-        {/* Settings Dialog */}
         {settings && (
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogContent className="sm:max-w-md">

@@ -1,4 +1,3 @@
-// src/hooks/useDashboardData.js
 import useSWR, { useSWRConfig } from 'swr';
 import { useMemo, useCallback, useRef } from 'react';
 import { adminApi } from '../api/apiEndpoints';
@@ -11,16 +10,13 @@ import {
   ensureNegative
 } from '../utils/dashboardUtils';
 
-// ============================================
-// SWR CONFIGURATION (Single Source of Truth)
-// ============================================
 const SWR_CONFIG = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
   revalidateOnMount: true,
-  shouldRetryOnError: true,        // ✅ Let SWR handle retries
-  errorRetryCount: 2,              // ✅ Reasonable retry count
-  errorRetryInterval: 3000,        // ✅ Wait before retry
+  shouldRetryOnError: true,       
+  errorRetryCount: 2,              
+  errorRetryInterval: 3000,
   dedupingInterval: 5000,
   focusThrottleInterval: 30000,
   loadingTimeout: 10000,
@@ -48,9 +44,6 @@ const METRIC_ENDPOINT_MAP = {
 
 const NEGATIVE_METRICS = ['rsrp', 'rsrq'];
 
-// ============================================
-// UTILITY FUNCTIONS (Simplified)
-// ============================================
 const createCacheKey = (base, filters) => {
   if (!filters || Object.keys(filters).length === 0) return base;
   
@@ -77,10 +70,6 @@ const createCacheKey = (base, filters) => {
     : base;
 };
 
-/**
- * ✅ SIMPLIFIED: Extract data from various API response formats
- * No more manual caching - let SWR handle it
- */
 const extractData = (response, fallback = []) => {
   if (response === null || response === undefined) return fallback;
   
@@ -102,17 +91,12 @@ const extractData = (response, fallback = []) => {
   return fallback;
 };
 
-/**
- * ✅ SIMPLIFIED: Standard fetcher that throws on error
- * SWR will handle error states and caching
- */
 const createFetcher = (apiFn, fallback = []) => {
   return async () => {
     try {
       const response = await apiFn();
       const data = extractData(response, fallback);
       
-      // Return valid data or fallback
       if (data !== null && data !== undefined) {
         const isValidArray = Array.isArray(data) && data.length > 0;
         const isValidObject = !Array.isArray(data) && typeof data === 'object' && Object.keys(data).length > 0;
@@ -125,16 +109,11 @@ const createFetcher = (apiFn, fallback = []) => {
       
       return fallback;
     } catch (error) {
-      // ✅ Throw error so SWR can handle it properly
-      // SWR's keepPreviousData will show old data while error state is active
       throw error;
     }
   };
 };
 
-// ============================================
-// DATA PROCESSING FUNCTIONS (Unchanged)
-// ============================================
 const processMetricData = (rawData, metric) => {
   if (!Array.isArray(rawData) || rawData.length === 0) return [];
   
@@ -255,9 +234,6 @@ const processUniqueList = (rawData, keyOptions) => {
   return Array.from(unique).sort();
 };
 
-// ============================================
-// ✅ HOOKS: BASIC DATA (Using simplified fetcher)
-// ============================================
 export const useTotals = () => {
   return useSWR(
     'totals',
@@ -292,7 +268,6 @@ export const useOperatorSamples = (filters) => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT, fallbackData: [] }
   );
   
-  // ✅ Memoize the processing
   const processedData = useMemo(
     () => groupOperatorSamplesByNetwork(rawData || []),
     [rawData]
@@ -312,9 +287,6 @@ export const useNetworkDistribution = (filters) => {
   );
 };
 
-// ============================================
-// ✅ HOOKS: METRICS (With memoized processing)
-// ============================================
 export const useMetricData = (metric, filters) => {
   const cacheKey = useMemo(() => createCacheKey(`metric_${metric}`, filters), [metric, filters]);
   const query = useMemo(() => buildQueryString(filters), [filters]);
@@ -331,7 +303,6 @@ export const useMetricData = (metric, filters) => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT, fallbackData: [] }
   );
   
-  // ✅ Memoize processing to prevent re-computation
   const processedData = useMemo(
     () => processMetricData(rawData || [], metric),
     [rawData, metric]
@@ -357,7 +328,6 @@ export const useOperatorMetrics = (metric, filters) => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT, fallbackData: [] }
   );
   
-  // ✅ Memoize processing
   const processedData = useMemo(
     () => processOperatorMetrics(rawData || [], metric),
     [rawData, metric]
@@ -366,9 +336,6 @@ export const useOperatorMetrics = (metric, filters) => {
   return { data: processedData, ...rest };
 };
 
-// ============================================
-// ✅ HOOKS: BAND DISTRIBUTION
-// ============================================
 export const useBandDistributionRaw = (filters) => {
   const cacheKey = useMemo(() => createCacheKey('bandDistRaw', filters), [filters]);
   const query = useMemo(() => buildQueryString(filters), [filters]);
@@ -390,7 +357,6 @@ export const useBandDistribution = (filters) => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM, fallbackData: [] }
   );
   
-  // ✅ Memoize processing
   const processedData = useMemo(
     () => processBandDistribution(rawData || []),
     [rawData]
@@ -406,7 +372,6 @@ export const useBandCount = () => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM, fallbackData: [] }
   );
   
-  // ✅ Memoize count calculation
   const count = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return 0;
     
@@ -424,9 +389,6 @@ export const useBandCount = () => {
   return { data: count, ...rest };
 };
 
-// ============================================
-// ✅ HOOKS: INDOOR/OUTDOOR COUNTS
-// ============================================
 export const useIndoorCount = (filters = {}) => {
   const cacheKey = useMemo(() => createCacheKey('indoorCount', filters), [filters]);
   const query = useMemo(() => buildQueryString(filters), [filters]);
@@ -465,9 +427,6 @@ export const useOutdoorCount = (filters = {}) => {
   );
 };
 
-// ============================================
-// ✅ HOOKS: RANKINGS
-// ============================================
 export const useCoverageRanking = (rsrpMin = -95, rsrpMax = 0) => {
   const cacheKey = useMemo(
     () => createCacheKey('coverageRank', { min: rsrpMin, max: rsrpMax }), 
@@ -483,7 +442,6 @@ export const useCoverageRanking = (rsrpMin = -95, rsrpMax = 0) => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM, fallbackData: [] }
   );
   
-  // ✅ Memoize ranking
   const ranking = useMemo(
     () => buildRanking(rawData || [], { nameKey: 'name', countKey: 'count' }),
     [rawData]
@@ -507,7 +465,6 @@ export const useQualityRanking = (rsrqMin = -10, rsrqMax = 0) => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM, fallbackData: [] }
   );
   
-  // ✅ Memoize ranking
   const ranking = useMemo(
     () => buildRanking(rawData || [], { nameKey: 'name', countKey: 'count' }),
     [rawData]
@@ -516,31 +473,14 @@ export const useQualityRanking = (rsrqMin = -10, rsrqMax = 0) => {
   return { data: ranking, ...rest };
 };
 
-// ============================================
-// ✅ HOOKS: HANDSET
-// ============================================
-// In src/hooks/useDashboardData.js
-
-// ✅ Make sure this hook is configured correctly
-// src/hooks/useDashboardData.js
-
 export const useHandsetPerformance = () => {
   const { data: rawData, ...rest } = useSWR(
     'handsetAvg',
     async () => {
-      console.log('🔄 Fetching handset performance data...');
-      const startTime = performance.now();
-      
       try {
         const response = await adminApi.getHandsetDistributionV2();
-        const endTime = performance.now();
-        console.log(`✅ Handset data fetched in ${(endTime - startTime).toFixed(2)}ms`);
-        console.log('Raw response:', response);
-        
-        // ✅ extractData will return the Data array
         return extractData(response, []);
       } catch (error) {
-        console.error('❌ Handset fetch failed:', error);
         throw error;
       }
     },
@@ -552,26 +492,19 @@ export const useHandsetPerformance = () => {
     }
   );
   
-  // ✅ FIXED: Map new API fields to expected component fields
   const processedData = useMemo(() => {
-    console.log('📊 useHandsetPerformance processing:', rawData);
-    
     if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
-      console.log('⚠️ No handset data to process');
       return [];
     }
 
     const processed = rawData.map(item => ({
-      // ✅ Map new field names to component-expected names
       Make: item?.name || 'Unknown',
       Avg: ensureNegative(toNumber(item?.avg_rsrp || 0)),
       Samples: toNumber(item?.value || 0),
-      // ✅ Include additional metrics for tooltips/future use
       AvgRsrq: toNumber(item?.avg_rsrq || 0),
       AvgSinr: toNumber(item?.avg_sinr || 0),
     }));
 
-    console.log(`✅ Processed ${processed.length} handset records:`, processed.slice(0, 2));
     return processed;
   }, [rawData]);
   
@@ -589,9 +522,6 @@ export const useHandsetDistribution = (filters) => {
   );
 };
 
-// ============================================
-// ✅ HOOKS: OPERATORS & NETWORKS
-// ============================================
 export const useOperatorsAndNetworks = () => {
   const { 
     data: rawOperators = [], 
@@ -613,7 +543,6 @@ export const useOperatorsAndNetworks = () => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.LONG, fallbackData: [] }
   );
 
-  // ✅ Memoize operators processing
   const operators = useMemo(() => {
     if (!rawOperators || (Array.isArray(rawOperators) && rawOperators.length === 0)) {
       return [];
@@ -633,7 +562,6 @@ export const useOperatorsAndNetworks = () => {
       .filter(op => op && op !== 'Unknown' && op !== 'unknown');
   }, [rawOperators]);
 
-  // ✅ Memoize networks processing
   const networks = useMemo(() => {
     if (!rawNetworks || (Array.isArray(rawNetworks) && rawNetworks.length === 0)) {
       return [];
@@ -659,9 +587,6 @@ export const useOperatorsAndNetworks = () => {
   };
 };
 
-// ============================================
-// ✅ HOOKS: PARALLEL DATA FETCHING
-// ============================================
 export const useDashboardDataParallel = (filters) => {
   const cacheKey = useMemo(() => createCacheKey('dashboardAll', filters), [filters]);
   const query = useMemo(() => buildQueryString(filters), [filters]);
@@ -716,7 +641,6 @@ export const useDashboardDataParallel = (filters) => {
     }
   );
 
-  // ✅ Memoize all processing
   const processedData = useMemo(() => ({
     totals: rawData?.totals || {},
     monthlySamples: rawData?.monthlySamples || [],
@@ -739,7 +663,7 @@ export const useParallelMetrics = (metrics = [], filters) => {
   const query = useMemo(() => buildQueryString(filters), [filters]);
   
   const { data: rawData, ...rest } = useSWR(
-    metrics.length > 0 ? cacheKey : null, // ✅ Conditional fetching
+    metrics.length > 0 ? cacheKey : null,
     async () => {
       const results = await Promise.all(
         metrics.map(async (metric) => {
@@ -760,7 +684,6 @@ export const useParallelMetrics = (metrics = [], filters) => {
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT, fallbackData: {} }
   );
 
-  // ✅ Memoize processing for each metric
   const processedData = useMemo(() => {
     if (!rawData || Object.keys(rawData).length === 0) return {};
     
@@ -774,10 +697,6 @@ export const useParallelMetrics = (metrics = [], filters) => {
   return { data: processedData, ...rest };
 };
 
-// ============================================
-// ✅ HOOKS: APP DATA
-// ============================================
-// Helper function to parse duration "HH:MM:SS" to hours (decimal)
 const parseDurationToHours = (duration) => {
   if (!duration || typeof duration !== 'string') return 0;
   
@@ -788,11 +707,9 @@ const parseDurationToHours = (duration) => {
   const minutes = parseInt(parts[1], 10) || 0;
   const seconds = parseInt(parts[2], 10) || 0;
   
-  // Return total hours as decimal (e.g., 03:30:00 = 3.5 hours)
   return parseFloat((hours + (minutes / 60) + (seconds / 3600)).toFixed(2));
 };
 
-// Helper to parse duration to minutes
 const parseDurationToMinutes = (duration) => {
   if (!duration || typeof duration !== 'string') return 0;
   
@@ -828,9 +745,7 @@ export const useAppData = () => {
         avgRsrp: toNumber(item?.avgRsrp || item?.AvgRsrp),
         avgRsrq: toNumber(item?.avgRsrq || item?.AvgRsrq),
         avgSinr: toNumber(item?.avgSinr || item?.AvgSinr),
-        // Convert duration to numeric (hours)
         avgDuration: parseDurationToHours(durationStr),
-        // Keep original formatted string for tooltip display
         avgDurationFormatted: durationStr,
       };
     });
@@ -839,9 +754,6 @@ export const useAppData = () => {
   return { data: processedData, ...rest };
 };
 
-// ============================================
-// ✅ CACHE MANAGEMENT (Simplified)
-// ============================================
 export const usePrefetchDashboard = (filters) => {
   const prefetchRef = useRef(false);
   const query = useMemo(() => buildQueryString(filters), [filters]);
@@ -860,26 +772,18 @@ export const usePrefetchDashboard = (filters) => {
   }, [query]);
 };
 
-/**
- * ✅ Clear only SWR cache - no more sessionStorage to clear
- */
 export const useClearDashboardCache = () => {
   const { cache, mutate } = useSWRConfig();
   
   return useCallback(() => {
-    // Clear SWR cache
     if (cache instanceof Map) {
       cache.clear();
     }
     
-    // Revalidate all
     mutate(() => true, undefined, { revalidate: true });
   }, [cache, mutate]);
 };
 
-/**
- * ✅ Soft refresh - revalidate without clearing cache
- */
 export const useRefreshDashboard = () => {
   const { mutate } = useSWRConfig();
   
@@ -888,7 +792,4 @@ export const useRefreshDashboard = () => {
   }, [mutate]);
 };
 
-// ============================================
-// EXPORTS
-// ============================================
 export { SWR_CONFIG, CACHE_TIME };

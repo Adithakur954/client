@@ -1,4 +1,4 @@
-import React, { useState, useMemo,useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Activity, BarChart3, Signal, TrendingUp, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
   BarChart,
@@ -171,28 +171,28 @@ const calculateAverage = (values) => {
 };
 
 const getSignalColor = (value, thresholds) => {
-  if (value == null) return "text-slate-400";
+  if (value == null) return "text-white";
   if (value >= thresholds[0]) return "text-green-400";
   if (value >= thresholds[1]) return "text-yellow-400";
   return "text-red-400";
 };
 
 const getMosColor = (value) => {
-  if (value == null) return "text-slate-400";
+  if (value == null) return "text-white";
   if (value >= 4) return "text-green-400";
   if (value >= 3) return "text-yellow-400";
   return "text-red-400";
 };
 
 const getLatencyColor = (value) => {
-  if (value == null) return "text-slate-400";
+  if (value == null) return "text-white";
   if (value < 50) return "text-green-400";
   if (value < 100) return "text-yellow-400";
   return "text-red-400";
 };
 
 const getPacketLossColor = (value) => {
-  if (value == null) return "text-slate-400";
+  if (value == null) return "text-white";
   if (value === 0) return "text-green-400";
   if (value < 1) return "text-yellow-400";
   return "text-red-400";
@@ -207,7 +207,7 @@ const getCategoryColor = (category) => {
     'Video Call': 'bg-cyan-900/50 text-cyan-300 border border-cyan-700/30',
     'Browser': 'bg-orange-900/50 text-orange-300 border border-orange-700/30',
     'Shopping/Payment': 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/30',
-    'Other': 'bg-slate-700/50 text-slate-300 border border-slate-600/30',
+    'Other': 'bg-slate-700/50 text-white border border-slate-600/30',
   };
   return colors[category] || colors['Other'];
 };
@@ -225,7 +225,6 @@ export const ApplicationTab = ({
   const [sortConfig, setSortConfig] = useState({ key: "totalSamples", direction: "desc" });
 
   // Aggregate and normalize app data
-  // ✅ Duration: SUM | All other metrics: AVERAGE
   const aggregatedAppData = useMemo(() => {
     if (!appSummary || !Object.keys(appSummary).length) return [];
 
@@ -239,7 +238,6 @@ export const ApplicationTab = ({
       Object.entries(apps).forEach(([appName, metrics]) => {
         if (!metrics) return;
         
-        // Normalize the app name
         const normalizedName = normalizeAppName(metrics.appName || appName);
         const category = getAppCategory(normalizedName);
         
@@ -248,12 +246,8 @@ export const ApplicationTab = ({
             name: normalizedName,
             category,
             sessions: new Set(),
-            
-            // ✅ SUM these values
             totalDurationSeconds: 0,
             totalSamples: 0,
-            
-            // ✅ Collect for AVERAGING
             rsrpValues: [],
             rsrqValues: [],
             sinrValues: [],
@@ -269,11 +263,9 @@ export const ApplicationTab = ({
         const agg = appAggregates[normalizedName];
         agg.sessions.add(sessionId);
         
-        // ✅ SUM: Duration and Samples
         agg.totalDurationSeconds += parseDuration(metrics.durationHHMMSS);
         agg.totalSamples += metrics.sampleCount || 0;
         
-        // ✅ Collect values for AVERAGING (only add if value exists)
         if (metrics.avgRsrp != null && !isNaN(metrics.avgRsrp)) {
           agg.rsrpValues.push(parseFloat(metrics.avgRsrp));
         }
@@ -304,18 +296,13 @@ export const ApplicationTab = ({
       });
     });
 
-    // Calculate final values
     return Object.values(appAggregates).map((app) => ({
       name: app.name,
       category: app.category,
       sessionCount: app.sessions.size,
-      
-      // ✅ SUM values
       totalSamples: app.totalSamples,
       totalDurationSeconds: app.totalDurationSeconds,
       duration: formatDuration(app.totalDurationSeconds),
-      
-      // ✅ AVERAGE values
       avgRsrp: calculateAverage(app.rsrpValues),
       avgRsrq: calculateAverage(app.rsrqValues),
       avgSinr: calculateAverage(app.sinrValues),
@@ -328,22 +315,18 @@ export const ApplicationTab = ({
     }));
   }, [appSummary]);
 
-
   useEffect(() => { 
     console.log(aggregatedAppData, "Aggregated App Data in ApplicationTab");
   }, [aggregatedAppData]);
 
-  // Get unique categories
   const categories = useMemo(() => {
     const cats = [...new Set(aggregatedAppData.map(app => app.category))].sort();
     return ['all', ...cats];
   }, [aggregatedAppData]);
 
-  // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
     let filtered = [...aggregatedAppData];
 
-    // Apply search filter
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(app => 
@@ -352,22 +335,18 @@ export const ApplicationTab = ({
       );
     }
 
-    // Apply category filter
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(app => app.category === selectedCategory);
     }
 
-    // Apply sorting
     if (sortConfig.key) {
       filtered.sort((a, b) => {
         let aVal = a[sortConfig.key];
         let bVal = b[sortConfig.key];
         
-        // Handle null values
         if (aVal == null) aVal = -Infinity;
         if (bVal == null) bVal = -Infinity;
         
-        // Handle string comparison
         if (typeof aVal === 'string') {
           return sortConfig.direction === 'asc' 
             ? aVal.localeCompare(bVal)
@@ -381,32 +360,22 @@ export const ApplicationTab = ({
     return filtered;
   }, [aggregatedAppData, searchTerm, selectedCategory, sortConfig]);
 
-  // Chart data for comparison view
-  // Chart data for comparison view - UPDATED
-const chartData = useMemo(() => {
-  return filteredAndSortedData.map(app => ({
-    name: app.name,
-    
-    // Quality metrics
-    mos: app.avgMos || 0,
-    avgSinr: app.avgSinr || 0,
-    avgRsrp: app.avgRsrp || 0,
-    avgRsrq: app.avgRsrq || 0,
-    
-    // Throughput
-    dl: app.avgDl || 0,
-    ul: app.avgUl || 0,
-    
-    // Performance metrics
-    avgLatency: app.avgLatency || 0,
-    avgJitter: app.avgJitter || 0,
-    avgPacketLoss: app.avgPacketLoss || 0,
-    
-    sessionCount: app.sessionCount,
-  }));
-}, [filteredAndSortedData]);
+  const chartData = useMemo(() => {
+    return filteredAndSortedData.map(app => ({
+      name: app.name,
+      mos: app.avgMos || 0,
+      avgSinr: app.avgSinr || 0,
+      avgRsrp: app.avgRsrp || 0,
+      avgRsrq: app.avgRsrq || 0,
+      dl: app.avgDl || 0,
+      ul: app.avgUl || 0,
+      avgLatency: app.avgLatency || 0,
+      avgJitter: app.avgJitter || 0,
+      avgPacketLoss: app.avgPacketLoss || 0,
+      sessionCount: app.sessionCount,
+    }));
+  }, [filteredAndSortedData]);
 
-  // Handle sort
   const handleSort = (key) => {
     setSortConfig(prev => ({
       key,
@@ -414,7 +383,6 @@ const chartData = useMemo(() => {
     }));
   };
 
-  // Summary stats
   const summaryStats = useMemo(() => {
     const data = filteredAndSortedData;
     const appsWithMos = data.filter(a => a.avgMos != null);
@@ -437,9 +405,9 @@ const chartData = useMemo(() => {
     return (
       <div className="space-y-4">
         <div className="bg-slate-800 rounded-lg p-6 text-center border border-slate-700">
-          <Activity className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400 text-sm mb-2">No Application Performance Data Available</p>
-          <p className="text-slate-500 text-xs">
+          <Activity className="h-14 w-14 text-white mx-auto mb-3" />
+          <p className="text-white text-[17px] mb-2">No Application Performance Data Available</p>
+          <p className="text-white text-[15px]">
             Application metrics will appear here when data is available from your sessions.
           </p>
         </div>
@@ -449,34 +417,31 @@ const chartData = useMemo(() => {
 
   return (
     <div className="space-y-4">
-      {/* Summary Cards */}
-     
-
       {/* Sub-Tab Navigation */}
       <div className="flex gap-2 bg-slate-800 p-2 rounded-lg">
         <button
           onClick={() => setAppSubTab("table")}
-          className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+          className={`flex-1 px-4 py-2 text-[17px] font-medium rounded-md transition-all ${
             appSubTab === "table"
               ? "bg-blue-600 text-white shadow-md"
-              : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              : "bg-slate-700 text-white hover:bg-slate-600"
           }`}
         >
           <div className="flex items-center justify-center gap-2">
-            <Activity className="h-4 w-4" />
+            <Activity className="h-5 w-5" />
             App Table ({filteredAndSortedData.length})
           </div>
         </button>
         <button
           onClick={() => setAppSubTab("comparison")}
-          className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+          className={`flex-1 px-4 py-2 text-[17px] font-medium rounded-md transition-all ${
             appSubTab === "comparison"
               ? "bg-blue-600 text-white shadow-md"
-              : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              : "bg-slate-700 text-white hover:bg-slate-600"
           }`}
         >
           <div className="flex items-center justify-center gap-2">
-            <BarChart3 className="h-4 w-4" />
+            <BarChart3 className="h-5 w-5" />
             Comparison Charts
           </div>
         </button>
@@ -486,23 +451,23 @@ const chartData = useMemo(() => {
       <div className="flex gap-3 items-center flex-wrap">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white" />
           <input
             type="text"
             placeholder="Search apps..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-[17px] text-white placeholder-white/60 focus:outline-none focus:border-blue-500"
           />
         </div>
 
         {/* Category Filter */}
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-slate-400" />
+          <Filter className="h-5 w-5 text-white" />
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="bg-slate-800 border border-slate-700 rounded-lg text-[17px] text-white px-3 py-2 focus:outline-none focus:border-blue-500"
           >
             {categories.map(cat => (
               <option key={cat} value={cat}>
@@ -536,24 +501,24 @@ const AppTableView = ({ data, sortConfig, onSort, expanded }) => {
   if (!data?.length) {
     return (
       <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700">
-        <Activity className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-400 text-sm">No apps match the current filters</p>
+        <Activity className="h-14 w-14 text-white mx-auto mb-3" />
+        <p className="text-white text-[17px]">No apps match the current filters</p>
       </div>
     );
   }
 
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) {
-      return <ArrowUpDown className="h-3 w-3 text-slate-500" />;
+      return <ArrowUpDown className="h-4 w-4 text-white" />;
     }
     return sortConfig.direction === 'asc' 
-      ? <ArrowUp className="h-3 w-3 text-blue-400" />
-      : <ArrowDown className="h-3 w-3 text-blue-400" />;
+      ? <ArrowUp className="h-4 w-4 text-blue-400" />
+      : <ArrowDown className="h-4 w-4 text-blue-400" />;
   };
 
   const HeaderCell = ({ children, sortKey, className = "" }) => (
     <th 
-      className={`p-2 text-slate-400 font-medium cursor-pointer hover:text-white hover:bg-slate-800 transition-colors ${className}`}
+      className={`p-2 text-white font-medium cursor-pointer hover:text-blue-300 hover:bg-slate-800 transition-colors ${className}`}
       onClick={() => onSort(sortKey)}
     >
       <div className="flex items-center justify-center gap-1">
@@ -566,14 +531,14 @@ const AppTableView = ({ data, sortConfig, onSort, expanded }) => {
   return (
     <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
       <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-[15px]">
           <thead className="bg-slate-800 sticky top-0 z-10">
             <tr className="border-b border-slate-700">
               <HeaderCell sortKey="name" className="text-left min-w-[150px]">App Name</HeaderCell>
               <HeaderCell sortKey="category" className="min-w-[100px]">Category</HeaderCell>
               <HeaderCell sortKey="sessionCount" className="min-w-[80px]">Sessions</HeaderCell>
               <HeaderCell sortKey="totalSamples" className="min-w-[80px]">Samples</HeaderCell>
-              <HeaderCell sortKey="totalDurationSeconds" className="min-w-[90px]">Duration </HeaderCell>
+              <HeaderCell sortKey="totalDurationSeconds" className="min-w-[90px]">Duration</HeaderCell>
               <HeaderCell sortKey="avgRsrp" className="min-w-[70px]">RSRP (Avg)</HeaderCell>
               <HeaderCell sortKey="avgRsrq" className="min-w-[70px]">RSRQ (Avg)</HeaderCell>
               <HeaderCell sortKey="avgSinr" className="min-w-[70px]">SINR (Avg)</HeaderCell>
@@ -594,26 +559,26 @@ const AppTableView = ({ data, sortConfig, onSort, expanded }) => {
                 {/* App Name */}
                 <td className="p-2 text-left">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
                     <span className="font-semibold text-white">{app.name}</span>
                   </div>
                 </td>
 
                 {/* Category */}
                 <td className="p-2 text-center">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getCategoryColor(app.category)}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[13px] font-medium ${getCategoryColor(app.category)}`}>
                     {app.category}
                   </span>
                 </td>
 
                 {/* Sessions */}
-                <td className="p-2 text-center text-slate-300">{app.sessionCount}</td>
+                <td className="p-2 text-center text-white">{app.sessionCount}</td>
 
                 {/* Samples (SUM) */}
-                <td className="p-2 text-center text-slate-300 font-semibold">{app.totalSamples.toLocaleString()}</td>
+                <td className="p-2 text-center text-white font-semibold">{app.totalSamples.toLocaleString()}</td>
 
                 {/* Duration (SUM) */}
-                <td className="p-2 text-center text-green-400 font-mono text-[10px] font-semibold">{app.duration}</td>
+                <td className="p-2 text-center text-green-400 font-mono text-[13px] font-semibold">{app.duration}</td>
 
                 {/* RSRP (AVG) */}
                 <td className={`p-2 text-center font-semibold ${getSignalColor(app.avgRsrp, [-90, -105])}`}>
@@ -666,7 +631,7 @@ const AppTableView = ({ data, sortConfig, onSort, expanded }) => {
       </div>
 
       {/* Table Footer */}
-      <div className="bg-slate-800 px-3 py-2 text-xs text-slate-400 border-t border-slate-700 flex justify-between">
+      <div className="bg-slate-800 px-3 py-2 text-[15px] text-white border-t border-slate-700 flex justify-between">
         <span>Showing {data.length} apps</span>
         <span>
           Total Samples: {data.reduce((sum, app) => sum + app.totalSamples, 0).toLocaleString()} | 
@@ -679,11 +644,9 @@ const AppTableView = ({ data, sortConfig, onSort, expanded }) => {
 
 
 const AppComparisonView = ({ chartData, chartRefs }) => {
-  // State for chart metric selection
   const [selectedQualityMetric, setSelectedQualityMetric] = useState('mos');
   const [selectedPerformanceMetric, setSelectedPerformanceMetric] = useState('latency');
 
-  // Quality metrics configuration (MOS chart)
   const QUALITY_METRICS = {
     mos: {
       key: 'mos',
@@ -692,7 +655,6 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       format: (val) => val?.toFixed(2) || 'N/A',
       domain: [0, 5],
       unit: '',
-      
     },
     sinr: {
       key: 'avgSinr',
@@ -701,7 +663,6 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       format: (val) => `${val?.toFixed(1) || 0} dB`,
       domain: [-20, 30],
       unit: 'dB',
-      
     },
     rsrp: {
       key: 'avgRsrp',
@@ -710,7 +671,6 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       format: (val) => `${val?.toFixed(1) || 0} dBm`,
       domain: [-140, -40],
       unit: 'dBm',
-      
     },
     rsrq: {
       key: 'avgRsrq',
@@ -719,11 +679,9 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       format: (val) => `${val?.toFixed(1) || 0} dB`,
       domain: [-20, 0],
       unit: 'dB',
-     
     }
   };
 
-  // Performance metrics configuration (Latency chart)
   const PERFORMANCE_METRICS = {
     latency: {
       key: 'avgLatency',
@@ -732,7 +690,6 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       format: (val) => `${val?.toFixed(1) || 0} ms`,
       domain: [0, 'auto'],
       unit: 'ms',
-      
     },
     jitter: {
       key: 'avgJitter',
@@ -741,7 +698,6 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       format: (val) => `${val?.toFixed(1) || 0} ms`,
       domain: [0, 'auto'],
       unit: 'ms',
-      
     },
     packetLoss: {
       key: 'avgPacketLoss',
@@ -750,7 +706,6 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
       format: (val) => `${val?.toFixed(2) || 0}%`,
       domain: [0, 'auto'],
       unit: '%',
-      
     }
   };
 
@@ -760,198 +715,221 @@ const AppComparisonView = ({ chartData, chartRefs }) => {
   if (!chartData?.length) {
     return (
       <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700">
-        <BarChart3 className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-400 text-sm">No application data for comparison</p>
+        <BarChart3 className="h-14 w-14 text-white mx-auto mb-3" />
+        <p className="text-white text-[17px]">No application data for comparison</p>
       </div>
     );
   }
 
+  // Chart Card Component with fixed max size
+  const ChartCard = ({ children, chartRef, title, icon: Icon, metricSelector }) => (
+    <div 
+      ref={chartRef}
+      className="bg-slate-900 rounded-lg p-4 border border-slate-700 w-full max-w-[600px]"
+    >
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h4 className="text-[17px] font-semibold text-white flex items-center gap-2">
+          <Icon className="h-5 w-5" />
+          {title}
+        </h4>
+        {metricSelector}
+      </div>
+      <div className="h-[280px] w-full">
+        {children}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
-      {/* Signal Quality Comparison Chart */}
-      <div 
-        ref={chartRefs?.mosChart}
-        className="bg-slate-900 rounded-lg p-4 border border-slate-700"
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Signal Quality Comparison (Average)
-          </h4>
-          
-          {/* Metric Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Metric:</span>
-            <select
-              value={selectedQualityMetric}
-              onChange={(e) => setSelectedQualityMetric(e.target.value)}
-              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 hover:border-slate-500 transition-colors"
-            >
-              {Object.entries(QUALITY_METRICS).map(([key, config]) => (
-                <option key={key} value={key}>
-                  {config.icon} {config.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+      {/* Responsive Grid - 1 column on small, 2 columns when space available */}
+      <div className="flex flex-wrap gap-4 justify-center">
+        
+        {/* Signal Quality Comparison Chart */}
+        <ChartCard
+          chartRef={chartRefs?.mosChart}
+          title="Signal Quality (Average)"
+          icon={BarChart3}
+          metricSelector={
+            <div className="flex items-center gap-2">
+              <span className="text-[15px] text-white">Metric:</span>
+              <select
+                value={selectedQualityMetric}
+                onChange={(e) => setSelectedQualityMetric(e.target.value)}
+                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-[15px] text-white focus:outline-none focus:border-blue-500 hover:border-slate-500 transition-colors"
+              >
+                {Object.entries(QUALITY_METRICS).map(([key, config]) => (
+                  <option key={key} value={key}>
+                    {config.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          }
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={70} 
+                tick={{ fill: "#ffffff", fontSize: 11 }} 
+                interval={0}
+              />
+              <YAxis 
+                domain={currentQualityMetric.domain}
+                tick={{ fill: "#ffffff", fontSize: 13 }} 
+                width={50}
+                label={{
+                  value: `${currentQualityMetric.label} ${currentQualityMetric.unit ? `(${currentQualityMetric.unit})` : ''}`,
+                  angle: -90,
+                  position: 'insideLeft',
+                  style: { fill: '#ffffff', fontSize: 12 }
+                }}
+              />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: "#1e293b",
+                  border: "1px solid #475569",
+                  borderRadius: "8px",
+                  color: "#fff",
+                  fontSize: "14px",
+                }}
+                formatter={(value) => [
+                  currentQualityMetric.format(value),
+                  `Avg ${currentQualityMetric.label}`
+                ]}
+              />
+              <Legend wrapperStyle={{ fontSize: "13px", color: "#fff" }} />
+              <Bar 
+                dataKey={currentQualityMetric.key} 
+                fill={currentQualityMetric.color} 
+                name={`Avg ${currentQualityMetric.label}`} 
+                radius={[6, 6, 0, 0]} 
+                maxBarSize={50}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45} 
-              textAnchor="end" 
-              height={80} 
-              tick={{ fill: "#9CA3AF", fontSize: 10 }} 
-            />
-            <YAxis 
-              domain={currentQualityMetric.domain}
-              tick={{ fill: "#9CA3AF", fontSize: 12 }} 
-              label={{
-                value: `${currentQualityMetric.label} ${currentQualityMetric.unit ? `(${currentQualityMetric.unit})` : ''}`,
-                angle: -90,
-                position: 'insideLeft',
-                style: { fill: '#9CA3AF', fontSize: 11 }
-              }}
-            />
-            <Tooltip 
-              contentStyle={{
-                backgroundColor: "#1e293b",
-                border: "1px solid #475569",
-                borderRadius: "8px",
-                color: "#fff",
-              }}
-              formatter={(value) => [
-                currentQualityMetric.format(value),
-                `Avg ${currentQualityMetric.label}`
-              ]}
-            />
-            <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar 
-              dataKey={currentQualityMetric.key} 
-              fill={currentQualityMetric.color} 
-              name={`Avg ${currentQualityMetric.label}`} 
-              radius={[8, 8, 0, 0]} 
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+        {/* Throughput Comparison */}
+        <ChartCard
+          chartRef={chartRefs?.throughputChart}
+          title="Throughput (Average)"
+          icon={TrendingUp}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={70} 
+                tick={{ fill: "#ffffff", fontSize: 11 }} 
+                interval={0}
+              />
+              <YAxis 
+                tick={{ fill: "#ffffff", fontSize: 13 }}
+                width={50}
+                label={{
+                  value: 'Throughput (Mbps)',
+                  angle: -90,
+                  position: 'insideLeft',
+                  style: { fill: '#ffffff', fontSize: 12 }
+                }}
+              />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: "#1e293b",
+                  border: "1px solid #475569",
+                  borderRadius: "8px",
+                  color: "#fff",
+                  fontSize: "14px",
+                }}
+                formatter={(value, name) => [`${value?.toFixed(2) || 0} Mbps`, name]} 
+              />
+              <Legend wrapperStyle={{ fontSize: "13px", color: "#fff" }} />
+              <Bar dataKey="dl" fill="#06b6d4" name="Avg DL (Mbps)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="ul" fill="#fb923c" name="Avg UL (Mbps)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-      {/* Throughput Comparison */}
-      <div 
-        ref={chartRefs?.throughputChart}
-        className="bg-slate-900 rounded-lg p-4 border border-slate-700"
-      >
-        <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-          <TrendingUp className="h-4 w-4" />
-          Throughput Comparison (Average)
-        </h4>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45} 
-              textAnchor="end" 
-              height={80} 
-              tick={{ fill: "#9CA3AF", fontSize: 10 }} 
-            />
-            <YAxis 
-              tick={{ fill: "#9CA3AF", fontSize: 12 }}
-              label={{
-                value: 'Throughput (Mbps)',
-                angle: -90,
-                position: 'insideLeft',
-                style: { fill: '#9CA3AF', fontSize: 11 }
-              }}
-            />
-            <Tooltip 
-              contentStyle={{
-                backgroundColor: "#1e293b",
-                border: "1px solid #475569",
-                borderRadius: "8px",
-                color: "#fff",
-              }}
-              formatter={(value, name) => [`${value?.toFixed(2) || 0} Mbps`, name]} 
-            />
-            <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar dataKey="dl" fill="#06b6d4" name="Avg Download (Mbps)" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="ul" fill="#fb923c" name="Avg Upload (Mbps)" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+        
 
-      {/* Network Performance Comparison Chart */}
-      <div 
-        ref={chartRefs?.qoeChart}
-        className="bg-slate-900 rounded-lg p-4 border border-slate-700"
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-            <Signal className="h-4 w-4" />
-            Network Performance Comparison (Average)
-          </h4>
-          
-          {/* Metric Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Metric:</span>
-            <select
-              value={selectedPerformanceMetric}
-              onChange={(e) => setSelectedPerformanceMetric(e.target.value)}
-              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 hover:border-slate-500 transition-colors"
-            >
-              {Object.entries(PERFORMANCE_METRICS).map(([key, config]) => (
-                <option key={key} value={key}>
-                  {config.icon} {config.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        {/* Network Performance Comparison Chart */}
+        <ChartCard
+          chartRef={chartRefs?.qoeChart}
+          title="Network Performance (Average)"
+          icon={Signal}
+          metricSelector={
+            <div className="flex items-center gap-2">
+              <span className="text-[15px] text-white">Metric:</span>
+              <select
+                value={selectedPerformanceMetric}
+                onChange={(e) => setSelectedPerformanceMetric(e.target.value)}
+                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-[15px] text-white focus:outline-none focus:border-blue-500 hover:border-slate-500 transition-colors"
+              >
+                {Object.entries(PERFORMANCE_METRICS).map(([key, config]) => (
+                  <option key={key} value={key}>
+                    {config.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          }
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={70} 
+                tick={{ fill: "#ffffff", fontSize: 11 }} 
+                interval={0}
+              />
+              <YAxis 
+                domain={currentPerformanceMetric.domain}
+                tick={{ fill: "#ffffff", fontSize: 13 }}
+                width={50}
+                label={{
+                  value: `${currentPerformanceMetric.label} ${currentPerformanceMetric.unit ? `(${currentPerformanceMetric.unit})` : ''}`,
+                  angle: -90,
+                  position: 'insideLeft',
+                  style: { fill: '#ffffff', fontSize: 12 }
+                }}
+              />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: "#1e293b",
+                  border: "1px solid #475569",
+                  borderRadius: "8px",
+                  color: "#fff",
+                  fontSize: "14px",
+                }}
+                formatter={(value) => [
+                  currentPerformanceMetric.format(value),
+                  `Avg ${currentPerformanceMetric.label}`
+                ]} 
+              />
+              <Legend wrapperStyle={{ fontSize: "13px", color: "#fff" }} />
+              <Bar 
+                dataKey={currentPerformanceMetric.key} 
+                fill={currentPerformanceMetric.color} 
+                name={`Avg ${currentPerformanceMetric.label}`} 
+                radius={[6, 6, 0, 0]} 
+                maxBarSize={50}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45} 
-              textAnchor="end" 
-              height={80} 
-              tick={{ fill: "#9CA3AF", fontSize: 10 }} 
-            />
-            <YAxis 
-              domain={currentPerformanceMetric.domain}
-              tick={{ fill: "#9CA3AF", fontSize: 12 }}
-              label={{
-                value: `${currentPerformanceMetric.label} ${currentPerformanceMetric.unit ? `(${currentPerformanceMetric.unit})` : ''}`,
-                angle: -90,
-                position: 'insideLeft',
-                style: { fill: '#9CA3AF', fontSize: 11 }
-              }}
-            />
-            <Tooltip 
-              contentStyle={{
-                backgroundColor: "#1e293b",
-                border: "1px solid #475569",
-                borderRadius: "8px",
-                color: "#fff",
-              }}
-              formatter={(value) => [
-                currentPerformanceMetric.format(value),
-                `Avg ${currentPerformanceMetric.label}`
-              ]} 
-            />
-            <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar 
-              dataKey={currentPerformanceMetric.key} 
-              fill={currentPerformanceMetric.color} 
-              name={`Avg ${currentPerformanceMetric.label}`} 
-              radius={[8, 8, 0, 0]} 
-            />
-          </BarChart>
-        </ResponsiveContainer>
+        
       </div>
     </div>
   );

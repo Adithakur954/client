@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import Spinner from '../components/common/Spinner';
-import { X, Plus, Save, RefreshCw } from 'lucide-react';
+import { X, Plus, Save, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { settingApi } from '../api/apiEndpoints';
 import { useAuth } from '@/context/AuthContext';
 
@@ -14,16 +14,21 @@ const PARAMETERS = {
     sinr: "SINR",
     dl_thpt: "DL Throughput",
     ul_thpt: "UL Throughput",
-    volte_call: "VoLTE Call",
-    
+    lte_bler: "LTE BLER",
     mos: "MOS",
     coveragehole: "Coverage Hole"
 };
 
-const DEFAULT_ROW = { min: 0, max: 0, color: '#00ff00', label: '' };
+const SPECIAL_FIELDS = {
+    volte_call: "VoLTE Call"
+};
+
 const DEFAULT_COVERAGE_HOLE = -110;
 
-// ✅ Generate range string from min/max
+const generateId = () => {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
 const generateRangeString = (min, max) => {
     if (min === undefined || max === undefined || min === null || max === null) {
         return '';
@@ -31,155 +36,162 @@ const generateRangeString = (min, max) => {
     return `${min} to ${max}`;
 };
 
-// ✅ Clean and normalize threshold row data
+const parseNumber = (value) => {
+    if (value === '' || value === '-' || value === null || value === undefined) {
+        return 0;
+    }
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+};
+
 const normalizeRow = (row) => {
-    const min = Number(row.min) || 0;
-    const max = Number(row.max) || 0;
+    const min = parseNumber(row.min);
+    const max = parseNumber(row.max);
     
     return {
+        id: row.id || generateId(),
         min,
         max,
         color: row.color || '#00ff00',
         label: row.label || '',
-        range: generateRangeString(min, max), // Auto-generate range
+        range: generateRangeString(min, max),
     };
 };
 
-// Single Row Component
-const ThresholdRow = memo(({ row, index, onChange, onDelete, paramKey }) => {
-    const [min, setMin] = useState(row.min ?? 0);
-    const [max, setMax] = useState(row.max ?? 0);
+const createNewRow = () => ({
+    id: generateId(),
+    min: 0,
+    max: 0,
+    color: '#00ff00',
+    label: '',
+    range: '0 to 0'
+});
+
+const extractResponseData = (response) => {
+    return response?.data || response;
+};
+
+const ThresholdRow = memo(({ row, index, onChange, onDelete }) => {
+    const [minStr, setMinStr] = useState(String(row.min ?? 0));
+    const [maxStr, setMaxStr] = useState(String(row.max ?? 0));
     const [color, setColor] = useState(row.color || '#00ff00');
     const [label, setLabel] = useState(row.label || '');
 
-    // Update local state when row prop changes
     useEffect(() => {
-        setMin(row.min ?? 0);
-        setMax(row.max ?? 0);
+        setMinStr(String(row.min ?? 0));
+        setMaxStr(String(row.max ?? 0));
         setColor(row.color || '#00ff00');
         setLabel(row.label || '');
-    }, [row.min, row.max, row.color, row.label]);
+    }, [row.id, row.min, row.max, row.color, row.label]);
 
-    // Handle min change
-    const handleMinChange = (value) => {
-        setMin(value);
-    };
+    const syncToParent = useCallback((updates = {}) => {
+        const currentMin = updates.min !== undefined ? updates.min : parseNumber(minStr);
+        const currentMax = updates.max !== undefined ? updates.max : parseNumber(maxStr);
+        const currentColor = updates.color !== undefined ? updates.color : color;
+        const currentLabel = updates.label !== undefined ? updates.label : label;
 
-    const handleMinBlur = () => {
         onChange(index, { 
-            min, 
-            max, 
-            color, 
-            label,
-            range: generateRangeString(min, max) 
+            id: row.id,
+            min: currentMin, 
+            max: currentMax, 
+            color: currentColor, 
+            label: currentLabel,
+            range: generateRangeString(currentMin, currentMax) 
         });
-    };
+    }, [index, row.id, minStr, maxStr, color, label, onChange]);
 
-    // Handle max change
-    const handleMaxChange = (value) => {
-        setMax(value);
-    };
+    const handleMinBlur = useCallback(() => {
+        const num = parseNumber(minStr);
+        setMinStr(String(num));
+        syncToParent({ min: num });
+    }, [minStr, syncToParent]);
 
-    const handleMaxBlur = () => {
-        onChange(index, { 
-            min, 
-            max, 
-            color, 
-            label,
-            range: generateRangeString(min, max) 
-        });
-    };
+    const handleMaxBlur = useCallback(() => {
+        const num = parseNumber(maxStr);
+        setMaxStr(String(num));
+        syncToParent({ max: num });
+    }, [maxStr, syncToParent]);
 
-    // Handle color change
-    const handleColorChange = (value) => {
-        setColor(value);
-        onChange(index, { 
-            min, 
-            max, 
-            color: value, 
-            label,
-            range: generateRangeString(min, max) 
-        });
-    };
-
-    // Handle label change
-    const handleLabelBlur = () => {
-        onChange(index, { 
-            min, 
-            max, 
-            color, 
-            label,
-            range: generateRangeString(min, max) 
-        });
-    };
+    const currentMin = parseNumber(minStr);
+    const currentMax = parseNumber(maxStr);
 
     return (
-        <div className="grid grid-cols-12 gap-2 items-center p-3 bg-slate-700/50 rounded-lg">
-            {/* Min */}
+        <div className="grid grid-cols-12 gap-2 items-center p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700/70 transition-colors">
             <div className="col-span-2">
                 <label className="text-xs text-gray-400 block mb-1">Min</label>
                 <Input
-                    className="text-white bg-slate-800 border-slate-600"
+                    className="text-white bg-slate-800 border-slate-600 focus:border-blue-500"
                     type="number"
-                    value={min}
-                    onChange={e => handleMinChange(e.target.valueAsNumber || 0)}
+                    step="any"
+                    value={minStr}
+                    onChange={e => setMinStr(e.target.value)}
                     onBlur={handleMinBlur}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                            handleMinBlur();
+                        }
+                    }}
                 />
             </div>
 
-            {/* Max */}
             <div className="col-span-2">
                 <label className="text-xs text-gray-400 block mb-1">Max</label>
                 <Input
-                    className="text-white bg-slate-800 border-slate-600"
+                    className="text-white bg-slate-800 border-slate-600 focus:border-blue-500"
                     type="number"
-                    value={max}
-                    onChange={e => handleMaxChange(e.target.valueAsNumber || 0)}
+                    step="any"
+                    value={maxStr}
+                    onChange={e => setMaxStr(e.target.value)}
                     onBlur={handleMaxBlur}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                            handleMaxBlur();
+                        }
+                    }}
                 />
             </div>
 
-            {/* Color */}
             <div className="col-span-3">
                 <label className="text-xs text-gray-400 block mb-1">Color</label>
                 <div className="flex items-center gap-2">
                     <Input
                         type="color"
                         value={color}
-                        onChange={e => handleColorChange(e.target.value)}
-                        className="w-10 h-9 p-1 cursor-pointer rounded"
+                        onChange={e => {
+                            setColor(e.target.value);
+                            syncToParent({ color: e.target.value });
+                        }}
+                        className="w-10 h-9 p-1 cursor-pointer rounded border-slate-600"
                     />
                     <Input
                         className="text-white bg-slate-800 border-slate-600 flex-1 text-xs"
                         placeholder="#00ff00"
                         value={color}
                         onChange={e => setColor(e.target.value)}
-                        onBlur={e => handleColorChange(e.target.value)}
+                        onBlur={e => syncToParent({ color: e.target.value })}
                     />
                 </div>
             </div>
 
-            {/* Label */}
             <div className="col-span-3">
                 <label className="text-xs text-gray-400 block mb-1">Label</label>
                 <Input
-                    className="text-white bg-slate-800 border-slate-600"
+                    className="text-white bg-slate-800 border-slate-600 focus:border-blue-500"
                     placeholder="e.g., Good, Poor"
                     value={label}
                     onChange={e => setLabel(e.target.value)}
-                    onBlur={handleLabelBlur}
+                    onBlur={() => syncToParent({ label })}
                 />
             </div>
 
-            {/* Range Preview & Delete */}
             <div className="col-span-2 flex items-end gap-2">
                 <div className="flex-1">
                     <label className="text-xs text-gray-400 block mb-1">Range</label>
                     <div 
-                        className="text-xs px-2 py-2 rounded text-center font-medium"
+                        className="text-xs px-2 py-2 rounded text-center font-medium truncate"
                         style={{ backgroundColor: color + '40', color: color }}
                     >
-                        {generateRangeString(min, max) || 'N/A'}
+                        {generateRangeString(currentMin, currentMax) || 'N/A'}
                     </div>
                 </div>
                 <Button
@@ -199,15 +211,18 @@ ThresholdRow.displayName = 'ThresholdRow';
 
 const ThresholdForm = memo(({ paramKey, paramName, initialData, onUpdate, onClose }) => {
     const [localData, setLocalData] = useState([]);
+    const isInitialMount = useRef(true);
+    const pendingUpdate = useRef(false);
 
-    // Initialize with normalized data
     useEffect(() => {
-        const normalized = (initialData || []).map(normalizeRow);
+        const normalized = (initialData || []).map(row => normalizeRow(row));
         setLocalData(normalized);
-    }, [initialData]);
+        isInitialMount.current = false;
+        pendingUpdate.current = false;
+    }, [paramKey]);
 
-    // Handle full row update
     const handleChange = useCallback((index, updatedRow) => {
+        pendingUpdate.current = true;
         setLocalData(prev => {
             const updated = [...prev];
             updated[index] = normalizeRow(updatedRow);
@@ -216,28 +231,31 @@ const ThresholdForm = memo(({ paramKey, paramName, initialData, onUpdate, onClos
     }, []);
 
     const addRow = useCallback(() => {
-        setLocalData(prev => [...prev, { ...DEFAULT_ROW, range: '0 to 0' }]);
+        pendingUpdate.current = true;
+        setLocalData(prev => [...prev, createNewRow()]);
     }, []);
 
     const deleteRow = useCallback((index) => {
+        pendingUpdate.current = true;
         setLocalData(prev => prev.filter((_, i) => i !== index));
     }, []);
 
-    // Sync to parent with debounce
+    const sortByMin = useCallback(() => {
+        pendingUpdate.current = true;
+        setLocalData(prev => [...prev].sort((a, b) => a.min - b.min));
+    }, []);
+
     useEffect(() => {
+        if (isInitialMount.current) return;
+        if (!pendingUpdate.current) return;
+
         const timer = setTimeout(() => {
             onUpdate(localData);
+            pendingUpdate.current = false;
         }, 300);
+
         return () => clearTimeout(timer);
     }, [localData, onUpdate]);
-
-    // Sort by min value
-    const sortByMin = useCallback(() => {
-        setLocalData(prev => {
-            const sorted = [...prev].sort((a, b) => a.min - b.min);
-            return sorted;
-        });
-    }, []);
 
     return (
         <div className="mt-4 p-4 border border-slate-600 rounded-lg bg-slate-800">
@@ -254,9 +272,9 @@ const ThresholdForm = memo(({ paramKey, paramName, initialData, onUpdate, onClos
                         size="sm" 
                         onClick={sortByMin}
                         className="text-gray-400 hover:text-white"
-                        title="Sort by Min value"
+                        disabled={localData.length < 2}
                     >
-                        <RefreshCw className="h-4 w-4 mr-1" />
+                        <ArrowUpDown className="h-4 w-4 mr-1" />
                         Sort
                     </Button>
                     <Button variant="ghost" size="icon" onClick={onClose}>
@@ -265,14 +283,12 @@ const ThresholdForm = memo(({ paramKey, paramName, initialData, onUpdate, onClos
                 </div>
             </div>
 
-            {/* Rows */}
             <div className="space-y-2 max-h-96 overflow-y-auto">
                 {localData.map((row, index) => (
                     <ThresholdRow
-                        key={`${paramKey}-${index}`}
+                        key={row.id}
                         row={row}
                         index={index}
-                        paramKey={paramKey}
                         onChange={handleChange}
                         onDelete={deleteRow}
                     />
@@ -287,20 +303,19 @@ const ThresholdForm = memo(({ paramKey, paramName, initialData, onUpdate, onClos
             )}
 
             <div className="flex gap-2 mt-4">
-                <Button onClick={addRow} variant="outline" className="flex-1">
+                <Button onClick={addRow} variant="outline" className="flex-1 border-slate-600 hover:bg-slate-700">
                     <Plus className="h-4 w-4 mr-1" />
                     Add Row
                 </Button>
             </div>
 
-            {/* Preview */}
             {localData.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-slate-600">
                     <p className="text-xs text-gray-400 mb-2">Preview:</p>
                     <div className="flex flex-wrap gap-1">
-                        {localData.map((row, index) => (
+                        {localData.map((row) => (
                             <div
-                                key={index}
+                                key={row.id}
                                 className="px-2 py-1 rounded text-xs font-medium"
                                 style={{ 
                                     backgroundColor: row.color + '30', 
@@ -308,7 +323,7 @@ const ThresholdForm = memo(({ paramKey, paramName, initialData, onUpdate, onClos
                                     border: `1px solid ${row.color}`
                                 }}
                             >
-                                {row.label || row.range || `${row.min} to ${row.max}`}
+                                {row.label || row.range}
                             </div>
                         ))}
                     </div>
@@ -320,22 +335,156 @@ const ThresholdForm = memo(({ paramKey, paramName, initialData, onUpdate, onClos
 
 ThresholdForm.displayName = 'ThresholdForm';
 
-// Coverage Hole Form
-const CoverageHoleForm = memo(({ value, setValue, onClose }) => {
-    const [localValue, setLocalValue] = useState(value);
+const VoLTECallForm = memo(({ value, setValue, onClose }) => {
+    const [localData, setLocalData] = useState([]);
+    const isInitialMount = useRef(true);
+    const pendingUpdate = useRef(false);
 
     useEffect(() => {
-        setLocalValue(value);
+        let parsed = [];
+        if (value) {
+            if (Array.isArray(value)) {
+                parsed = value;
+            } else if (typeof value === 'string') {
+                try {
+                    parsed = JSON.parse(value);
+                } catch (e) {
+                    parsed = [];
+                }
+            }
+        }
+        setLocalData((Array.isArray(parsed) ? parsed : []).map(normalizeRow));
+        isInitialMount.current = false;
+    }, []);
+
+    const handleChange = useCallback((index, updatedRow) => {
+        pendingUpdate.current = true;
+        setLocalData(prev => {
+            const updated = [...prev];
+            updated[index] = normalizeRow(updatedRow);
+            return updated;
+        });
+    }, []);
+
+    const addRow = useCallback(() => {
+        pendingUpdate.current = true;
+        setLocalData(prev => [...prev, createNewRow()]);
+    }, []);
+
+    const deleteRow = useCallback((index) => {
+        pendingUpdate.current = true;
+        setLocalData(prev => prev.filter((_, i) => i !== index));
+    }, []);
+
+    const sortByMin = useCallback(() => {
+        pendingUpdate.current = true;
+        setLocalData(prev => [...prev].sort((a, b) => a.min - b.min));
+    }, []);
+
+    useEffect(() => {
+        if (isInitialMount.current) return;
+        if (!pendingUpdate.current) return;
+
+        const timer = setTimeout(() => {
+            setValue(localData);
+            pendingUpdate.current = false;
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [localData, setValue]);
+
+    return (
+        <div className="mt-4 p-4 border border-slate-600 rounded-lg bg-slate-800">
+            <div className="flex justify-between items-center mb-4">
+                <div>
+                    <h3 className="text-lg font-semibold text-white">VoLTE Call</h3>
+                    <p className="text-xs text-gray-400 mt-1">
+                        {localData.length} threshold range(s) configured
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={sortByMin}
+                        className="text-gray-400 hover:text-white"
+                        disabled={localData.length < 2}
+                    >
+                        <ArrowUpDown className="h-4 w-4 mr-1" />
+                        Sort
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={onClose}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+                {localData.map((row, index) => (
+                    <ThresholdRow
+                        key={row.id}
+                        row={row}
+                        index={index}
+                        onChange={handleChange}
+                        onDelete={deleteRow}
+                    />
+                ))}
+            </div>
+
+            {localData.length === 0 && (
+                <div className="text-center py-8 text-gray-400 border-2 border-dashed border-slate-600 rounded-lg">
+                    <p>No thresholds configured</p>
+                </div>
+            )}
+
+            <div className="flex gap-2 mt-4">
+                <Button onClick={addRow} variant="outline" className="flex-1 border-slate-600 hover:bg-slate-700">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Row
+                </Button>
+            </div>
+
+            {localData.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-600">
+                    <p className="text-xs text-gray-400 mb-2">Preview:</p>
+                    <div className="flex flex-wrap gap-1">
+                        {localData.map((row) => (
+                            <div
+                                key={row.id}
+                                className="px-2 py-1 rounded text-xs font-medium"
+                                style={{ 
+                                    backgroundColor: row.color + '30', 
+                                    color: row.color,
+                                    border: `1px solid ${row.color}`
+                                }}
+                            >
+                                {row.label || row.range}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+});
+
+VoLTECallForm.displayName = 'VoLTECallForm';
+
+const CoverageHoleForm = memo(({ value, setValue, onClose }) => {
+    const [localValueStr, setLocalValueStr] = useState(String(value ?? DEFAULT_COVERAGE_HOLE));
+
+    useEffect(() => {
+        setLocalValueStr(String(value ?? DEFAULT_COVERAGE_HOLE));
     }, [value]);
 
-    const handleBlur = useCallback((e) => {
-        const num = Number(e.target.value);
-        if (!isNaN(num)) {
-            const finalValue = num > 0 ? -num : num;
-            setLocalValue(finalValue);
-            setValue(finalValue);
-        }
-    }, [setValue]);
+    const handleBlur = useCallback(() => {
+        const num = parseNumber(localValueStr);
+        const finalValue = num > 0 ? -num : num;
+        setLocalValueStr(String(finalValue));
+        setValue(finalValue);
+    }, [localValueStr, setValue]);
+
+    const currentValue = parseNumber(localValueStr);
 
     return (
         <div className="mt-4 p-4 border border-slate-600 rounded-lg bg-slate-800">
@@ -354,14 +503,20 @@ const CoverageHoleForm = memo(({ value, setValue, onClose }) => {
             <div className="flex items-center gap-3">
                 <Input
                     type="number"
-                    value={localValue}
-                    onChange={e => setLocalValue(Number(e.target.value) || 0)}
+                    step="any"
+                    value={localValueStr}
+                    onChange={e => setLocalValueStr(e.target.value)}
                     onBlur={handleBlur}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                            handleBlur();
+                        }
+                    }}
                     className="w-32 text-white bg-slate-700 border-slate-600"
                 />
                 <span className="text-gray-400 text-sm">dBm</span>
                 <div className="text-xs text-gray-500">
-                    (Values below {localValue} dBm will be marked as coverage holes)
+                    (Values below {currentValue} dBm will be marked as coverage holes)
                 </div>
             </div>
         </div>
@@ -370,75 +525,80 @@ const CoverageHoleForm = memo(({ value, setValue, onClose }) => {
 
 CoverageHoleForm.displayName = 'CoverageHoleForm';
 
-// ✅ Parse backend data - ensure min/max are numbers
 const parseThresholdData = (data) => {
-    console.log('📥 Raw data from API:', data);
-    
     const parsedData = { 
         id: data.id,
-        userId: data.user_id || data.m_user_id,
+        userId: data.user_id,
+        isDefault: data.is_default,
     };
 
     Object.keys(PARAMETERS).forEach(key => {
         if (key === "coveragehole") {
-            parsedData[key] = Number(data.coveragehole_json || data.coveragehole) || DEFAULT_COVERAGE_HOLE;
+            parsedData[key] = parseNumber(data.coveragehole_json || data.coveragehole) || DEFAULT_COVERAGE_HOLE;
         } else {
-            const jsonString = data[`${key}_json`] || data[key];
+            const jsonString = data[`${key}_json`];
             let parsed = [];
             
             if (jsonString) {
                 try {
-                    if (typeof jsonString === 'object') {
-                        parsed = Array.isArray(jsonString) ? jsonString : [jsonString];
-                    } else {
-                        parsed = JSON.parse(jsonString);
-                    }
+                    parsed = typeof jsonString === 'object' 
+                        ? (Array.isArray(jsonString) ? jsonString : [jsonString])
+                        : JSON.parse(jsonString);
                 } catch (e) {
-                    console.warn(`Failed to parse ${key}:`, e);
                     parsed = [];
                 }
             }
             
-            // ✅ Normalize all rows - ensure min/max are proper numbers
             parsedData[key] = (Array.isArray(parsed) ? parsed : [parsed])
-                .map(row => normalizeRow(row))
+                .map(normalizeRow)
                 .filter(row => row.min !== undefined && row.max !== undefined);
         }
     });
 
-    console.log('✅ Parsed threshold data:', parsedData);
+    let volteCallData = [];
+    if (data.volte_call) {
+        try {
+            volteCallData = typeof data.volte_call === 'string' 
+                ? JSON.parse(data.volte_call) 
+                : (Array.isArray(data.volte_call) ? data.volte_call : []);
+        } catch (e) {
+            volteCallData = [];
+        }
+    }
+    parsedData.volte_call = (Array.isArray(volteCallData) ? volteCallData : []).map(normalizeRow);
+
     return parsedData;
 };
 
-// ✅ Build payload - ensure clean data structure
 const buildSavePayload = (thresholds, userId) => {
-    const payload = { 
-        id: thresholds.id,
-        m_user_id: userId,
+    const normalizeArray = (arr) => {
+        return (arr || []).map(row => ({
+            min: parseNumber(row.min),
+            max: parseNumber(row.max),
+            color: row.color || '#00ff00',
+            label: row.label || '',
+            range: generateRangeString(parseNumber(row.min), parseNumber(row.max)),
+        }));
     };
 
-    Object.keys(PARAMETERS).forEach(key => {
-        if (key === "coveragehole") {
-            payload.coveragehole_json = String(thresholds[key] ?? DEFAULT_COVERAGE_HOLE);
-        } else {
-            // ✅ Normalize all rows before saving
-            const normalizedData = (thresholds[key] || []).map(row => ({
-                min: Number(row.min) || 0,
-                max: Number(row.max) || 0,
-                color: row.color || '#00ff00',
-                label: row.label || '',
-                range: generateRangeString(Number(row.min) || 0, Number(row.max) || 0),
-            }));
-            
-            payload[`${key}_json`] = JSON.stringify(normalizedData);
-        }
-    });
+    const payload = { 
+        id: thresholds.id || 0,
+        user_id: userId || 0,
+        is_default: 0,
+        rsrp_json: JSON.stringify(normalizeArray(thresholds.rsrp)),
+        rsrq_json: JSON.stringify(normalizeArray(thresholds.rsrq)),
+        sinr_json: JSON.stringify(normalizeArray(thresholds.sinr)),
+        dl_thpt_json: JSON.stringify(normalizeArray(thresholds.dl_thpt)),
+        ul_thpt_json: JSON.stringify(normalizeArray(thresholds.ul_thpt)),
+        lte_bler_json: JSON.stringify(normalizeArray(thresholds.lte_bler)),
+        mos_json: JSON.stringify(normalizeArray(thresholds.mos)),
+        volte_call: JSON.stringify(normalizeArray(thresholds.volte_call)),
+        coveragehole_json: String(thresholds.coveragehole ?? DEFAULT_COVERAGE_HOLE),
+    };
 
-    console.log('📤 Save payload:', payload);
     return payload;
 };
 
-// Main Page
 const SettingsPage = () => {
     const { user } = useAuth();
     const [thresholds, setThresholds] = useState(null);
@@ -446,28 +606,26 @@ const SettingsPage = () => {
     const [saving, setSaving] = useState(false);
     const [activeParam, setActiveParam] = useState(null);
 
-    // Fetch thresholds
+    const allParameters = { ...PARAMETERS, ...SPECIAL_FIELDS };
+
     useEffect(() => {
         let mounted = true;
 
         const fetchData = async () => {
             try {
-                console.log('🔄 Fetching threshold settings...');
-                
                 const response = await settingApi.getThresholdSettings();
-                console.log('📥 API Response:', response);
+                const data = extractResponseData(response);
                 
                 if (mounted) {
-                    if (response?.Status === 1 && response.Data) {
-                        const parsed = parseThresholdData(response.Data);
+                    if (data?.Status === 1 && data.Data) {
+                        const parsed = parseThresholdData(data.Data);
                         setThresholds(parsed);
                     } else {
-                        toast.error("Failed to load settings");
+                        toast.error(data?.Message || "Failed to load settings");
                     }
                     setLoading(false);
                 }
             } catch (error) {
-                console.error('❌ Fetch error:', error);
                 if (mounted) {
                     toast.error(`Error: ${error.message}`);
                     setLoading(false);
@@ -484,30 +642,31 @@ const SettingsPage = () => {
     }, []);
 
     const handleSave = useCallback(async () => {
-        if (!thresholds) return;
+        if (!thresholds) {
+            toast.error("No thresholds to save");
+            return;
+        }
         
         setSaving(true);
         try {
             const payload = buildSavePayload(thresholds, user?.id);
-            console.log('💾 Saving...');
-            
             const response = await settingApi.saveThreshold(payload);
-            console.log('📥 Save response:', response);
+            const data = extractResponseData(response);
             
-            if (response?.Status === 1) {
+            if (data?.Status === 1) {
                 toast.success("Settings saved successfully!");
                 
-                // Refetch to confirm
                 const refetchResponse = await settingApi.getThresholdSettings();
-                if (refetchResponse?.Status === 1 && refetchResponse.Data) {
-                    const refetched = parseThresholdData(refetchResponse.Data);
+                const refetchData = extractResponseData(refetchResponse);
+                
+                if (refetchData?.Status === 1 && refetchData.Data) {
+                    const refetched = parseThresholdData(refetchData.Data);
                     setThresholds(refetched);
                 }
             } else {
-                toast.error(response?.Message || "Save failed");
+                toast.error(data?.Message || "Save failed");
             }
         } catch (error) {
-            console.error('❌ Save error:', error);
             toast.error(`Error: ${error.message}`);
         } finally {
             setSaving(false);
@@ -517,6 +676,16 @@ const SettingsPage = () => {
     const handleClose = useCallback(() => {
         setActiveParam(null);
     }, []);
+
+    const toggleParam = useCallback((key) => {
+        setActiveParam(prev => prev === key ? null : key);
+    }, []);
+
+    const getParamCount = (key) => {
+        if (key === "coveragehole") return null;
+        const data = thresholds?.[key];
+        return Array.isArray(data) ? data.length : 0;
+    };
 
     if (loading) {
         return (
@@ -549,7 +718,7 @@ const SettingsPage = () => {
                     >
                         {saving ? (
                             <>
-                                <Spinner className="h-4 w-4 mr-2" />
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                                 Saving...
                             </>
                         ) : (
@@ -570,18 +739,20 @@ const SettingsPage = () => {
                     </CardHeader>
 
                     <CardContent>
-                        {/* Parameter Buttons */}
                         <div className="flex flex-wrap gap-2">
-                            {Object.entries(PARAMETERS).map(([key, name]) => {
-                                const count = key !== "coveragehole" ? (thresholds[key]?.length || 0) : null;
+                            {Object.entries(allParameters).map(([key, name]) => {
+                                const count = getParamCount(key);
                                 const isActive = activeParam === key;
                                 
                                 return (
                                     <Button
                                         key={key}
                                         variant={isActive ? "default" : "outline"}
-                                        onClick={() => setActiveParam(prev => prev === key ? null : key)}
-                                        className={`${isActive ? "bg-blue-600 hover:bg-blue-700" : "border-slate-600 hover:bg-slate-700"}`}
+                                        onClick={() => toggleParam(key)}
+                                        className={isActive 
+                                            ? "bg-blue-600 hover:bg-blue-700" 
+                                            : "border-slate-600 hover:bg-slate-700 text-gray-300"
+                                        }
                                     >
                                         {name}
                                         {count !== null && count > 0 && (
@@ -594,36 +765,47 @@ const SettingsPage = () => {
                             })}
                         </div>
 
-                        {/* Active Form */}
                         {activeParam === "coveragehole" && (
                             <CoverageHoleForm
-                                key="coveragehole"
                                 value={thresholds.coveragehole}
                                 setValue={val => updateParam("coveragehole", val)}
                                 onClose={handleClose}
                             />
                         )}
 
-                        {activeParam && activeParam !== "coveragehole" && (
+                        {activeParam === "volte_call" && (
+                            <VoLTECallForm
+                                value={thresholds.volte_call}
+                                setValue={val => updateParam("volte_call", val)}
+                                onClose={handleClose}
+                            />
+                        )}
+
+                        {activeParam && activeParam !== "coveragehole" && activeParam !== "volte_call" && (
                             <ThresholdForm
                                 key={activeParam}
                                 paramKey={activeParam}
-                                paramName={PARAMETERS[activeParam]}
+                                paramName={allParameters[activeParam]}
                                 initialData={thresholds[activeParam] || []}
                                 onUpdate={data => updateParam(activeParam, data)}
                                 onClose={handleClose}
                             />
                         )}
 
-                        {/* Quick Summary */}
                         {!activeParam && (
                             <div className="mt-6 p-4 bg-slate-800 rounded-lg border border-slate-700">
-                                <h4 className="text-sm font-semibold text-gray-300 mb-3">Current Configuration Summary</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                    {Object.entries(PARAMETERS).map(([key, name]) => {
+                                <h4 className="text-sm font-semibold text-gray-300 mb-3">
+                                    Current Configuration Summary
+                                </h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {Object.entries(allParameters).map(([key, name]) => {
                                         if (key === "coveragehole") {
                                             return (
-                                                <div key={key} className="p-3 bg-slate-700/50 rounded">
+                                                <div 
+                                                    key={key} 
+                                                    className="p-3 bg-slate-700/50 rounded cursor-pointer hover:bg-slate-700"
+                                                    onClick={() => toggleParam(key)}
+                                                >
                                                     <div className="text-xs text-gray-400">{name}</div>
                                                     <div className="text-lg font-bold text-white">
                                                         {thresholds.coveragehole} dBm
@@ -634,19 +816,22 @@ const SettingsPage = () => {
                                         
                                         const data = thresholds[key] || [];
                                         return (
-                                            <div key={key} className="p-3 bg-slate-700/50 rounded">
+                                            <div 
+                                                key={key} 
+                                                className="p-3 bg-slate-700/50 rounded cursor-pointer hover:bg-slate-700"
+                                                onClick={() => toggleParam(key)}
+                                            >
                                                 <div className="text-xs text-gray-400">{name}</div>
                                                 <div className="text-lg font-bold text-white">
-                                                    {data.length} ranges
+                                                    {data.length} range{data.length !== 1 ? 's' : ''}
                                                 </div>
                                                 {data.length > 0 && (
                                                     <div className="flex gap-1 mt-2">
                                                         {data.slice(0, 4).map((row, i) => (
                                                             <div
-                                                                key={i}
+                                                                key={row.id || i}
                                                                 className="w-4 h-4 rounded"
                                                                 style={{ backgroundColor: row.color }}
-                                                                title={`${row.min} to ${row.max}`}
                                                             />
                                                         ))}
                                                         {data.length > 4 && (
@@ -664,7 +849,9 @@ const SettingsPage = () => {
 
                     <CardFooter className="justify-between border-t border-slate-700 pt-4">
                         <div className="text-xs text-gray-500">
-                            User: {user?.name} (ID: {user?.id}) | Threshold ID: {thresholds?.id}
+                            User: {user?.name || 'Unknown'} (ID: {user?.id || 'N/A'}) | 
+                            Threshold ID: {thresholds?.id || 'New'}
+                            {thresholds?.isDefault === 1 ? ' (Default)' : ' (Custom)'}
                         </div>
                         <Button 
                             onClick={handleSave} 
@@ -673,7 +860,7 @@ const SettingsPage = () => {
                         >
                             {saving ? (
                                 <>
-                                    <Spinner className="h-4 w-4 mr-2" />
+                                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                                     Saving...
                                 </>
                             ) : (

@@ -6,14 +6,13 @@ import {
   TextField,
   Typography,
   Grid,
-  ToggleButton,
-  ToggleButtonGroup,
-  Divider,
   Button,
   ButtonGroup,
   Paper,
   Chip,
   Fade,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   SignalCellularAlt,
@@ -24,7 +23,6 @@ import ChartCard from '../ChartCard';
 import { useCoverageRanking, useQualityRanking } from '@/hooks/useDashboardData.js';
 import { formatNumber } from '@/utils/chartUtils';
 
-// Operator-specific brand colors with gradients
 const OPERATOR_COLORS = {
   jio: {
     primary: '#0a3d91',
@@ -48,13 +46,9 @@ const OPERATOR_COLORS = {
   },
 };
 
-// Fallback colors
 const CHART_COLORS = ['#0a3d91', '#ff0000', '#ffc107', '#e60000', '#7b1fa2', '#0097a7'];
-
-// Allowed telecom operators
 const ALLOWED_OPERATORS = ['jio', 'airtel', 'vi', 'vodafone'];
 
-// Helper function to get operator config
 const getOperatorConfig = (name) => {
   const nameLower = name.toLowerCase();
   if (nameLower.includes('jio')) return OPERATOR_COLORS.jio;
@@ -67,7 +61,6 @@ const getOperatorConfig = (name) => {
   };
 };
 
-// Helper function to get operator icon
 const getOperatorIcon = (name) => {
   const nameLower = name.toLowerCase();
   if (nameLower.includes('jio')) return '📶';
@@ -98,20 +91,16 @@ const OperatorRankingChart = () => {
   const currentData = chartType === 'coverage' ? coverageData : qualityData;
   const isLoading = chartType === 'coverage' ? coverageLoading : qualityLoading;
 
-  // Filter and process chart data
   const chartData = useMemo(() => {
     if (!currentData || currentData.length === 0) return [];
 
-    // Filter only allowed operators (JIO, Airtel, Vi, Vodafone)
     const filteredData = currentData.filter((item) => {
       const nameLower = item.name.toLowerCase();
       return ALLOWED_OPERATORS.some((operator) => nameLower.includes(operator));
     });
 
-    // Calculate total from filtered data
     const total = filteredData.reduce((sum, item) => sum + (item.value || 0), 0);
 
-    // Sort by value descending and map with colors
     return filteredData
       .sort((a, b) => b.value - a.value)
       .map((item, index) => {
@@ -132,7 +121,6 @@ const OperatorRankingChart = () => {
       });
   }, [currentData]);
 
-  // Calculate statistics
   const stats = useMemo(() => {
     if (chartData.length === 0) return { total: 0, leader: null, average: 0 };
 
@@ -187,7 +175,7 @@ const OperatorRankingChart = () => {
     setQualitySettings({ rsrqMin, rsrqMax });
   };
 
-  const handleChartTypeChange = (_, newType) => {
+  const handleChartTypeChange = (event, newType) => {
     if (newType !== null) {
       setChartType(newType);
     }
@@ -195,42 +183,17 @@ const OperatorRankingChart = () => {
 
   const getTitle = () => {
     if (chartType === 'coverage') {
-      return `Operator Coverage Ranking (RSRP ${coverageSettings.rsrpMin} to ${coverageSettings.rsrpMax} dBm)`;
+      return `Coverage Ranking (RSRP ${coverageSettings.rsrpMin} to ${coverageSettings.rsrpMax} dBm)`;
     }
-    return `Operator Quality Ranking (RSRQ ${qualitySettings.rsrqMin} to ${qualitySettings.rsrqMax} dB)`;
+    return `Quality Ranking (RSRQ ${qualitySettings.rsrqMin} to ${qualitySettings.rsrqMax} dB)`;
   };
 
   const renderSettings = () => (
     <Box sx={{ p: 2 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" fontWeight="600" gutterBottom>
-          Chart Type
-        </Typography>
-        <ToggleButtonGroup
-          value={chartType}
-          exclusive
-          onChange={handleChartTypeChange}
-          fullWidth
-          size="small"
-          color="primary"
-        >
-          <ToggleButton value="coverage">
-            <SignalCellular4Bar sx={{ mr: 1, fontSize: 18 }} />
-            Coverage (RSRP)
-          </ToggleButton>
-          <ToggleButton value="quality">
-            <SignalCellularAlt sx={{ mr: 1, fontSize: 18 }} />
-            Quality (RSRQ)
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      <Divider sx={{ my: 2 }} />
-
       {chartType === 'coverage' && (
         <Fade in={chartType === 'coverage'}>
           <Box>
-            <Typography variant="subtitle1" fontWeight="600" gutterBottom>
+            <Typography variant="subtitle1" fontWeight="600" fontSize="16px" gutterBottom>
               RSRP Coverage Range (dBm)
             </Typography>
             <Grid container spacing={2}>
@@ -243,6 +206,7 @@ const OperatorRankingChart = () => {
                   onChange={(e) => setCoverageDraft((s) => ({ ...s, rsrpMin: e.target.value }))}
                   size="small"
                   inputProps={{ step: 1 }}
+                  sx={{ '& .MuiInputLabel-root': { fontSize: '14px' }, '& .MuiInputBase-input': { fontSize: '14px' } }}
                 />
               </Grid>
               <Grid item xs={6}>
@@ -254,18 +218,12 @@ const OperatorRankingChart = () => {
                   onChange={(e) => setCoverageDraft((s) => ({ ...s, rsrpMax: e.target.value }))}
                   size="small"
                   inputProps={{ step: 1 }}
+                  sx={{ '& .MuiInputLabel-root': { fontSize: '14px' }, '& .MuiInputBase-input': { fontSize: '14px' } }}
                 />
               </Grid>
             </Grid>
-            <Paper
-              sx={{
-                mt: 2,
-                p: 1.5,
-                backgroundColor: '#e3f2fd',
-                borderRadius: 2,
-              }}
-            >
-              <Typography variant="caption" color="primary" fontWeight="500">
+            <Paper sx={{ mt: 2, p: 1.5, backgroundColor: '#e3f2fd', borderRadius: 2 }}>
+              <Typography variant="caption" color="primary" fontWeight="500" fontSize="12px">
                 💡 Typical RSRP range: -140 to -44 dBm
               </Typography>
             </Paper>
@@ -276,7 +234,7 @@ const OperatorRankingChart = () => {
       {chartType === 'quality' && (
         <Fade in={chartType === 'quality'}>
           <Box>
-            <Typography variant="subtitle1" fontWeight="600" gutterBottom>
+            <Typography variant="subtitle1" fontWeight="600" fontSize="16px" gutterBottom>
               RSRQ Quality Range (dB)
             </Typography>
             <Grid container spacing={2}>
@@ -289,6 +247,7 @@ const OperatorRankingChart = () => {
                   onChange={(e) => setQualityDraft((s) => ({ ...s, rsrqMin: e.target.value }))}
                   size="small"
                   inputProps={{ step: 0.5 }}
+                  sx={{ '& .MuiInputLabel-root': { fontSize: '14px' }, '& .MuiInputBase-input': { fontSize: '14px' } }}
                 />
               </Grid>
               <Grid item xs={6}>
@@ -300,18 +259,12 @@ const OperatorRankingChart = () => {
                   onChange={(e) => setQualityDraft((s) => ({ ...s, rsrqMax: e.target.value }))}
                   size="small"
                   inputProps={{ step: 0.5 }}
+                  sx={{ '& .MuiInputLabel-root': { fontSize: '14px' }, '& .MuiInputBase-input': { fontSize: '14px' } }}
                 />
               </Grid>
             </Grid>
-            <Paper
-              sx={{
-                mt: 2,
-                p: 1.5,
-                backgroundColor: '#fff3e0',
-                borderRadius: 2,
-              }}
-            >
-              <Typography variant="caption" color="warning.dark" fontWeight="500">
+            <Paper sx={{ mt: 2, p: 1.5, backgroundColor: '#fff3e0', borderRadius: 2 }}>
+              <Typography variant="caption" color="warning.dark" fontWeight="500" fontSize="12px">
                 💡 Typical RSRQ range: -20 to -3 dB
               </Typography>
             </Paper>
@@ -321,39 +274,55 @@ const OperatorRankingChart = () => {
     </Box>
   );
 
-  const renderHeaderActions = () => (
-    <ButtonGroup size="small" variant="outlined" sx={{ mr: 1 }}>
-      <Button
-        onClick={() => setChartType('coverage')}
-        variant={chartType === 'coverage' ? 'contained' : 'outlined'}
-        startIcon={<SignalCellular4Bar sx={{ fontSize: 16 }} />}
-        sx={{
-          fontSize: '12px',
+  const HeaderToggleButtons = () => (
+    <ToggleButtonGroup
+      value={chartType}
+      exclusive
+      onChange={handleChartTypeChange}
+      size="small"
+      sx={{
+        '& .MuiToggleButton-root': {
+          fontSize: '13px',
           py: 0.5,
-          transition: 'all 0.3s ease',
-          ...(chartType === 'coverage' && {
+          px: 1.5,
+          textTransform: 'none',
+          fontWeight: 600,
+          border: '1px solid #e0e0e0',
+          '&.Mui-selected': {
+            color: '#fff',
+          },
+        },
+      }}
+    >
+      <ToggleButton
+        value="coverage"
+        sx={{
+          '&.Mui-selected': {
             background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
-          }),
+            '&:hover': {
+              background: 'linear-gradient(45deg, #1565c0 30%, #1976d2 90%)',
+            },
+          },
         }}
       >
+        <SignalCellular4Bar sx={{ fontSize: 16, mr: 0.5 }} />
         Coverage
-      </Button>
-      <Button
-        onClick={() => setChartType('quality')}
-        variant={chartType === 'quality' ? 'contained' : 'outlined'}
-        startIcon={<SignalCellularAlt sx={{ fontSize: 16 }} />}
+      </ToggleButton>
+      <ToggleButton
+        value="quality"
         sx={{
-          fontSize: '12px',
-          py: 0.5,
-          transition: 'all 0.3s ease',
-          ...(chartType === 'quality' && {
+          '&.Mui-selected': {
             background: 'linear-gradient(45deg, #f57c00 30%, #ffb74d 90%)',
-          }),
+            '&:hover': {
+              background: 'linear-gradient(45deg, #ef6c00 30%, #f57c00 90%)',
+            },
+          },
         }}
       >
+        <SignalCellularAlt sx={{ fontSize: 16, mr: 0.5 }} />
         Quality
-      </Button>
-    </ButtonGroup>
+      </ToggleButton>
+    </ToggleButtonGroup>
   );
 
   return (
@@ -363,35 +332,34 @@ const OperatorRankingChart = () => {
       exportFileName={chartType === 'coverage' ? 'coverage_rank' : 'quality_rank'}
       isLoading={isLoading}
       showChartFilters={false}
-      headerActions={renderHeaderActions()}
+      headerActions={<HeaderToggleButtons />}
       settings={{
-        title: 'Ranking Settings',
+        title: `${chartType === 'coverage' ? 'RSRP' : 'RSRQ'} Range Settings`,
         render: renderSettings,
         onApply: chartType === 'coverage' ? applyCoverageSettings : applyQualitySettings,
       }}
     >
-      {/* Main Container - Side by Side Layout */}
       <Box
         sx={{
           width: '100%',
           height: '100%',
           display: 'flex',
           flexDirection: 'row',
-          gap: 2,
-          p: 2,
+          gap: 1.5,
+          p: 1.5,
           boxSizing: 'border-box',
           overflow: 'hidden',
         }}
       >
-        {/* LEFT SIDE - Pie Chart */}
         <Box
           sx={{
-            flex: '0 0 52%',
+            flex: '0 0 50%',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
+            minWidth: 0,
           }}
         >
           <Box sx={{ position: 'relative' }}>
@@ -401,50 +369,48 @@ const OperatorRankingChart = () => {
                   data: chartData,
                   highlightScope: { faded: 'global', highlighted: 'item' },
                   faded: {
-                    innerRadius: 25,
-                    additionalRadius: -25,
+                    innerRadius: 20,
+                    additionalRadius: -20,
                     color: 'gray',
                   },
-                  innerRadius: 55,
-                  outerRadius: 105,
+                  innerRadius: 50,
+                  outerRadius: 95,
                   paddingAngle: 3,
-                  cornerRadius: 8,
+                  cornerRadius: 6,
                   arcLabel: (item) => `${item.percentage}%`,
-                  arcLabelMinAngle: 20,
-                  arcLabelRadius: '68%',
+                  arcLabelMinAngle: 25,
+                  arcLabelRadius: '70%',
                   valueFormatter: (item) =>
                     `${formatNumber(item.value)} (${item.percentage}%)`,
                 },
               ]}
               colors={chartData.map((item) => item.color)}
-              width={260}
-              height={260}
+              width={240}
+              height={240}
               slotProps={{
                 legend: { hidden: true },
               }}
               sx={{
                 '& .MuiPieArc-root': {
                   stroke: '#ffffff',
-                  strokeWidth: 3,
-                  filter: 'drop-shadow(3px 5px 8px rgba(0,0,0,0.2))',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  strokeWidth: 2,
+                  filter: 'drop-shadow(2px 4px 6px rgba(0,0,0,0.15))',
+                  transition: 'all 0.3s ease',
                   cursor: 'pointer',
                   '&:hover': {
-                    filter: 'drop-shadow(5px 8px 15px rgba(0,0,0,0.35))',
-                    transform: 'scale(1.03)',
+                    filter: 'drop-shadow(4px 6px 12px rgba(0,0,0,0.3))',
                   },
                 },
                 '& .MuiChartsArcLabel-root': {
                   fill: '#ffffff',
                   fontWeight: 700,
-                  fontSize: '11px',
-                  textShadow: '1px 1px 3px rgba(0,0,0,0.6)',
+                  fontSize: '13px',
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
                 },
               }}
-              margin={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              margin={{ top: 10, bottom: 10, left: 10, right: 10 }}
             />
 
-            {/* Center Label */}
             <Box
               sx={{
                 position: 'absolute',
@@ -466,7 +432,7 @@ const OperatorRankingChart = () => {
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   lineHeight: 1.1,
-                  fontSize: '16px',
+                  fontSize: '18px',
                 }}
               >
                 {formatNumber(stats.total)}
@@ -475,7 +441,7 @@ const OperatorRankingChart = () => {
                 variant="caption"
                 sx={{
                   color: '#666',
-                  fontSize: '9px',
+                  fontSize: '11px',
                   display: 'block',
                 }}
               >
@@ -483,112 +449,91 @@ const OperatorRankingChart = () => {
               </Typography>
               {stats.leader && (
                 <Chip
-                  icon={<TrendingUp sx={{ fontSize: 12 }} />}
+                  icon={<TrendingUp sx={{ fontSize: 14 }} />}
                   label={stats.leader.label}
                   size="small"
                   sx={{
                     mt: 0.5,
-                    height: 18,
-                    fontSize: '8px',
+                    height: 20,
+                    fontSize: '10px',
                     background: stats.leader.gradient,
                     color: stats.leader.color === '#ffc107' ? '#333' : '#fff',
                     fontWeight: 600,
+                    '& .MuiChip-icon': { ml: 0.5 },
                   }}
                 />
               )}
             </Box>
           </Box>
 
-          {/* Stats Below Chart */}
-          <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 0.5, mt: 1.5, flexWrap: 'wrap', justifyContent: 'center' }}>
             <Chip
               size="small"
               label={`${chartData.length} Operators`}
-              sx={{ fontSize: '9px', height: 20, backgroundColor: '#f5f5f5', fontWeight: 500 }}
+              sx={{ fontSize: '11px', height: 22, backgroundColor: '#f5f5f5', fontWeight: 500 }}
             />
             <Chip
               size="small"
               label={`Avg: ${formatNumber(Math.round(stats.average))}`}
-              sx={{ fontSize: '9px', height: 20, backgroundColor: '#f5f5f5', fontWeight: 500 }}
-            />
-            <Chip
-              size="small"
-              icon={
-                chartType === 'coverage' ? (
-                  <SignalCellular4Bar sx={{ fontSize: 12 }} />
-                ) : (
-                  <SignalCellularAlt sx={{ fontSize: 12 }} />
-                )
-              }
-              label={chartType === 'coverage' ? 'RSRP' : 'RSRQ'}
-              sx={{
-                fontSize: '9px',
-                height: 20,
-                backgroundColor: chartType === 'coverage' ? '#e3f2fd' : '#fff3e0',
-                color: chartType === 'coverage' ? '#1976d2' : '#f57c00',
-                fontWeight: 600,
-                '& .MuiChip-icon': {
-                  color: 'inherit',
-                },
-              }}
+              sx={{ fontSize: '11px', height: 22, backgroundColor: '#f5f5f5', fontWeight: 500 }}
             />
           </Box>
         </Box>
 
-        {/* RIGHT SIDE - Beautiful Legend */}
         <Box
           sx={{
-            flex: '0 0 45%',
+            flex: '0 0 48%',
             display: 'flex',
             flexDirection: 'column',
-            gap: 1.2,
+            gap: 1,
             overflowY: 'auto',
+            overflowX: 'hidden',
+            minWidth: 0,
             pr: 0.5,
             '&::-webkit-scrollbar': {
-              width: '5px',
+              width: '4px',
             },
             '&::-webkit-scrollbar-thumb': {
               backgroundColor: '#ccc',
-              borderRadius: '3px',
+              borderRadius: '2px',
             },
           }}
         >
-          {/* Legend Title */}
           <Typography
             variant="subtitle2"
             fontWeight="700"
             sx={{
               color: '#333',
-              mb: 0.3,
+              mb: 0.5,
               display: 'flex',
               alignItems: 'center',
-              gap: 0.8,
-              fontSize: '12px',
+              gap: 0.5,
+              fontSize: '14px',
+              flexShrink: 0,
             }}
           >
-            📊 Operator Rankings
+             Rankings
           </Typography>
 
-          {/* Legend Items */}
           {chartData.map((item, index) => (
             <Paper
               key={index}
-              elevation={3}
+              elevation={2}
               sx={{
                 position: 'relative',
                 overflow: 'hidden',
-                borderRadius: 2,
-                transition: 'all 0.3s ease',
+                borderRadius: 1.5,
+                transition: 'all 0.2s ease',
                 cursor: 'pointer',
-                border: `2px solid ${item.color}20`,
+                border: `1px solid ${item.color}20`,
+                flexShrink: 0,
                 '&:hover': {
-                  transform: 'translateX(4px)',
-                  boxShadow: `0 5px 16px ${item.color}40`,
+                  transform: 'translateX(3px)',
+                  boxShadow: `0 4px 12px ${item.color}30`,
                   borderColor: item.color,
                 },
               }}
             >
-              {/* Gradient Background */}
               <Box
                 sx={{
                   position: 'absolute',
@@ -597,26 +542,24 @@ const OperatorRankingChart = () => {
                   right: 0,
                   bottom: 0,
                   background: `linear-gradient(90deg, ${item.lightColor} 0%, #ffffff 100%)`,
-                  opacity: 0.6,
+                  opacity: 0.5,
                 }}
               />
 
-              {/* Content */}
               <Box
                 sx={{
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1.2,
-                  p: 1.2,
+                  gap: 1,
+                  p: 1,
                 }}
               >
-                {/* Rank Badge */}
                 <Box
                   sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '6px',
+                    width: 28,
+                    height: 28,
+                    borderRadius: '5px',
                     background: item.gradient,
                     display: 'flex',
                     alignItems: 'center',
@@ -624,14 +567,13 @@ const OperatorRankingChart = () => {
                     color: item.color === '#ffc107' ? '#333' : '#fff',
                     fontWeight: 800,
                     fontSize: '14px',
-                    boxShadow: `0 3px 8px ${item.color}50`,
+                    boxShadow: `0 2px 6px ${item.color}40`,
                     flexShrink: 0,
                   }}
                 >
                   #{item.rank}
                 </Box>
 
-                {/* Operator Info */}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography
                     variant="body2"
@@ -639,14 +581,14 @@ const OperatorRankingChart = () => {
                     sx={{
                       color: '#333',
                       lineHeight: 1.2,
-                      fontSize: '11px',
+                      fontSize: '13px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 0.4,
-                      mb: 0.4,
+                      gap: 0.3,
+                      mb: 0.3,
                     }}
                   >
-                    <span style={{ fontSize: '14px' }}>{item.icon}</span>
+                    <span style={{ fontSize: '12px' }}>{item.icon}</span>
                     <span
                       style={{
                         whiteSpace: 'nowrap',
@@ -658,14 +600,13 @@ const OperatorRankingChart = () => {
                     </span>
                   </Typography>
 
-                  {/* Progress Bar */}
                   <Box
                     sx={{
-                      height: 5,
+                      height: 4,
                       backgroundColor: '#e0e0e0',
-                      borderRadius: 2.5,
+                      borderRadius: 2,
                       overflow: 'hidden',
-                      mb: 0.4,
+                      mb: 0.3,
                     }}
                   >
                     <Box
@@ -673,33 +614,32 @@ const OperatorRankingChart = () => {
                         height: '100%',
                         width: `${item.percentage}%`,
                         background: item.gradient,
-                        transition: 'width 0.5s ease',
-                        boxShadow: `0 0 6px ${item.color}80`,
+                        transition: 'width 0.4s ease',
                       }}
                     />
                   </Box>
 
-                  {/* Stats */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography
                       variant="caption"
                       sx={{
                         color: '#666',
-                        fontSize: '9px',
-                        fontWeight: 600,
+                        fontSize: '11px',
+                        fontWeight: 500,
                       }}
                     >
-                      {formatNumber(item.value)} samples
+                      {formatNumber(item.value)}
                     </Typography>
                     <Chip
                       label={`${item.percentage}%`}
                       size="small"
                       sx={{
-                        height: 16,
-                        fontSize: '9px',
+                        height: 18,
+                        fontSize: '11px',
                         fontWeight: 700,
                         background: item.gradient,
                         color: item.color === '#ffc107' ? '#333' : '#fff',
+                        '& .MuiChip-label': { px: 0.8 },
                       }}
                     />
                   </Box>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Filter, X, SlidersHorizontal } from "lucide-react";
+import { Filter, X, SlidersHorizontal, Database, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
@@ -10,55 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mapViewApi } from "@/api/apiEndpoints";
+import { COLOR_SCHEMES } from "@/utils/colorUtils";
 
 const getYesterday = () => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d;
-};
-
-// Normalize technology names
-const normalizeTechName = (tech) => {
-  if (!tech) return "Unknown";
-  const t = String(tech).trim().toUpperCase();
-
-  if (t.includes("5G") || t.includes("NR")) return "5G";
-  if (t.includes("LTE") || t.includes("4G")) return "4G";
-  if (t.includes("3G")) return "3G";
-  if (t.includes("2G") || t.includes("EDGE")) return "2G";
-  return "Unknown";
-};
-
-// Normalize provider names
-const normalizeProviderName = (raw) => {
-  if (!raw) return "Unknown";
-  const s = String(raw).trim();
-  if (/^\/+$/.test(s)) return "Unknown";
-  if (s.replace(/\s+/g, "") === "404011") return "Unknown";
-
-  const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
-
-  // Handle Jio variations (including "Jio True5G")
-  if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) {
-    return "Jio";
-  }
-  if (cleaned.includes("AIRTEL")) {
-    return "Airtel";
-  }
-  if (
-    cleaned === "VI" ||
-    cleaned.includes("VIINDIA") ||
-    cleaned.includes("VODAFONE") ||
-    cleaned.includes("IDEA")
-  ) {
-    return "VI India";
-  }
-  if (cleaned.includes("BSNL")) {
-    return "BSNL";
-  }
-
-  return "Unknown";
 };
 
 const defaultFilters = {
@@ -72,141 +29,41 @@ const defaultFilters = {
   colorBy: null,
 };
 
-const COLOR_SCHEMES = {
-  provider: {
-    JIO: "#3B82F6",
-    Airtel: "#EF4444",
-    "VI India": "#22C55E",
-    BSNL: "#F59E0B",
-    Unknown: "#6B7280",
-  },
-  technology: {
-    "5G": "#EC4899",
-    "4G": "#8B5CF6",
-    "3G": "#10B981",
-    "2G": "#6B7280",
-    Unknown: "#F59E0B",
-  },
-  band: {
-    3: "#EF4444",
-    5: "#F59E0B",
-    8: "#10B981",
-    40: "#3B82F6",
-    41: "#8B5CF6",
-    n28: "#EC4899",
-    n78: "#F472B6",
-    1: "#EF4444",
-    2: "#F59E0B",
-    7: "#10B781",
-    Unknown: "#6B7280",
-  },
-};
-
-export const getLogColor = (colorBy, value, defaultColor = "#6B7280") => {
-  if (!colorBy || !value) {
-    return defaultColor;
-  }
-
-  const scheme = COLOR_SCHEMES[colorBy];
-  if (!scheme) {
-    return defaultColor;
-  }
-
-  let normalizedValue = String(value).trim();
-
-  // Apply normalization based on colorBy type
-  if (colorBy === "provider") {
-    normalizedValue = normalizeProviderName(value);
-  } else if (colorBy === "technology") {
-    normalizedValue = normalizeTechName(value);
-  } else if (colorBy === "band") {
-    // Bands might be negative (-1), handle special cases
-    if (normalizedValue === "-1" || normalizedValue === "") {
-      normalizedValue = "Unknown";
-    }
-  }
-
-  // Try exact match first
-  if (scheme[normalizedValue]) {
-    return scheme[normalizedValue];
-  }
-
-  // Try case-insensitive match (fallback)
-  const matchKey = Object.keys(scheme).find(
-    (key) => key.toLowerCase() === normalizedValue.toLowerCase()
-  );
-
-  if (matchKey) {
-    return scheme[matchKey];
-  }
-
-  return defaultColor;
-};
-
 const isObjectNonEmpty = (obj) =>
   obj && typeof obj === "object" && Object.keys(obj).length > 0;
 
-const PanelSection = ({ title, children }) => (
+const PanelSection = ({ title, children, badge }) => (
   <div className="space-y-2">
-    <div className="text-sm font-medium text-slate-100">{title}</div>
-    <div className="rounded-lg border p-3 bg-slate-900">{children}</div>
+    <div className="flex items-center justify-between">
+      <div className="text-sm font-medium text-slate-100">{title}</div>
+      {badge && (
+        <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">
+          {badge}
+        </span>
+      )}
+    </div>
+    <div className="rounded-lg border border-slate-700 p-3 bg-slate-900">{children}</div>
   </div>
 );
 
-const ColorLegend = ({ colorBy, logs=[] }) => {
+const ColorLegend = ({ colorBy }) => {
   if (!colorBy) return null;
-
   const scheme = COLOR_SCHEMES[colorBy];
   if (!scheme) return null;
 
-  const counts = React.useMemo(() => {
-    const c = {};
-    Object.keys(scheme).forEach(k => c[k] = 0);
-
-    logs.forEach(log => {
-      let key = "Unknown";
-      
-      // Use existing normalization logic
-      if (colorBy === 'provider') {
-        key = normalizeProviderName(log.provider || log.Provider);
-      } else if (colorBy === 'technology') {
-        key = normalizeTechName(log.network || log.Network);
-      } else if (colorBy === 'band') {
-        const b = String(log.band || log.Band).trim();
-        // Bands map directly if they exist in scheme
-        key = scheme[b] ? b : "Unknown"; 
-      }
-
-      // If key matches a scheme entry, increment
-      // Note: normalizeProviderName returns "Jio" but scheme has "JIO", handle case
-      const match = Object.keys(scheme).find(k => k.toLowerCase() === key.toLowerCase());
-      if (match) {
-        c[match]++;
-      } else if (c[key] !== undefined) {
-        c[key]++;
-      }
-    });
-    return c;
-  }, [logs, colorBy, scheme]);
-
   return (
-    <div className="mt-2 p-2 bg-slate-800 rounded-md">
+    <div className="mt-2 p-2 bg-slate-800 rounded-md border border-slate-700">
       <div className="text-xs font-medium mb-2 text-slate-300">
         Color Legend ({colorBy})
       </div>
       <div className="space-y-1">
         {Object.entries(scheme).map(([key, color]) => (
-          <div key={key} className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              <span className="text-xs text-slate-300">{key}</span>
-            </div>
-            <span className="text-xs text-slate-400 font-mono">
-              {counts[key] || 0}
-            </span>
+          <div key={key} className="flex items-center gap-2">
+            <div
+              className="w-3 h-3 rounded-full border border-slate-600"
+              style={{ backgroundColor: color }}
+            />
+            <span className="text-xs text-slate-300">{key}</span>
           </div>
         ))}
       </div>
@@ -227,6 +84,9 @@ export default function MapSidebarFloating({
   hideTrigger = false,
   thresholds = {},
   logs = [],
+  availableFilterOptions = { providers: [], technologies: [], bands: [] },
+  rawLogsCount = 0,
+  isLoading = false,
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = typeof controlledOpen === "boolean";
@@ -237,66 +97,22 @@ export default function MapSidebarFloating({
   };
 
   const [filters, setFilters] = useState(defaultFilters);
-  const [providers, setProviders] = useState([]);
-  const [technologies, setTechnologies] = useState([]);
-  const [bands, setBands] = useState([]);
-  const [projects, setProjects] = useState([]);
-
   const hasActiveFilters = isObjectNonEmpty(initialFilters);
 
+  const { providers, technologies, bands } = availableFilterOptions;
+
+  // Only sync initial filters when they change, not when component mounts
   useEffect(() => {
-    if (!initialFilters) return;
-    setFilters((prev) => ({ ...prev, ...initialFilters }));
+    if (initialFilters && isObjectNonEmpty(initialFilters)) {
+      setFilters((prev) => ({ ...prev, ...initialFilters }));
+    }
   }, [initialFilters]);
-
-  useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        const [provRes, techRes, bandsRes, projRes] = await Promise.all([
-          mapViewApi.getProviders(),
-          mapViewApi.getTechnologies(),
-          mapViewApi.getBands(),
-          mapViewApi.getProjects?.(),
-        ]);
-
-        const provList = Array.isArray(provRes) ? provRes : [];
-        console.log("Raw providers from API:", provList);
-        const normalizedSet = new Set(
-          provList.map((p) => normalizeProviderName(p.name))
-        );
-        console.log(" Normalized providers:", Array.from(normalizedSet));
-        const normalizedProviders = Array.from(normalizedSet).map((name) => ({
-          id: name,
-          name,
-        }));
-
-        setProviders(normalizedProviders);
-        setTechnologies(Array.isArray(techRes) ? techRes : []);
-        setBands(Array.isArray(bandsRes) ? bandsRes : []);
-
-        const projData = Array.isArray(projRes?.Data)
-          ? projRes.Data
-          : Array.isArray(projRes)
-          ? projRes
-          : [];
-        const projList = projData.map((p) => ({
-          id: p.id,
-          name: p.project_name,
-        }));
-        setProjects(projList);
-      } catch (error) {
-        console.error("Failed to fetch filter options", error);
-      }
-    };
-    fetchFilterOptions();
-  }, []);
 
   const handleFilterChange = (key, value) =>
     setFilters((prev) => ({ ...prev, [key]: value }));
 
   const handleNeighChange = (event) => {
     const checked = event.target.checked;
-
     onUIChange?.({ showNeighbours: checked });
   };
 
@@ -309,7 +125,7 @@ export default function MapSidebarFloating({
 
   const sideClasses = useMemo(() => {
     const base =
-      "fixed top-16 h-[calc(100vh-4rem)] z-50 w-[90vw] sm:w-[360px] bg-slate-950 text-white  transition-transform duration-200 ease-out";
+      "fixed top-16 h-[calc(100vh-4rem)] z-50 w-[90vw] sm:w-[320px] bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out flex flex-col";
     if (position === "right") {
       return isOpen
         ? `${base} right-0 translate-x-0`
@@ -322,13 +138,11 @@ export default function MapSidebarFloating({
 
   const fabPosition = useMemo(() => {
     const base = "fixed z-40";
-    return position === "right"
-      ? `${base} top-4 right-4`
-      : `${base} top-4 left-4`;
+    return position === "right" ? `${base} top-4 right-4` : `${base} top-4 left-4`;
   }, [position]);
 
-  const applyAndClose = () => {   // yaha pe pita ji ko bhej raha hai 
-    onApplyFilters?.(filters, "logs");
+  const applyAndClose = () => {
+    onApplyFilters?.(filters);
     if (autoCloseOnApply) setOpen(false);
   };
 
@@ -338,12 +152,14 @@ export default function MapSidebarFloating({
     setOpen(false);
   };
 
+  const hasLoadedLogs = rawLogsCount > 0;
+
   return (
     <>
       {!hideTrigger && (
         <button
           type="button"
-          className={`${fabPosition} inline-flex items-center gap-2 rounded-full px-4 py-2 bg-blue-600 text-white  hover:bg-blue-700 focus:outline-none`}
+          className={`${fabPosition} inline-flex items-center gap-2 rounded-full px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 focus:outline-none shadow-lg`}
           onClick={() => setOpen(true)}
           aria-label="Open filters"
         >
@@ -359,59 +175,94 @@ export default function MapSidebarFloating({
       )}
 
       {isOpen && (
-        <div
-          className="fixed inset-0 z-40  "
-          onClick={() => setOpen(false)}
+        <div 
+          className="fixed inset-0 z-40  " 
+          onClick={() => setOpen(false)} 
         />
       )}
 
       <div className={sideClasses}>
-        <div className="flex items-center justify-between p-2 border-b">
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 flex items-center justify-between p-3 border-b border-slate-700 bg-slate-900">
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4" />
             <h3 className="text-base font-semibold">Map Filters</h3>
           </div>
           <button
-            className="p-1 rounded hover:bg-slate-800"
+            className="p-1 rounded hover:bg-slate-800 transition-colors"
             onClick={() => setOpen(false)}
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="h-[calc(100%-112px)] overflow-y-auto p-3 space-y-4">
+        {/* Logs Count Badge - Fixed */}
+        {hasLoadedLogs && (
+          <div className="flex-shrink-0 px-3 py-2 bg-slate-900 border-b border-slate-800">
+            <div className="flex items-center gap-2 text-sm">
+              <Database className="h-4 w-4 text-green-400" />
+              <span className="text-slate-300">
+                <span className="text-green-400 font-medium">
+                  {rawLogsCount.toLocaleString()}
+                </span>{" "}
+                logs loaded
+              </span>
+            </div>
+            {logs.length !== rawLogsCount && logs.length > 0 && (
+              <div className="text-xs text-slate-400 mt-1">
+                Showing {logs.length.toLocaleString()} after filters
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-4">
+          {/* Date Filter */}
           <PanelSection title="Date Filter">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-3">
               <div>
-                <Label className="pb-2">Start</Label>
+                <Label className="text-xs text-slate-300 mb-1 block">Start Date</Label>
                 <DatePicker
-                  className="w-70"
                   date={filters.startDate}
                   setDate={(d) => handleFilterChange("startDate", d)}
+                  className="w-full"
                 />
               </div>
-              <br />
               <div>
-                <Label className="pb-2">End</Label>
+                <Label className="text-xs text-slate-300 mb-1 block">End Date</Label>
                 <DatePicker
-                  className="w-70"
                   date={filters.endDate}
                   setDate={(d) => handleFilterChange("endDate", d)}
+                  className="w-full"
                 />
               </div>
             </div>
+            
           </PanelSection>
 
-          <PanelSection title="Filter by">
-            <div className="grid grid-cols-1 gap-3">
+          {/* Filter Options */}
+          <PanelSection title="Filter by" badge={hasLoadedLogs ? "From Data" : undefined}>
+            <div className="space-y-3">
+              {/* Provider */}
               <div>
-                <Label className="pb-2">Provider</Label>
+                <Label className="text-xs text-slate-300 mb-1 flex items-center gap-2">
+                  Provider
+                  {providers.length > 0 && (
+                    <span className="text-xs text-slate-500">
+                      ({providers.length} available)
+                    </span>
+                  )}
+                </Label>
                 <Select
                   value={filters.provider}
                   onValueChange={(v) => handleFilterChange("provider", v)}
+                  disabled={!hasLoadedLogs && providers.length === 0}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Provider..." />
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={hasLoadedLogs ? "Select Provider..." : "Load data first..."}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">ALL Providers</SelectItem>
@@ -424,14 +275,25 @@ export default function MapSidebarFloating({
                 </Select>
               </div>
 
+              {/* Technology */}
               <div>
-                <Label className="pb-2">Technology</Label>
+                <Label className="text-xs text-slate-300 mb-1 flex items-center gap-2">
+                  Technology
+                  {technologies.length > 0 && (
+                    <span className="text-xs text-slate-500">
+                      ({technologies.length} available)
+                    </span>
+                  )}
+                </Label>
                 <Select
                   value={filters.technology}
                   onValueChange={(v) => handleFilterChange("technology", v)}
+                  disabled={!hasLoadedLogs && technologies.length === 0}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Technology..." />
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={hasLoadedLogs ? "Select Technology..." : "Load data first..."}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">ALL Technologies</SelectItem>
@@ -444,41 +306,53 @@ export default function MapSidebarFloating({
                 </Select>
               </div>
 
+              {/* Band */}
               <div>
-                <Label className="pb-2">Band / Frequency</Label>
+                <Label className="text-xs text-slate-300 mb-1 flex items-center gap-2">
+                  Band / Frequency
+                  {bands.length > 0 && (
+                    <span className="text-xs text-slate-500">
+                      ({bands.length} available)
+                    </span>
+                  )}
+                </Label>
                 <Select
                   value={filters.band}
                   onValueChange={(v) => handleFilterChange("band", v)}
+                  disabled={!hasLoadedLogs && bands.length === 0}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Band..." />
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={hasLoadedLogs ? "Select Band..." : "Load data first..."}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">ALL Bands</SelectItem>
                     {bands.map((b) => (
                       <SelectItem key={b.id} value={b.name}>
-                        {b.name}
+                        Band {b.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Metric */}
               <div>
-                <Label className="pb-2">Visualize Metric</Label>
+                <Label className="text-xs text-slate-300 mb-1 block">Visualize Metric</Label>
                 <Select
                   value={filters.measureIn}
                   onValueChange={(v) => handleFilterChange("measureIn", v)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select metric..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="rsrp">RSRP</SelectItem>
-                    <SelectItem value="rsrq">RSRQ</SelectItem>
-                    <SelectItem value="sinr">SINR</SelectItem>
-                    <SelectItem value="ul_tpt">UL-Throughput</SelectItem>
-                    <SelectItem value="dl_tpt">DL-Throughput</SelectItem>
+                    <SelectItem value="rsrp">RSRP (dBm)</SelectItem>
+                    <SelectItem value="rsrq">RSRQ (dB)</SelectItem>
+                    <SelectItem value="sinr">SINR (dB)</SelectItem>
+                    <SelectItem value="ul_tpt">UL Throughput (Mbps)</SelectItem>
+                    <SelectItem value="dl_tpt">DL Throughput (Mbps)</SelectItem>
                     <SelectItem value="mos">MOS</SelectItem>
                     <SelectItem value="pci">PCI</SelectItem>
                   </SelectContent>
@@ -487,108 +361,121 @@ export default function MapSidebarFloating({
             </div>
           </PanelSection>
 
-          <PanelSection title="Layers">
-            <div className="space-y-2 text-sm">
-              <label className="flex items-center gap-2">
+          {/* Layers */}
+          <PanelSection title="Layers & Display">
+            <div className="space-y-2.5 text-sm">
+              <label className="flex items-start gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
                 <input
                   type="checkbox"
                   checked={filters.coverageHoleOnly || false}
-                  onChange={(e) =>
-                    handleFilterChange("coverageHoleOnly", e.target.checked)
-                  }
-                  className="w-4 h-4 rounded border-gray-300"
+                  onChange={(e) => handleFilterChange("coverageHoleOnly", e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-medium">Coverage Holes</div>
+                  <div className="text-sm font-medium text-slate-100">Coverage Holes</div>
+                  <div className="text-xs text-slate-400">
+                    RSRP &lt; {thresholds?.coveragehole || -110} dBm
+                  </div>
                 </div>
               </label>
 
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
                 <input
                   type="checkbox"
                   checked={filters.colorBy === "provider"}
                   onChange={() => handleColorByChange("provider")}
-                  className="w-4 h-4 rounded border-gray-300"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <div className="flex-1">
-                  <div className="text-sm font-medium">Provider</div>
-                </div>
+                <div className="text-sm font-medium text-slate-100">Color by Provider</div>
               </label>
 
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
                 <input
                   type="checkbox"
                   checked={filters.colorBy === "technology"}
                   onChange={() => handleColorByChange("technology")}
-                  className="w-4 h-4 rounded border-gray-300"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <div className="flex-1">
-                  <div className="text-sm font-medium">Technology</div>
-                </div>
+                <div className="text-sm font-medium text-slate-100">Color by Technology</div>
               </label>
 
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
                 <input
                   type="checkbox"
                   checked={filters.colorBy === "band"}
                   onChange={() => handleColorByChange("band")}
-                  className="w-4 h-4 rounded border-gray-300"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <div className="flex-1">
-                  <div className="text-sm font-medium">Band</div>
-                </div>
+                <div className="text-sm font-medium text-slate-100">Color by Band</div>
               </label>
 
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
                 <input
                   type="checkbox"
-                  checked={ui?.clusterSessions}
-                  onChange={(e) =>
-                    onUIChange?.({ clusterSessions: e.target.checked })
-                  }
+                  checked={ui?.clusterSessions || false}
+                  onChange={(e) => onUIChange?.({ clusterSessions: e.target.checked })}
                   disabled={!ui?.showSessions || hasActiveFilters}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                 />
-                Cluster Sessions
+                <div className="text-sm text-slate-100">Cluster Sessions</div>
               </label>
 
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
                 <input
                   type="checkbox"
                   checked={ui?.showNeighbours || false}
                   onChange={handleNeighChange}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                Show Neighbours
+                <div className="text-sm text-slate-100">Show Neighbours</div>
               </label>
 
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
                 <input
                   type="checkbox"
-                  checked={ui?.showHeatmap}
-                  onChange={(e) =>
-                    onUIChange?.({ showHeatmap: e.target.checked })
-                  }
+                  checked={ui?.showHeatmap || false}
+                  onChange={(e) => onUIChange?.({ showHeatmap: e.target.checked })}
                   disabled={!hasActiveFilters}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                 />
-                Heatmap
+                <div className="text-sm text-slate-100">Heatmap</div>
               </label>
             </div>
           </PanelSection>
 
-          {filters.colorBy && <ColorLegend colorBy={filters.colorBy} />}
+          {/* Color Legend */}
+         
         </div>
 
-        <div className="p-3 border-t flex gap-2">
-          <Button
-            variant="secondary"
-            className="flex-1"
-            onClick={clearAndClose}
-          >
-            Clear
-          </Button>
-          <Button className="flex-1" onClick={applyAndClose}>
-            <Filter title="Apply & Fetch Logs" className="h-4 w-4 mr-2" />
-            Apply & Fetch Logs
-          </Button>
+        {/* Footer - Fixed */}
+        <div className="flex-shrink-0 p-3 border-t border-slate-700 bg-slate-900">
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              className="flex-1 bg-slate-800 hover:bg-slate-700 text-white"
+              onClick={clearAndClose}
+              disabled={isLoading}
+            >
+              Clear All
+            </Button>
+            <Button
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={applyAndClose}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <Filter className="h-4 w-4 mr-2" />
+                  Apply
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </>

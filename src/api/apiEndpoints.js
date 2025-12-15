@@ -619,10 +619,45 @@ export const homeApi = {
   getAuthStatus: () => api.get("/api/auth/status"),
 };
 
+// export const settingApi = {
+//   checkSession: () => api.get("/api/Setting/CheckSession"),
+//   getThresholdSettings: () => api.get("/api/Setting/GetThresholdSettings"),
+//   saveThreshold: (payload) => api.post("/api/Setting/SaveThreshold", payload),
+// };
+
 export const settingApi = {
-  checkSession: () => api.get("/api/Setting/CheckSession"),
-  getThresholdSettings: () => api.get("/api/Setting/GetThresholdSettings"),
-  saveThreshold: (payload) => api.post("/api/Setting/SaveThreshold", payload),
+    checkSession: async () => {
+        try {
+            const response = await api.get("/api/Setting/CheckSession");
+            return response; // Already extracted by interceptor
+        } catch (error) {
+            console.error('CheckSession error:', error);
+            throw error;
+        }
+    },
+
+    getThresholdSettings: async () => {
+        try {
+            const response = await api.get("/api/Setting/GetThresholdSettings");
+            console.log('📥 getThresholdSettings response:', response);
+            return response;
+        } catch (error) {
+            console.error('GetThresholdSettings error:', error);
+            throw error;
+        }
+    },
+
+    saveThreshold: async (payload) => {
+        try {
+            console.log('📤 saveThreshold payload:', JSON.stringify(payload, null, 2));
+            const response = await api.post("/api/Setting/SaveThreshold", payload);
+            console.log('📥 saveThreshold response:', response);
+            return response;
+        } catch (error) {
+            console.error('SaveThreshold error:', error);
+            throw error;
+        }
+    },
 };
 
 export const excelApi = {

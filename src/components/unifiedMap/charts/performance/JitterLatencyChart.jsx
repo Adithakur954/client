@@ -14,7 +14,6 @@ import { ChartContainer } from "../../common/ChartContainer";
 import { EmptyState } from "../../common/EmptyState";
 import { CHART_CONFIG } from "@/utils/constants";
 
-// Define ranges for latency (in ms)
 const LATENCY_RANGES = [
   { min: 0, max: 20, label: "0-20", color: "#22c55e", quality: "Excellent" },
   { min: 20, max: 50, label: "20-50", color: "#84cc16", quality: "Good" },
@@ -23,7 +22,6 @@ const LATENCY_RANGES = [
   { min: 150, max: Infinity, label: "150+", color: "#ef4444", quality: "Bad" },
 ];
 
-// Define ranges for jitter (in ms)
 const JITTER_RANGES = [
   { min: 0, max: 5, label: "0-5", color: "#22c55e", quality: "Excellent" },
   { min: 5, max: 10, label: "5-10", color: "#84cc16", quality: "Good" },
@@ -32,7 +30,6 @@ const JITTER_RANGES = [
   { min: 30, max: Infinity, label: "30+", color: "#ef4444", quality: "Bad" },
 ];
 
-// Define ranges for packet loss (in %)
 const PACKET_LOSS_RANGES = [
   { min: 0, max: 1, label: "0-1", color: "#22c55e", quality: "Excellent" },
   { min: 1, max: 3, label: "1-3", color: "#84cc16", quality: "Good" },
@@ -41,7 +38,6 @@ const PACKET_LOSS_RANGES = [
   { min: 10, max: Infinity, label: "10+", color: "#ef4444", quality: "Bad" },
 ];
 
-// Distribution Chart Tooltip
 const DistributionTooltip = ({ active, payload, label, unit = "ms" }) => {
   if (!active || !payload?.length) return null;
 
@@ -58,11 +54,11 @@ const DistributionTooltip = ({ active, payload, label, unit = "ms" }) => {
                 className="w-2.5 h-2.5 rounded-sm"
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-slate-300 text-sm">{entry.name}</span>
+              <span className="text-white text-sm">{entry.name}</span>
             </div>
             <span className="font-semibold text-white text-sm">
               {entry.value} samples
-              <span className="text-slate-400 text-xs ml-1">
+              <span className="text-white text-xs ml-1">
                 ({entry.payload?.percentage}%)
               </span>
             </span>
@@ -73,7 +69,6 @@ const DistributionTooltip = ({ active, payload, label, unit = "ms" }) => {
   );
 };
 
-// Single Distribution Bar Chart
 const DistributionBarChart = ({ data, ranges, title, totalSamples, unit = "ms" }) => {
   const distributionData = useMemo(() => {
     return ranges.map((range) => {
@@ -95,7 +90,7 @@ const DistributionBarChart = ({ data, ranges, title, totalSamples, unit = "ms" }
 
   return (
     <div className="w-full">
-      <div className="text-sm font-medium text-slate-300 mb-3 text-center">
+      <div className="text-sm font-medium text-white mb-3 text-center">
         {title}
       </div>
       <ResponsiveContainer width="100%" height={240}>
@@ -103,12 +98,12 @@ const DistributionBarChart = ({ data, ranges, title, totalSamples, unit = "ms" }
           <CartesianGrid {...CHART_CONFIG.grid} />
           <XAxis
             dataKey="range"
-            tick={{ fill: "#9CA3AF", fontSize: 11 }}
-            label={{ value: unit, position: "bottom", fill: "#9CA3AF", fontSize: 11, offset: -5 }}
+            tick={{ fill: "#ffffff", fontSize: 11 }}
+            label={{ value: unit, position: "bottom", fill: "#ffffff", fontSize: 11, offset: -5 }}
           />
           <YAxis
-            tick={{ fill: "#9CA3AF", fontSize: 11 }}
-            label={{ value: "Samples", angle: -90, position: "insideLeft", fill: "#9CA3AF", fontSize: 11 }}
+            tick={{ fill: "#ffffff", fontSize: 11 }}
+            label={{ value: "Samples", angle: -90, position: "insideLeft", fill: "#ffffff", fontSize: 11 }}
           />
           <Tooltip content={(props) => <DistributionTooltip {...props} unit={unit} />} />
           <Bar dataKey="count" name={title} radius={[4, 4, 0, 0]}>
@@ -119,7 +114,6 @@ const DistributionBarChart = ({ data, ranges, title, totalSamples, unit = "ms" }
         </BarChart>
       </ResponsiveContainer>
       
-      {/* Legend with quality labels */}
       <div className="mt-3 space-y-1.5">
         {distributionData.map((item, idx) => (
           <div
@@ -138,13 +132,13 @@ const DistributionBarChart = ({ data, ranges, title, totalSamples, unit = "ms" }
               <span className="text-sm font-medium" style={{ color: item.color }}>
                 {item.range} {unit}
               </span>
-              <span className="text-xs text-slate-500">({item.quality})</span>
+              <span className="text-xs text-white">({item.quality})</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-semibold text-white">
                 {item.count} samples
               </span>
-              <span className="text-xs text-slate-400 min-w-[45px] text-right">
+              <span className="text-xs text-white min-w-[45px] text-right">
                 {item.percentage}%
               </span>
             </div>
@@ -155,11 +149,10 @@ const DistributionBarChart = ({ data, ranges, title, totalSamples, unit = "ms" }
   );
 };
 
-// Quality Summary Bar
 const QualitySummary = ({ data, ranges, title, totalSamples }) => {
   return (
     <div>
-      <div className="text-xs text-slate-400 mb-2">{title}</div>
+      <div className="text-xs text-white mb-2">{title}</div>
       <div className="space-y-1.5">
         {ranges.map((range, idx) => {
           const count = data.filter(
@@ -172,7 +165,7 @@ const QualitySummary = ({ data, ranges, title, totalSamples }) => {
           
           return (
             <div key={idx} className="flex items-center gap-2">
-              <div className="w-16 text-xs text-slate-400">{range.quality}</div>
+              <div className="w-16 text-xs text-white">{range.quality}</div>
               <div className="flex-1 h-4 bg-slate-700 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
@@ -239,32 +232,31 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
 
   return (
     <ChartContainer ref={ref} title="Network Quality Metrics Distribution" icon={Activity}>
-      {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
           <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-            <div className="text-xs text-slate-400">Avg Latency</div>
+            <div className="text-xs text-white">Avg Latency</div>
             <div className="text-xl font-bold text-pink-400">{stats.avgLatency} ms</div>
-            <div className="text-[10px] text-slate-500 mt-1">
+            <div className="text-[10px] text-white mt-1">
               {stats.minLatency} - {stats.maxLatency} ms
             </div>
           </div>
           <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-            <div className="text-xs text-slate-400">Avg Jitter</div>
+            <div className="text-xs text-white">Avg Jitter</div>
             <div className="text-xl font-bold text-indigo-400">{stats.avgJitter} ms</div>
-            <div className="text-[10px] text-slate-500 mt-1">
+            <div className="text-[10px] text-white mt-1">
               {stats.minJitter} - {stats.maxJitter} ms
             </div>
           </div>
           <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-            <div className="text-xs text-slate-400">Avg Packet Loss</div>
+            <div className="text-xs text-white">Avg Packet Loss</div>
             <div className="text-xl font-bold text-orange-400">{stats.avgPacketLoss}%</div>
-            <div className="text-[10px] text-slate-500 mt-1">
+            <div className="text-[10px] text-white mt-1">
               {stats.minPacketLoss} - {stats.maxPacketLoss}%
             </div>
           </div>
           <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors">
-            <div className="text-xs text-slate-400">Quality Score</div>
+            <div className="text-xs text-white">Quality Score</div>
             <div className={`text-xl font-bold ${
               stats.avgLatency < 50 && stats.avgJitter < 10 && stats.avgPacketLoss < 1
                 ? "text-green-400" 
@@ -282,7 +274,6 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
         </div>
       )}
 
-      {/* Distribution Charts */}
       <div className="flex flex-col gap-4 mb-4">
         <div className="bg-slate-800/50 rounded-lg p-4">
           <DistributionBarChart
@@ -313,9 +304,8 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
         </div>
       </div>
 
-      {/* Quality Summary Blocks */}
       <div className="bg-slate-800 rounded-lg p-4">
-        <div className="text-sm font-medium text-slate-300 mb-3">Quality Summary</div>
+        <div className="text-sm font-medium text-white mb-3">Quality Summary</div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <QualitySummary
             data={stats?.latencyValues || []}

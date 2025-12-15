@@ -60,7 +60,14 @@ export const SignalDistributionChart = React.forwardRef(
             />
             <YAxis tick={{ fill: "#9CA3AF", fontSize: 12 }} />
             <Tooltip
-              contentStyle={CHART_CONFIG.tooltip}
+              
+              contentStyle={{
+                ...CHART_CONFIG.tooltip,
+                backgroundColor: "#020617",
+                border: "1px solid #334155",
+              }}
+              labelStyle={{ color: "#FFFFFF" }}
+  itemStyle={{ color: "#FFFFFF" }}
               formatter={(value) => [value, "Samples"]}
             />
             <Bar dataKey="count" radius={[8, 8, 0, 0]}>

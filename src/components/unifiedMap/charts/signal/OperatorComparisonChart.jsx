@@ -307,14 +307,14 @@ export const OperatorComparisonChart = React.forwardRef(({
         <div className="flex items-center gap-2">
           {/* View Mode Toggle */}
           <div className="flex rounded-lg overflow-hidden border border-slate-600">
-            {["bar", "radar", "table"].map((mode) => (
+            {["bar",  "table"].map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 className={`px-2 py-1 text-[10px] font-medium transition-colors capitalize ${
                   viewMode === mode
                     ? "bg-blue-600 text-white"
-                    : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                    : "bg-slate-800 text-white hover:bg-slate-700"
                 }`}
               >
                 {mode}
@@ -347,7 +347,7 @@ export const OperatorComparisonChart = React.forwardRef(({
                   onClick={() => setShowSettings(false)}
                 />
                 <div className="absolute right-0 top-full mt-1 z-50 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-2 min-w-[180px]">
-                  <div className="text-[10px] text-slate-400 mb-2 font-medium">
+                  <div className="text-[10px] text-white mb-2 font-medium">
                     Select Metrics
                   </div>
                   <div className="space-y-1">

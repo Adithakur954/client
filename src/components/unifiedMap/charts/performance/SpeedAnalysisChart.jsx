@@ -55,10 +55,11 @@ export const SpeedAnalysisChart = React.forwardRef(({ locations }, ref) => {
     if (!data.length) return [];
 
     const buckets = [
-      { range: "0-20", min: 0, max: 20, count: 0, color: "#ef4444", label: "Very Slow" },
-      { range: "20-40", min: 20, max: 40, count: 0, color: "#f59e0b", label: "Slow" },
-      { range: "40-60", min: 40, max: 60, count: 0, color: "#eab308", label: "Moderate" },
-      { range: "60-80", min: 60, max: 80, count: 0, color: "#22c55e", label: "Fast" },
+      { range: "0-5", min: 0, max: 20, count: 0, color: "#ef4444", label: "Static/walking" },
+      
+      { range: "5-20", min: 20, max: 40, count: 0, color: "#f59e0b", label: "Cycling" },
+      { range: "20-40", min: 40, max: 60, count: 0, color: "#eab308", label: "Moderate" },
+      { range: "40-80", min: 60, max: 80, count: 0, color: "#22c55e", label: "Fast" },
       { range: "80-100", min: 80, max: 100, count: 0, color: "#3b82f6", label: "Very Fast" },
       { range: "100+", min: 100, max: Infinity, count: 0, color: "#8b5cf6", label: "Highway" },
     ];
@@ -91,25 +92,25 @@ export const SpeedAnalysisChart = React.forwardRef(({ locations }, ref) => {
       {stats && (
         <div className="grid grid-cols-3 gap-2 mb-4">
           <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700 hover:bg-slate-750 transition-colors">
-            <div className="text-xs text-slate-400 mb-1">Average Speed</div>
+            <div className="text-xs text-white mb-1">Average Speed</div>
             <div className="text-xl font-bold text-blue-400">
               {stats.avgSpeed}
             </div>
-            <div className="text-xs text-slate-500 mt-0.5">km/h</div>
+            <div className="text-xs text-white mt-0.5">km/h</div>
           </div>
           <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700 hover:bg-slate-750 transition-colors">
-            <div className="text-xs text-slate-400 mb-1">Max Speed</div>
+            <div className="text-xs text-white mb-1">Max Speed</div>
             <div className="text-xl font-bold text-green-400">
               {stats.maxSpeed}
             </div>
-            <div className="text-xs text-slate-500 mt-0.5">km/h</div>
+            <div className="text-xs text-white mt-0.5">km/h</div>
           </div>
           <div className="bg-slate-800 rounded-lg p-3 text-center border border-slate-700 hover:bg-slate-750 transition-colors">
-            <div className="text-xs text-slate-400 mb-1">Min Speed</div>
+            <div className="text-xs text-white mb-1">Min Speed</div>
             <div className="text-xl font-bold text-orange-400">
               {stats.minSpeed}
             </div>
-            <div className="text-xs text-slate-500 mt-0.5">km/h</div>
+            <div className="text-xs text-white mt-0.5">km/h</div>
           </div>
         </div>
       )}
@@ -182,13 +183,13 @@ export const SpeedAnalysisChart = React.forwardRef(({ locations }, ref) => {
                 <span className="text-sm font-medium" style={{ color: item.color }}>
                   {item.range} km/h
                 </span>
-                <span className="text-xs text-slate-500">({item.label})</span>
+                <span className="text-xs text-white">({item.label})</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-white">
                   {item.count} samples
                 </span>
-                <span className="text-xs text-slate-400 min-w-[45px] text-right">
+                <span className="text-xs text-white min-w-[45px] text-right">
                   {((item.count / data.length) * 100).toFixed(1)}%
                 </span>
               </div>

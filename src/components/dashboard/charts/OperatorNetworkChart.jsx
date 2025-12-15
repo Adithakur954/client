@@ -1,33 +1,66 @@
-import React, { useState, useMemo } from 'react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts';
-import { Settings, Download, Filter, Activity, TrendingUp, Radio, X, BarChart3 } from 'lucide-react';
-import { NETWORK_COLORS, CHART_COLORS } from '@/components/constants/dashboardConstants';
-import { useOperatorMetrics, useOperatorsAndNetworks } from '@/hooks/useDashboardData.js';
-import { formatNumber } from '@/utils/chartUtils';
-import Spinner from '@/components/common/Spinner';
+import React, { useState, useMemo } from "react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  Cell,
+} from "recharts";
+import {
+  Settings,
+  Download,
+  Filter,
+  Activity,
+  TrendingUp,
+  Radio,
+  X,
+  BarChart3,
+} from "lucide-react";
+import {
+  NETWORK_COLORS,
+  CHART_COLORS,
+} from "@/components/constants/dashboardConstants";
+import {
+  useOperatorMetrics,
+  useOperatorsAndNetworks,
+} from "@/hooks/useDashboardData.js";
+import { formatNumber } from "@/utils/chartUtils";
+import Spinner from "@/components/common/Spinner";
 
 // Enhanced color palette for technologies
 const TECH_COLORS = {
-  '5G': '#8B5CF6',
-  '5G-SA': '#7C3AED',
-  '5G-NSA': '#A78BFA',
-  '4G': '#3B82F6',
-  '4G+': '#2563EB',
-  'LTE': '#6366F1',
-  'LTE-A': '#4F46E5',
-  '3G': '#10B981',
-  'HSPA': '#059669',
-  'HSPA+': '#34D399',
-  '2G': '#F59E0B',
-  'GSM': '#D97706',
-  'NR': '#EC4899',
-  'WCDMA': '#14B8A6',
+  "5G": "#8B5CF6",
+  "5G-SA": "#7C3AED",
+  "5G-NSA": "#A78BFA",
+  "4G": "#3B82F6",
+  "4G+": "#2563EB",
+  LTE: "#6366F1",
+  "LTE-A": "#4F46E5",
+  "3G": "#10B981",
+  HSPA: "#059669",
+  "HSPA+": "#34D399",
+  "2G": "#F59E0B",
+  GSM: "#D97706",
+  NR: "#EC4899",
+  WCDMA: "#14B8A6",
 };
 
 // Fallback colors
 const FALLBACK_COLORS = [
-  '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444',
-  '#06B6D4', '#EC4899', '#84CC16', '#F97316', '#6366F1'
+  "#3B82F6",
+  "#8B5CF6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#06B6D4",
+  "#EC4899",
+  "#84CC16",
+  "#F97316",
+  "#6366F1",
 ];
 
 // Get color for technology
@@ -40,172 +73,201 @@ const getTechColor = (tech, index) => {
 
 // Helper function to check if operator is one of the allowed ones (Airtel, Jio, Vi/Vodafone)
 const isAllowedOperator = (name) => {
-  if (!name || typeof name !== 'string') return false;
+  if (!name || typeof name !== "string") return false;
   const cleanName = name.toLowerCase().trim();
-  
-  if (cleanName.includes('air') || cleanName.includes('airtel') || cleanName.includes('bharti')) {
+
+  if (
+    cleanName.includes("air") ||
+    cleanName.includes("airtel") ||
+    cleanName.includes("bharti")
+  ) {
     return true;
   }
-  if (cleanName.includes('jio') || cleanName.includes('reliance')) {
+  if (cleanName.includes("jio") || cleanName.includes("reliance")) {
     return true;
   }
-  if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
+  if (
+    cleanName.includes("vi") ||
+    cleanName.includes("vodafone") ||
+    cleanName.includes("idea")
+  ) {
     return true;
   }
-  
+
   return false;
 };
 
 // Get operator brand name for display
 const getOperatorBrand = (name) => {
-  if (!name || typeof name !== 'string') return name;
+  if (!name || typeof name !== "string") return name;
   const cleanName = name.toLowerCase().trim();
-  
-  if (cleanName.includes('air') || cleanName.includes('airtel') || cleanName.includes('bharti')) {
-    return 'Airtel';
+
+  if (
+    cleanName.includes("air") ||
+    cleanName.includes("airtel") ||
+    cleanName.includes("bharti")
+  ) {
+    return "Airtel";
   }
-  if (cleanName.includes('jio') || cleanName.includes('reliance')) {
-    return 'Jio';
+  if (cleanName.includes("jio") || cleanName.includes("reliance")) {
+    return "Jio";
   }
-  if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
-    return 'Vi';
+  if (
+    cleanName.includes("vi") ||
+    cleanName.includes("vodafone") ||
+    cleanName.includes("idea")
+  ) {
+    return "Vi";
   }
   return name;
 };
 
 // Get operator color
 const getOperatorColor = (name) => {
-  if (!name || typeof name !== 'string') return '#6B7280';
+  if (!name || typeof name !== "string") return "#6B7280";
   const cleanName = name.toLowerCase().trim();
-  
-  if (cleanName.includes('air') || cleanName.includes('airtel') || cleanName.includes('bharti')) {
-    return '#E60000';
+
+  if (
+    cleanName.includes("air") ||
+    cleanName.includes("airtel") ||
+    cleanName.includes("bharti")
+  ) {
+    return "#E60000";
   }
-  if (cleanName.includes('jio') || cleanName.includes('reliance')) {
-    return '#0A2885';
+  if (cleanName.includes("jio") || cleanName.includes("reliance")) {
+    return "#0A2885";
   }
-  if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
-    return '#6B21A8';
+  if (
+    cleanName.includes("vi") ||
+    cleanName.includes("vodafone") ||
+    cleanName.includes("idea")
+  ) {
+    return "#6B21A8";
   }
-  return '#6B7280';
+  return "#6B7280";
 };
 
 // Helper function to validate names
 const isValidName = (name) => {
-  if (!name || typeof name !== 'string') return false;
+  if (!name || typeof name !== "string") return false;
   const cleanName = name.toLowerCase().trim();
   return (
-    cleanName !== '' &&
-    cleanName !== 'unknown' &&
-    cleanName !== 'null' &&
-    cleanName !== 'undefined' &&
-    cleanName !== 'n/a' &&
-    cleanName !== 'na' &&
-    cleanName !== '-' &&
-    cleanName !== '000 000' &&
-    cleanName !== '000000' &&
+    cleanName !== "" &&
+    cleanName !== "unknown" &&
+    cleanName !== "null" &&
+    cleanName !== "undefined" &&
+    cleanName !== "n/a" &&
+    cleanName !== "na" &&
+    cleanName !== "-" &&
+    cleanName !== "000 000" &&
+    cleanName !== "000000" &&
     !/^0+[\s]*0*$/.test(cleanName) &&
     !/^[\s0\-]+$/.test(cleanName) &&
-    !cleanName.includes('unknown') &&
+    !cleanName.includes("unknown") &&
     cleanName.length > 1
   );
 };
 
 // Check if value is valid for display
 const isValidDataValue = (value) => {
-  return typeof value === 'number' && !isNaN(value) && value > 0;
+  return typeof value === "number" && !isNaN(value) && value > 0;
 };
 
 // Metric configuration
 const METRICS = {
-  samples: { 
-    label: 'Sample Count', 
-    unit: 'samples',
-    yAxisLabel: 'Samples',
+  samples: {
+    label: "Sample Count",
+    unit: "samples",
+    yAxisLabel: "Samples",
     format: (val) => formatNumber(val),
     icon: Activity,
-    reversed: false
+    reversed: false,
   },
-  rsrp: { 
-    label: 'RSRP', 
-    unit: 'dBm',
-    yAxisLabel: 'RSRP (dBm)',
+  rsrp: {
+    label: "RSRP",
+    unit: "dBm",
+    yAxisLabel: "RSRP (dBm)",
     format: (val) => `${val?.toFixed(1) || 0} dBm`,
     icon: Activity,
-    reversed: true
+    reversed: true,
   },
-  rsrq: { 
-    label: 'RSRQ', 
-    unit: 'dB',
-    yAxisLabel: 'RSRQ (dB)',
+  rsrq: {
+    label: "RSRQ",
+    unit: "dB",
+    yAxisLabel: "RSRQ (dB)",
     format: (val) => `${val?.toFixed(1) || 0} dB`,
     icon: Activity,
-    reversed: true
+    reversed: true,
   },
-  sinr: { 
-    label: 'SINR', 
-    unit: 'dB',
-    yAxisLabel: 'SINR (dB)',
+  sinr: {
+    label: "SINR",
+    unit: "dB",
+    yAxisLabel: "SINR (dB)",
     format: (val) => `${val?.toFixed(1) || 0} dB`,
     icon: Activity,
-    reversed: false
+    reversed: false,
   },
-  mos: { 
-    label: 'MOS', 
-    unit: '',
-    yAxisLabel: 'MOS Score',
-    format: (val) => val?.toFixed(2) || '0',
+  mos: {
+    label: "MOS",
+    unit: "",
+    yAxisLabel: "MOS Score",
+    format: (val) => val?.toFixed(2) || "0",
     icon: Activity,
-    reversed: false
+    reversed: false,
   },
-  jitter: { 
-    label: 'Jitter', 
-    unit: 'ms',
-    yAxisLabel: 'Jitter (ms)',
+  jitter: {
+    label: "Jitter",
+    unit: "ms",
+    yAxisLabel: "Jitter (ms)",
     format: (val) => `${val?.toFixed(1) || 0} ms`,
     icon: Activity,
-    reversed: false
+    reversed: false,
   },
-  latency: { 
-    label: 'Latency', 
-    unit: 'ms',
-    yAxisLabel: 'Latency (ms)',
+  latency: {
+    label: "Latency",
+    unit: "ms",
+    yAxisLabel: "Latency (ms)",
     format: (val) => `${val?.toFixed(1) || 0} ms`,
     icon: Activity,
-    reversed: false
+    reversed: false,
   },
-  packetLoss: { 
-    label: 'Packet Loss', 
-    unit: '%',
-    yAxisLabel: 'Packet Loss (%)',
+  packetLoss: {
+    label: "Packet Loss",
+    unit: "%",
+    yAxisLabel: "Packet Loss (%)",
     format: (val) => `${val?.toFixed(2) || 0}%`,
     icon: Activity,
-    reversed: false
+    reversed: false,
   },
-  dlTpt: { 
-    label: 'Download Speed', 
-    unit: 'Mbps',
-    yAxisLabel: 'Download (Mbps)',
+  dlTpt: {
+    label: "Download Speed",
+    unit: "Mbps",
+    yAxisLabel: "Download (Mbps)",
     format: (val) => `${val?.toFixed(2) || 0} Mbps`,
     icon: TrendingUp,
-    reversed: false
+    reversed: false,
   },
-  ulTpt: { 
-    label: 'Upload Speed', 
-    unit: 'Mbps',
-    yAxisLabel: 'Upload (Mbps)',
+  ulTpt: {
+    label: "Upload Speed",
+    unit: "Mbps",
+    yAxisLabel: "Upload (Mbps)",
     format: (val) => `${val?.toFixed(2) || 0} Mbps`,
     icon: TrendingUp,
-    reversed: false
-  }
+    reversed: false,
+  },
 };
 
 const OperatorNetworkChart = () => {
-  const { operators: apiOperators, networks: apiNetworks, isLoading: metaLoading } = useOperatorsAndNetworks();
+  const {
+    operators: apiOperators,
+    networks: apiNetworks,
+    isLoading: metaLoading,
+  } = useOperatorsAndNetworks();
 
-  const [selectedMetric, setSelectedMetric] = useState('samples');
+  const [selectedMetric, setSelectedMetric] = useState("samples");
   const [showSettings, setShowSettings] = useState(false);
   const [selectedOperators, setSelectedOperators] = useState([]);
+
   const [selectedTechnologies, setSelectedTechnologies] = useState([]);
 
   const { data: allData, isLoading } = useOperatorMetrics(selectedMetric, {});
@@ -213,81 +275,149 @@ const OperatorNetworkChart = () => {
   // Filter out invalid technologies
   const availableTechnologies = useMemo(() => {
     if (!apiNetworks || !Array.isArray(apiNetworks)) return [];
-    return apiNetworks.filter(tech => 
-      isValidName(tech) &&
-      !tech.toLowerCase().includes('edge') && 
-      tech.toLowerCase() !== 'edge(2g)'
+    return apiNetworks.filter(
+      (tech) =>
+        isValidName(tech) &&
+        !tech.toLowerCase().includes("edge") &&
+        tech.toLowerCase() !== "edge(2g)"
     );
   }, [apiNetworks]);
 
   // Filter operators to only show Airtel, Jio, and Vi/Vodafone
   const availableOperators = useMemo(() => {
     if (!apiOperators || !Array.isArray(apiOperators)) return [];
-    return apiOperators.filter(operator => 
-      isValidName(operator) && isAllowedOperator(operator)
+
+    // Filter valid and allowed operators
+    const validOperators = apiOperators.filter(
+      (operator) => isValidName(operator) && isAllowedOperator(operator)
     );
+
+    // Deduplicate by brand name
+    const uniqueBrands = new Map();
+    validOperators.forEach((operator) => {
+      const brandName = getOperatorBrand(operator);
+      if (!uniqueBrands.has(brandName)) {
+        uniqueBrands.set(brandName, {
+          original: operator,
+          brand: brandName,
+          color: getOperatorColor(operator),
+        });
+      }
+    });
+
+    return Array.from(uniqueBrands.values());
   }, [apiOperators]);
 
   // Client-side filtering - only showing allowed operators
   const filteredData = useMemo(() => {
     if (!allData || allData.length === 0) return [];
 
-    let filtered = allData.filter(item => 
-      isValidName(item.name) && isAllowedOperator(item.name)
+    let filtered = allData.filter(
+      (item) => isValidName(item.name) && isAllowedOperator(item.name)
     );
 
-    filtered = filtered.map(item => {
-      const cleanItem = { 
-        name: item.name,
-        displayName: getOperatorBrand(item.name),
-        operatorColor: getOperatorColor(item.name)
-      };
-      
-      Object.keys(item).forEach(key => {
-        if (key === 'name' || key === 'total' || key === 'displayName' || key === 'operatorColor') return;
+    // Group by brand name to avoid duplicates
+    const groupedByBrand = new Map();
+
+    filtered.forEach((item) => {
+      const brandName = getOperatorBrand(item.name);
+
+      if (!groupedByBrand.has(brandName)) {
+        groupedByBrand.set(brandName, {
+          name: item.name,
+          displayName: brandName,
+          operatorColor: getOperatorColor(item.name),
+          techData: {},
+        });
+      }
+
+      const brandItem = groupedByBrand.get(brandName);
+
+      // Merge technology data
+      Object.keys(item).forEach((key) => {
+        if (
+          key === "name" ||
+          key === "total" ||
+          key === "displayName" ||
+          key === "operatorColor"
+        )
+          return;
         if (!isValidName(key)) return;
-        if (key.toLowerCase().includes('edge')) return;
-        
+        if (key.toLowerCase().includes("edge")) return;
+
         const value = item[key];
         if (isValidDataValue(value)) {
-          cleanItem[key] = value;
+          // Average values if multiple entries for same brand
+          if (brandItem.techData[key]) {
+            brandItem.techData[key] = (brandItem.techData[key] + value) / 2;
+          } else {
+            brandItem.techData[key] = value;
+          }
         }
       });
-      
-      return cleanItem;
     });
 
+    // Convert back to array format
+    filtered = Array.from(groupedByBrand.values()).map((item) => ({
+      name: item.name,
+      displayName: item.displayName,
+      operatorColor: item.operatorColor,
+      ...item.techData,
+    }));
+
+    // Apply operator filter
     if (selectedOperators.length > 0) {
-      filtered = filtered.filter(item => selectedOperators.includes(item.name));
+      filtered = filtered.filter((item) =>
+        selectedOperators.includes(item.displayName)
+      );
     }
 
+    // Apply technology filter
     if (selectedTechnologies.length > 0) {
-      filtered = filtered.map(item => {
-        const newItem = { 
-          name: item.name,
-          displayName: item.displayName,
-          operatorColor: item.operatorColor
-        };
-        selectedTechnologies.forEach(tech => {
-          if (isValidDataValue(item[tech])) {
-            newItem[tech] = item[tech];
-          }
-        });
-        return newItem;
-      }).filter(item => Object.keys(item).filter(k => !['name', 'displayName', 'operatorColor'].includes(k)).length > 0);
+      filtered = filtered
+        .map((item) => {
+          const newItem = {
+            name: item.name,
+            displayName: item.displayName,
+            operatorColor: item.operatorColor,
+          };
+          selectedTechnologies.forEach((tech) => {
+            if (isValidDataValue(item[tech])) {
+              newItem[tech] = item[tech];
+            }
+          });
+          return newItem;
+        })
+        .filter(
+          (item) =>
+            Object.keys(item).filter(
+              (k) => !["name", "displayName", "operatorColor"].includes(k)
+            ).length > 0
+        );
     }
 
-    filtered = filtered.map(item => {
-      const techs = Object.keys(item).filter(k => !['name', 'total', 'displayName', 'operatorColor'].includes(k));
-      const validValues = techs.filter(tech => isValidDataValue(item[tech]));
-      const total = validValues.length > 0 
-        ? validValues.reduce((sum, tech) => sum + item[tech], 0) / validValues.length
-        : 0;
-      return { ...item, total };
-    }).filter(item => {
-      const techs = Object.keys(item).filter(k => !['name', 'total', 'displayName', 'operatorColor'].includes(k));
-      return techs.some(tech => isValidDataValue(item[tech]));
-    });
+    // Calculate totals
+    filtered = filtered
+      .map((item) => {
+        const techs = Object.keys(item).filter(
+          (k) => !["name", "total", "displayName", "operatorColor"].includes(k)
+        );
+        const validValues = techs.filter((tech) =>
+          isValidDataValue(item[tech])
+        );
+        const total =
+          validValues.length > 0
+            ? validValues.reduce((sum, tech) => sum + item[tech], 0) /
+              validValues.length
+            : 0;
+        return { ...item, total };
+      })
+      .filter((item) => {
+        const techs = Object.keys(item).filter(
+          (k) => !["name", "total", "displayName", "operatorColor"].includes(k)
+        );
+        return techs.some((tech) => isValidDataValue(item[tech]));
+      });
 
     return filtered;
   }, [allData, selectedOperators, selectedTechnologies]);
@@ -295,9 +425,12 @@ const OperatorNetworkChart = () => {
   const technologyTypes = useMemo(() => {
     if (!filteredData?.length) return [];
     const techs = new Set();
-    filteredData.forEach(item => {
+    filteredData.forEach((item) => {
       Object.entries(item).forEach(([key, value]) => {
-        if (!['name', 'displayName', 'operatorColor', 'total'].includes(key) && value > 0) {
+        if (
+          !["name", "displayName", "operatorColor", "total"].includes(key) &&
+          value > 0
+        ) {
           techs.add(key);
         }
       });
@@ -310,16 +443,18 @@ const OperatorNetworkChart = () => {
     setShowSettings(false);
   };
 
-  const toggleOperator = (operator) => {
-    setSelectedOperators(prev => 
-      prev.includes(operator) ? prev.filter(op => op !== operator) : [...prev, operator]
+  const toggleOperator = (brandName) => {
+    setSelectedOperators((prev) =>
+      prev.includes(brandName)
+        ? prev.filter((op) => op !== brandName)
+        : [...prev, brandName]
     );
     setShowSettings(false);
   };
 
   const toggleTechnology = (tech) => {
-    setSelectedTechnologies(prev => 
-      prev.includes(tech) ? prev.filter(t => t !== tech) : [...prev, tech]
+    setSelectedTechnologies((prev) =>
+      prev.includes(tech) ? prev.filter((t) => t !== tech) : [...prev, tech]
     );
     setShowSettings(false);
   };
@@ -327,36 +462,45 @@ const OperatorNetworkChart = () => {
   const clearAllFilters = () => {
     setSelectedOperators([]);
     setSelectedTechnologies([]);
-    setSelectedMetric('samples');
+    setSelectedMetric("samples");
   };
 
-  const hasActiveFilters = selectedOperators.length > 0 || 
-                          selectedTechnologies.length > 0 || 
-                          selectedMetric !== 'samples';
+  const hasActiveFilters =
+    selectedOperators.length > 0 ||
+    selectedTechnologies.length > 0 ||
+    selectedMetric !== "samples";
 
   const handleExport = () => {
     if (!filteredData || filteredData.length === 0) return;
 
     const metricConfig = METRICS[selectedMetric];
-    const headers = ['Operator', ...technologyTypes, `Average ${metricConfig.label}`];
-    const rows = filteredData.map(item => [
+    const headers = [
+      "Operator",
+      ...technologyTypes,
+      `Average ${metricConfig.label}`,
+    ];
+    const rows = filteredData.map((item) => [
       item.displayName || item.name,
-      ...technologyTypes.map(tech => item[tech] || ''),
-      item.total || ''
+      ...technologyTypes.map((tech) => item[tech] || ""),
+      item.total || "",
     ]);
 
-    const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const csv = [headers.join(","), ...rows.map((row) => row.join(","))].join(
+      "\n"
+    );
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `operator_${selectedMetric}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `operator_${selectedMetric}_${
+      new Date().toISOString().split("T")[0]
+    }.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
 
   const formatYAxis = (value) => {
-    if (selectedMetric === 'samples') return formatNumber(value);
-    return value?.toFixed(1) || '0';
+    if (selectedMetric === "samples") return formatNumber(value);
+    return value?.toFixed(1) || "0";
   };
 
   // Simple, Compact Tooltip with Large Fonts
@@ -364,28 +508,32 @@ const OperatorNetworkChart = () => {
     if (!active || !payload || !payload.length) return null;
 
     const metricConfig = METRICS[selectedMetric];
-    const validPayload = payload.filter(p => isValidDataValue(p.value));
+    const validPayload = payload.filter((p) => isValidDataValue(p.value));
     if (validPayload.length === 0) return null;
 
-    const currentOperator = filteredData.find(item => item.name === label || item.displayName === label);
-    const operatorColor = currentOperator?.operatorColor || '#3B82F6';
+    const currentOperator = filteredData.find(
+      (item) => item.name === label || item.displayName === label
+    );
+    const operatorColor = currentOperator?.operatorColor || "#3B82F6";
     const displayName = currentOperator?.displayName || label;
 
-    const total = selectedMetric === 'samples'
-      ? validPayload.reduce((sum, p) => sum + (p.value || 0), 0)
-      : validPayload.reduce((sum, p) => sum + (p.value || 0), 0) / validPayload.length;
+    const total =
+      selectedMetric === "samples"
+        ? validPayload.reduce((sum, p) => sum + (p.value || 0), 0)
+        : validPayload.reduce((sum, p) => sum + (p.value || 0), 0) /
+          validPayload.length;
 
     return (
-      <div 
+      <div
         className="bg-white rounded-lg shadow-xl border-2 p-3"
-        style={{ 
+        style={{
           borderColor: operatorColor,
-          minWidth: '180px',
+          minWidth: "180px",
           zIndex: 99999,
         }}
       >
         {/* Operator Name */}
-        <div 
+        <div
           className="text-lg font-bold mb-2 pb-2 border-b"
           style={{ color: operatorColor, borderColor: `${operatorColor}30` }}
         >
@@ -397,7 +545,10 @@ const OperatorNetworkChart = () => {
           {validPayload
             .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
             .map((entry, index) => (
-              <div key={index} className="flex items-center justify-between gap-3">
+              <div
+                key={index}
+                className="flex items-center justify-between gap-3"
+              >
                 <div className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded"
@@ -415,17 +566,14 @@ const OperatorNetworkChart = () => {
         </div>
 
         {/* Total/Average */}
-        <div 
+        <div
           className="mt-2 pt-2 border-t flex justify-between items-center"
           style={{ borderColor: `${operatorColor}30` }}
         >
           <span className="text-base font-semibold text-gray-600">
-            {selectedMetric === 'samples' ? 'Total' : 'Avg'}
+            {selectedMetric === "samples" ? "Total" : "Avg"}
           </span>
-          <span 
-            className="text-lg font-bold"
-            style={{ color: operatorColor }}
-          >
+          <span className="text-lg font-bold" style={{ color: operatorColor }}>
             {metricConfig.format(total)}
           </span>
         </div>
@@ -436,22 +584,24 @@ const OperatorNetworkChart = () => {
   // Simple Legend
   const CustomLegend = ({ payload }) => {
     if (!payload || payload.length === 0) return null;
-    
-    const validLegendItems = payload.filter(entry => {
-      return filteredData.some(item => isValidDataValue(item[entry.value]));
+
+    const validLegendItems = payload.filter((entry) => {
+      return filteredData.some((item) => isValidDataValue(item[entry.value]));
     });
 
     if (validLegendItems.length === 0) return null;
-    
+
     return (
       <div className="flex flex-wrap justify-center gap-4 mt-4 pt-3 border-t border-gray-200">
         {validLegendItems.map((entry, index) => (
           <div key={index} className="flex items-center gap-2">
-            <div 
+            <div
               className="w-4 h-4 rounded"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-sm font-bold text-gray-700">{entry.value}</span>
+            <span className="text-sm font-bold text-gray-700">
+              {entry.value}
+            </span>
           </div>
         ))}
       </div>
@@ -509,7 +659,9 @@ const OperatorNetworkChart = () => {
             <button
               onClick={() => setShowSettings(!showSettings)}
               className={`p-2 rounded-lg transition-all ${
-                showSettings ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+                showSettings
+                  ? "text-blue-600 bg-blue-50"
+                  : "text-gray-500 hover:text-blue-600 hover:bg-blue-50"
               }`}
               title="Settings"
             >
@@ -549,7 +701,9 @@ const OperatorNetworkChart = () => {
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white font-medium"
               >
                 {Object.entries(METRICS).map(([key, config]) => (
-                  <option key={key} value={key}>{config.label}</option>
+                  <option key={key} value={key}>
+                    {config.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -563,25 +717,29 @@ const OperatorNetworkChart = () => {
                 {metaLoading ? (
                   <Spinner />
                 ) : availableOperators.length > 0 ? (
-                  availableOperators.map(operator => {
-                    const isSelected = selectedOperators.length === 0 || selectedOperators.includes(operator);
-                    const operatorColor = getOperatorColor(operator);
-                    const displayName = getOperatorBrand(operator);
-                    
+                  availableOperators.map((operatorData, index) => {
+                    const isSelected =
+                      selectedOperators.length === 0 ||
+                      selectedOperators.includes(operatorData.brand);
+
                     return (
                       <button
-                        key={operator}
-                        onClick={() => toggleOperator(operator)}
+                        key={`${operatorData.brand}-${index}`}
+                        onClick={() => toggleOperator(operatorData.brand)}
                         className="px-4 py-2 text-sm font-bold rounded-lg transition-all"
-                        style={isSelected ? {
-                          backgroundColor: operatorColor,
-                          color: '#fff',
-                        } : {
-                          backgroundColor: '#E5E7EB',
-                          color: '#6B7280',
-                        }}
+                        style={
+                          isSelected
+                            ? {
+                                backgroundColor: operatorData.color,
+                                color: "#fff",
+                              }
+                            : {
+                                backgroundColor: "#E5E7EB",
+                                color: "#6B7280",
+                              }
+                        }
                       >
-                        {displayName}
+                        {operatorData.brand}
                       </button>
                     );
                   })
@@ -600,14 +758,15 @@ const OperatorNetworkChart = () => {
                 {metaLoading ? (
                   <Spinner />
                 ) : availableTechnologies.length > 0 ? (
-                  availableTechnologies.map(tech => (
+                  availableTechnologies.map((tech, index) => (
                     <button
-                      key={tech}
+                      key={`${tech}-${index}`}
                       onClick={() => toggleTechnology(tech)}
                       className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-all ${
-                        selectedTechnologies.length === 0 || selectedTechnologies.includes(tech)
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-200 text-gray-500'
+                        selectedTechnologies.length === 0 ||
+                        selectedTechnologies.includes(tech)
+                          ? "bg-purple-600 text-white"
+                          : "bg-gray-200 text-gray-500"
                       }`}
                     >
                       {tech}
@@ -632,87 +791,101 @@ const OperatorNetworkChart = () => {
         )}
 
         {/* Chart */}
-        {!isLoading && filteredData && filteredData.length > 0 && technologyTypes.length > 0 && (
-          <div className="bg-gray-50 rounded-xl p-4">
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart
-                data={filteredData}
-                margin={{ top: 20, right: 30, left: 50, bottom: 60 }}
-                barGap={2}
-                barCategoryGap="25%"
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis
-                  dataKey="displayName"
-                  tick={{ fill: '#111827', fontSize: 14, fontWeight: 700 }}
-                  axisLine={{ stroke: '#D1D5DB' }}
-                  tickLine={{ stroke: '#D1D5DB' }}
-                />
-                <YAxis
-                  reversed={isReversedAxis}
-                  tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 500 }}
-                  tickFormatter={formatYAxis}
-                  axisLine={{ stroke: '#D1D5DB' }}
-                  tickLine={{ stroke: '#D1D5DB' }}
-                  label={{ 
-                    value: currentMetric.yAxisLabel, 
-                    angle: -90, 
-                    position: 'insideLeft',
-                    style: { fill: '#374151', fontSize: 12, fontWeight: 600 },
-                    offset: 0
-                  }}
-                />
-                <Tooltip 
-                  content={<CustomTooltip />} 
-                  cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
-                  wrapperStyle={{ zIndex: 99999 }}
-                />
-                <Legend content={<CustomLegend />} />
-                {technologyTypes.map((tech, idx) => (
-                  <Bar
-                    key={tech}
-                    dataKey={tech}
-                    name={tech}
-                    fill={getTechColor(tech, idx)}
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={50}
-                    shape={(props) => {
-                      if (!isValidDataValue(props.value)) return null;
-                      return <CustomBar {...props} />;
+        {!isLoading &&
+          filteredData &&
+          filteredData.length > 0 &&
+          technologyTypes.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-4">
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart
+                  data={filteredData}
+                  margin={{ top: 20, right: 30, left: 50, bottom: 60 }}
+                  barGap={2}
+                  barCategoryGap="25%"
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#E5E7EB"
+                  />
+                  <XAxis
+                    dataKey="displayName"
+                    tick={{ fill: "#111827", fontSize: 14, fontWeight: 700 }}
+                    axisLine={{ stroke: "#D1D5DB" }}
+                    tickLine={{ stroke: "#D1D5DB" }}
+                  />
+                  <YAxis
+                    reversed={isReversedAxis}
+                    tick={{ fill: "#6B7280", fontSize: 12, fontWeight: 500 }}
+                    tickFormatter={formatYAxis}
+                    axisLine={{ stroke: "#D1D5DB" }}
+                    tickLine={{ stroke: "#D1D5DB" }}
+                    label={{
+                      value: currentMetric.yAxisLabel,
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { fill: "#374151", fontSize: 12, fontWeight: 600 },
+                      offset: 0,
                     }}
-                  >
-                    {filteredData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`}
-                        fill={isValidDataValue(entry[tech]) ? getTechColor(tech, idx) : 'transparent'}
-                      />
-                    ))}
-                  </Bar>
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+                  />
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
+                    wrapperStyle={{ zIndex: 99999 }}
+                  />
+                  <Legend content={<CustomLegend />} />
+                  {technologyTypes.map((tech, idx) => (
+                    <Bar
+                      key={tech}
+                      dataKey={tech}
+                      name={tech}
+                      fill={getTechColor(tech, idx)}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={50}
+                      shape={(props) => {
+                        if (!isValidDataValue(props.value)) return null;
+                        return <CustomBar {...props} />;
+                      }}
+                    >
+                      {filteredData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={
+                            isValidDataValue(entry[tech])
+                              ? getTechColor(tech, idx)
+                              : "transparent"
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
         {/* Empty State */}
-        {!isLoading && (!filteredData || filteredData.length === 0 || technologyTypes.length === 0) && (
-          <div className="h-[400px] flex flex-col items-center justify-center text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
-            <Filter size={40} className="text-gray-400 mb-3" />
-            <p className="text-lg font-bold text-gray-700">No data available</p>
-            <p className="text-sm mt-1 text-gray-500">
-              Showing Airtel, Jio & Vi only
-            </p>
-            {hasActiveFilters && (
-              <button
-                onClick={clearAllFilters}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold flex items-center gap-2"
-              >
-                <X size={16} />
-                Clear Filters
-              </button>
-            )}
-          </div>
-        )}
+        {!isLoading &&
+          (!filteredData ||
+            filteredData.length === 0 ||
+            technologyTypes.length === 0) && (
+            <div className="h-[400px] flex flex-col items-center justify-center text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+              <Filter size={40} className="text-gray-400 mb-3" />
+              <p className="text-lg font-bold text-gray-700">
+                No data available
+              </p>
+              
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold flex items-center gap-2"
+                >
+                  <X size={16} />
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          )}
       </div>
     </div>
   );

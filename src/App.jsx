@@ -1,4 +1,3 @@
-// src/App.jsx
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -15,7 +14,6 @@ import AuthProvider, { useAuth } from "./context/AuthContext";
 import { localStorageProvider } from "./utils/localStorageProvider";
 import Spinner from "./components/common/Spinner";
 
-// --- Page Imports ---
 import LoginPage from "./pages/Login";
 import DashboardPage from "./pages/Dashboard";
 import SimpleMapView from "./pages/MapView";
@@ -31,10 +29,8 @@ import ProjectsPage from "./pages/Projects";
 import PredictionMapPage from "./pages/PredictionMap";
 import GetReportPage from "./pages/GetReport";
 import ViewProjectsPage from "./pages/ViewProjects";
+import SessionMapDebug from "./pages/SessionMapDebug";
 
-// ============================================
-// ROUTE COMPONENTS
-// ============================================
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
@@ -79,142 +75,57 @@ const NotFoundPage = () => (
   </div>
 );
 
-// ============================================
-// SWR CONFIGURATION
-// ============================================
 const swrConfig = {
   provider: localStorageProvider,
 
-  // Revalidation settings
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
   revalidateOnMount: true,
   revalidateIfStale: true,
 
-  // Error handling
   shouldRetryOnError: true,
   errorRetryCount: 2,
   errorRetryInterval: 3000,
 
-  // Performance settings
   dedupingInterval: 5000,
   focusThrottleInterval: 30000,
   loadingTimeout: 10000,
 
-  // Keep previous data while revalidating
   keepPreviousData: true,
 
-  // Callbacks
-  onLoadingSlow: (key, config) => {
-    console.warn(`⏱️ Slow loading detected: ${key}`);
-    console.log("Config:", config);
-  },
+  onLoadingSlow: (key, config) => {},
 
-  onSuccess: (data, key, config) => {
-    // ✅ Debug logging for specific keys (especially handset data)
-    if (key === "handsetAvg") {
-      console.group(`✅ SWR Success [${key}]`);
-      console.log("Data type:", typeof data);
-      console.log("Is array:", Array.isArray(data));
-      console.log("Data keys:", data ? Object.keys(data) : "null");
-      console.log("Data length:", data?.length);
-      console.log("Full data:", data);
-      console.groupEnd();
-    }
+  onSuccess: (data, key, config) => {},
 
-    // Log other important data fetches
-    if (
-      key.includes("handset") ||
-      key.includes("totals") ||
-      key.includes("operators")
-    ) {
-      console.log(`✅ [${key}] loaded successfully`, {
-        type: typeof data,
-        length: Array.isArray(data) ? data.length : undefined,
-        keys:
-          typeof data === "object" && data !== null
-            ? Object.keys(data)
-            : undefined,
-      });
-    }
-  },
-
-  onError: (error, key, config) => {
-    // ✅ Improved error logging with more details
-    console.group(`❌ SWR Error [${key}]`);
-    console.error("Error object:", error);
-    console.error("Error message:", error?.message);
-    console.error("Error name:", error?.name);
-    console.error("Error response:", error?.response);
-    console.error("Error response data:", error?.response?.data);
-    console.error("Error response status:", error?.response?.status);
-    console.groupEnd();
-
-    // Handle specific error types
-    if (
-      error?.message?.includes("Network Error") ||
-      error?.message?.includes("timeout") ||
-      error?.name === "AbortError"
-    ) {
-      console.warn(`🌐 Network connectivity issue for [${key}]`);
-    } else if (error?.response?.status === 401) {
-      console.error("🔒 Authentication required");
-      // Optionally redirect to login
-    } else if (error?.response?.status === 403) {
-      console.error("🚫 Access forbidden");
-    } else if (error?.response?.status === 404) {
-      console.warn(`📭 Resource not found: ${key}`);
-    } else if (error?.response?.status >= 500) {
-      console.error("🔥 Server error");
-    }
-  },
+  onError: (error, key, config) => {},
 
   onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
-    // ✅ Custom retry logic
-    console.log(
-      `🔄 Retrying [${key}] (attempt ${retryCount + 1}/${
-        config.errorRetryCount
-      })`
-    );
-
-    // Don't retry on 404
     if (error?.response?.status === 404) {
-      console.log("❌ Not retrying 404 error");
       return;
     }
 
-    // Don't retry on 401/403
     if (error?.response?.status === 401 || error?.response?.status === 403) {
-      console.log("❌ Not retrying auth error");
       return;
     }
 
-    // Max retries reached
     if (retryCount >= config.errorRetryCount) {
-      console.log("❌ Max retries reached");
       return;
     }
 
-    // Exponential backoff
     const timeout = Math.min(1000 * Math.pow(2, retryCount), 10000);
-    console.log(`⏳ Waiting ${timeout}ms before retry`);
 
     setTimeout(() => {
       revalidate({ retryCount });
     }, timeout);
   },
 
-  // Compare function for data equality (prevents unnecessary re-renders)
   compare: (a, b) => {
-    // For arrays, check length and first item
     if (Array.isArray(a) && Array.isArray(b)) {
       if (a.length !== b.length) return false;
       if (a.length === 0 && b.length === 0) return true;
-      // Simple shallow comparison for performance
       return JSON.stringify(a[0]) === JSON.stringify(b[0]);
     }
 
-    // For objects, shallow comparison
     if (
       typeof a === "object" &&
       typeof b === "object" &&
@@ -227,14 +138,10 @@ const swrConfig = {
       return keysA.every((key) => a[key] === b[key]);
     }
 
-    // Default comparison
     return a === b;
   },
 };
 
-// ============================================
-// MAIN APP COMPONENT
-// ============================================
 function App() {
   return (
     <Router>
@@ -254,7 +161,6 @@ function App() {
           />
 
           <Routes>
-            {/* Public Route */}
             <Route
               path="/"
               element={
@@ -264,7 +170,15 @@ function App() {
               }
             />
 
-            {/* Private Routes */}
+            <Route
+              path="/debug-map"
+              element={
+                <PrivateRoute>
+                  <SessionMapDebug />
+                </PrivateRoute>
+              }
+            />
+
             <Route
               path="/dashboard"
               element={
@@ -370,7 +284,6 @@ function App() {
               }
             />
 
-            {/* Catch-all for Not Found */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </SWRConfig>

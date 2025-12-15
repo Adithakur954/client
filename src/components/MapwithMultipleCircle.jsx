@@ -5,6 +5,7 @@ import { getColorForMetric } from "../utils/metrics";
 import { mapViewApi } from "../api/apiEndpoints";
 import CanvasOverlay from "./maps/CanvasOverlay";
 import { ArrowDown, X } from "lucide-react";
+import { getLogColor } from "../utils/colorUtils";
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
@@ -51,7 +52,7 @@ const getOperatorColor = (name) => {
   const cleanName = name.toLowerCase().trim();
   
   if (cleanName.includes('jio') || cleanName.includes('reliance')) return OPERATOR_COLORS.jio;
-  if (cleanName.includes('airtel') || cleanName.includes('bharti')) return OPERATOR_COLORS.airtel;
+  if (cleanName.includes('airtel') || cleanName.includes('Air')) return OPERATOR_COLORS.airtel;
   if (cleanName.includes('vodafone') || cleanName.includes('idea') || cleanName === 'vi' || cleanName.includes('vi india')) return OPERATOR_COLORS.vi;
   if (cleanName.includes('bsnl')) return OPERATOR_COLORS.bsnl;
   

@@ -36,9 +36,9 @@ const SideBar = ({ collapsed }) => {
                 { icon: FileText, text: 'View Projects', path: '/viewProject' },
             ]
         },
-        { icon: Users, text: 'Manage User', path: '/manage-users' },
-        { icon: ReceiptPoundSterling, text: 'Get Report', path: '/getreport' },
-        { icon: Settings, text: 'Setting', path: '/settings' },
+        { icon: Users, text: 'Manage Users', path: '/manage-users' },
+        { icon: ReceiptPoundSterling, text: 'Get Reports', path: '/getreport' },
+        { icon: Settings, text: 'Settings', path: '/settings' },
     ];
 
     const toggleDropdown = (text) => {

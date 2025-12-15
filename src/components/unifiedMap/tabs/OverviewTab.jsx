@@ -18,7 +18,6 @@ import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { mapViewApi } from "@/api/apiEndpoints";
 
-// Helper function to format duration
 const formatDuration = (seconds) => {
   if (!seconds || seconds <= 0) return "N/A";
   
@@ -34,14 +33,12 @@ const formatDuration = (seconds) => {
   return `${secs}s`;
 };
 
-// Helper function to format speed (kbps to Mbps)
 const formatSpeed = (kbps) => {
   if (!kbps || kbps <= 0) return "N/A";
   const mbps = kbps / 1024;
   return mbps >= 1 ? `${mbps.toFixed(2)} Mbps` : `${kbps.toFixed(0)} kbps`;
 };
 
-// Helper function to format bytes
 const formatBytes = (kb, toUnit = "GB") => {
   if (!kb || kb <= 0) return "0.00";
   if (toUnit === "GB") {
@@ -194,7 +191,6 @@ export const OverviewTab = ({
       }));
   }, [tptVolume]);
 
-  // Process provider volume data with all new fields
   const processedProviderVolume = useMemo(() => {
     if (!providerVolume || Object.keys(providerVolume).length === 0) {
       return null;
@@ -285,7 +281,6 @@ export const OverviewTab = ({
     return processed.length > 0 ? processed : null;
   }, [providerVolume]);
 
-  // Calculate summary statistics
   const volumeSummaryStats = useMemo(() => {
     if (!processedProviderVolume || processedProviderVolume.length === 0) return null;
 
@@ -360,7 +355,6 @@ export const OverviewTab = ({
         </div>
       )}
 
-      {/* Key Metrics */}
       <div className={`grid ${expanded ? "grid-cols-4" : "grid-cols-2"} gap-3`}>
         <StatCard
           icon={MapPin}
@@ -396,10 +390,9 @@ export const OverviewTab = ({
         )}
       </div>
 
-      {/* Statistics */}
       {stats && (
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-          <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <Activity className="h-4 w-4" />
             {selectedMetric?.toUpperCase() || "METRIC"} Statistics
           </h4>
@@ -414,17 +407,14 @@ export const OverviewTab = ({
         </div>
       )}
 
-      {/* Indoor/Outdoor Distribution */}
       {ioSummary && (ioSummary.indoor > 0 || ioSummary.outdoor > 0) && (
         <IODistributionCard ioSummary={ioSummary} />
       )}
 
-      {/* PCI Color Reference */}
       {selectedMetric === "pci" && topPCIs.length > 0 && (
         <PCIReferenceCard topPCIs={topPCIs} />
       )}
 
-      {/* Provider Volume by Technology */}
       {sessionIds.length > 0 && (
         <ProviderVolumeCard
           providerVolume={processedProviderVolume}
@@ -435,24 +425,14 @@ export const OverviewTab = ({
         />
       )}
 
-      {/* Data Volume */}
       {volume && (
         <DataVolumeCard volume={volume} sessionWiseVolume={sessionWiseVolume} />
       )}
 
-      
-
-      {/* Session Duration */}
       {duration && <SessionDurationCard duration={duration} />}
-
-      
-
-      
     </div>
   );
 };
-
-// ============ SUB-COMPONENTS ============
 
 const MetricCard = ({ label, value, color = "white", raw = false }) => {
   const colorClasses = {
@@ -465,7 +445,7 @@ const MetricCard = ({ label, value, color = "white", raw = false }) => {
 
   return (
     <div className="bg-slate-800 rounded p-3 text-center hover:bg-slate-750 transition-colors">
-      <div className="text-xs text-slate-400 mb-1">{label}</div>
+      <div className="text-xs text-white mb-1">{label}</div>
       <div className={`text-xl font-bold ${colorClasses[color]}`}>
         {raw ? value : typeof value === "number" ? value.toFixed(2) : "N/A"}
       </div>
@@ -475,7 +455,7 @@ const MetricCard = ({ label, value, color = "white", raw = false }) => {
 
 const IODistributionCard = ({ ioSummary }) => (
   <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-    <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
       <MapPin className="h-4 w-4" />
       Indoor/Outdoor Distribution
     </h4>
@@ -490,12 +470,12 @@ const IODistributionCard = ({ ioSummary }) => (
               </svg>
             </div>
             <div>
-              <div className="text-xs text-cyan-300/70 font-medium">Indoor Samples</div>
+              <div className="text-xs text-cyan-300 font-medium">Indoor Samples</div>
               <div className="text-2xl font-bold text-cyan-400">{ioSummary.indoor.toLocaleString()}</div>
             </div>
           </div>
           <div className="flex items-center justify-between pt-3 border-t border-cyan-500/20">
-            <span className="text-xs text-slate-400">Percentage</span>
+            <span className="text-xs text-white">Percentage</span>
             <span className="text-sm font-semibold text-cyan-400">
               {((ioSummary.indoor / ioSummary.total) * 100).toFixed(1)}%
             </span>
@@ -512,12 +492,12 @@ const IODistributionCard = ({ ioSummary }) => (
               </svg>
             </div>
             <div>
-              <div className="text-xs text-green-300/70 font-medium">Outdoor Samples</div>
+              <div className="text-xs text-green-300 font-medium">Outdoor Samples</div>
               <div className="text-2xl font-bold text-green-400">{ioSummary.outdoor.toLocaleString()}</div>
             </div>
           </div>
           <div className="flex items-center justify-between pt-3 border-t border-green-500/20">
-            <span className="text-xs text-slate-400">Percentage</span>
+            <span className="text-xs text-white">Percentage</span>
             <span className="text-sm font-semibold text-green-400">
               {((ioSummary.outdoor / ioSummary.total) * 100).toFixed(1)}%
             </span>
@@ -530,12 +510,12 @@ const IODistributionCard = ({ ioSummary }) => (
 
 const PCIReferenceCard = ({ topPCIs }) => (
   <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-    <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
       <Antenna className="h-4 w-4" />
       PCI Color Reference
     </h4>
 
-    <div className="text-xs text-slate-400 mb-2">Top 10 PCIs in Current View</div>
+    <div className="text-xs text-white mb-2">Top 10 PCIs in Current View</div>
     <div className="grid grid-cols-5 gap-1.5">
       {topPCIs.map((item, idx) => (
         <div
@@ -548,7 +528,7 @@ const PCIReferenceCard = ({ topPCIs }) => (
           />
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold truncate">PCI {item.pci}</div>
-            <div className="text-slate-400">{item.count} pts</div>
+            <div className="text-white">{item.count} pts</div>
           </div>
         </div>
       ))}
@@ -558,17 +538,17 @@ const PCIReferenceCard = ({ topPCIs }) => (
 
 const SessionDurationCard = ({ duration }) => (
   <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-    <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
       <Clock className="h-4 w-4" />
       Session Information
     </h4>
     <div className="grid grid-cols-2 gap-3 text-sm">
       <div className="bg-slate-800 p-3 rounded hover:bg-slate-750 transition-colors">
-        <div className="text-slate-400 text-xs mb-1">Duration</div>
+        <div className="text-white text-xs mb-1">Duration</div>
         <div className="text-white font-semibold">{duration.total_duration || "N/A"}</div>
       </div>
       <div className="bg-slate-800 p-3 rounded hover:bg-slate-750 transition-colors">
-        <div className="text-slate-400 text-xs mb-1">Start Time</div>
+        <div className="text-white text-xs mb-1">Start Time</div>
         <div className="text-white font-semibold">
           {duration.start_time ? new Date(duration.start_time).toLocaleTimeString() : "N/A"}
         </div>
@@ -591,7 +571,7 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
       "GSM": "bg-orange-500/20 border-orange-500/30 text-orange-400",
       "NR": "bg-purple-500/20 border-purple-500/30 text-purple-400",
     };
-    return techBadgeColors[tech?.toUpperCase()] || "bg-slate-700 border-slate-600 text-slate-400";
+    return techBadgeColors[tech?.toUpperCase()] || "bg-slate-700 border-slate-600 text-white";
   };
 
   const getProviderIcon = (provider) => {
@@ -603,13 +583,11 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
     return "📶";
   };
 
-  // ✅ Check if provider is a known/valid provider
   const isKnownProvider = (provider) => {
     if (!provider || typeof provider !== 'string') return false;
     
     const providerLower = provider.toLowerCase().trim();
     
-    // List of known providers - only these will be shown
     const knownProviders = [
       'jio',
       'airtel', 
@@ -618,31 +596,25 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
       'bsnl'
     ];
     
-    // Check if provider name includes any known provider
     return knownProviders.some(known => providerLower.includes(known));
   };
 
-  // ✅ Filter out entries with zero values AND unknown providers
   const filteredProviderVolume = useMemo(() => {
     if (!providerVolume || !Array.isArray(providerVolume)) return [];
     
     return providerVolume.filter(item => {
-      // Filter 1: Check if provider is known (Jio, Airtel, Vi, Vodafone, BSNL)
       if (!isKnownProvider(item.provider)) {
         return false;
       }
 
-      // Filter 2: Check if values are greater than 0
       const downloadValue = parseFloat(item.downloadGb) || 0;
       const uploadValue = parseFloat(item.uploadGb) || 0;
       const totalValue = parseFloat(item.totalGb) || 0;
       
-      // Only include if at least one value is greater than 0
       return downloadValue > 0 || uploadValue > 0 || totalValue > 0;
     });
   }, [providerVolume]);
 
-  // ✅ Filter technology summary by known providers
   const filteredTechSummary = useMemo(() => {
     if (!summaryStats?.byTech) return {};
     
@@ -652,7 +624,6 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
       const dlValue = parseFloat(data.downloadKb) || 0;
       const ulValue = parseFloat(data.uploadKb) || 0;
       
-      // Only include if has non-zero values
       if (dlValue > 0 || ulValue > 0) {
         filtered[tech] = data;
       }
@@ -666,10 +637,10 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
 
   return (
     <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-      <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+      <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
         <Wifi className="h-4 w-4" />
         Provider Volume by Technology
-        <span className="text-xs text-slate-400 font-normal ml-2">
+        <span className="text-xs text-white font-normal ml-2">
           ({sessionIds.length} session{sessionIds.length > 1 ? "s" : ""})
         </span>
       </h4>
@@ -678,73 +649,72 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
         <div className="flex items-center justify-center py-8">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
-            <span className="text-slate-400 text-sm">Loading provider volume data...</span>
+            <span className="text-white text-sm">Loading provider volume data...</span>
           </div>
         </div>
       ) : error ? (
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
             <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
-            <div className="text-slate-400 text-sm">Failed to load provider volume data</div>
-            <div className="text-xs text-slate-500 mt-1">{error}</div>
+            <div className="text-white text-sm">Failed to load provider volume data</div>
+            <div className="text-xs text-white mt-1">{error}</div>
           </div>
         </div>
       ) : !hasValidData ? (
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
-            <Wifi className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-            <div className="text-slate-400 text-sm">No valid provider volume data available</div>
-            <div className="text-xs text-slate-500 mt-1">
+            <Wifi className="h-8 w-8 text-white mx-auto mb-2" />
+            <div className="text-white text-sm">No valid provider volume data available</div>
+            <div className="text-xs text-white mt-1">
               Only showing data for: Jio, Airtel, Vi/Vodafone, BSNL
             </div>
           </div>
         </div>
       ) : (
         <>
-          {/* Detailed Table */}
           <div className="overflow-x-auto scrollbar-hide bg-slate-800/50 rounded">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-700 bg-slate-800">
-                  <th className="text-left px-2 py-2 text-slate-400 font-medium">Provider</th>
-                  <th className="text-left px-2 py-2 text-slate-400 font-medium">Tech</th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                  <th className="text-left px-2 py-2 text-white font-medium">Provider</th>
+                  <th className="text-left px-2 py-2 text-white font-medium">Tech</th>
+                  <th className="text-right px-2 py-2 text-white font-medium whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <Download className="h-3 w-3" />
                       DL (GB)
                     </div>
                   </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                  <th className="text-right px-2 py-2 text-white font-medium whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <Upload className="h-3 w-3" />
                       UL (GB)
                     </div>
                   </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                  <th className="text-right px-2 py-2 text-white font-medium whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <Gauge className="h-3 w-3" />
                       Avg DL
                     </div>
                   </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                  <th className="text-right px-2 py-2 text-white font-medium whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <Gauge className="h-3 w-3" />
                       Avg UL
                     </div>
                   </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium whitespace-nowrap">
+                  <th className="text-right px-2 py-2 text-white font-medium whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <Timer className="h-3 w-3" />
                       Duration
                     </div>
                   </th>
-                  <th className="text-right px-2 py-2 text-slate-400 font-medium">Total</th>
+                  <th className="text-right px-2 py-2 text-white font-medium">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProviderVolume.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-2 py-8 text-center text-slate-400 text-sm">
+                    <td colSpan="8" className="px-2 py-8 text-center text-white text-sm">
                       No data available for known providers
                     </td>
                   </tr>
@@ -754,7 +724,7 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
                       key={idx}
                       className="border-b border-slate-800 hover:bg-slate-700/30 transition-colors"
                     >
-                      <td className="px-2 py-2 text-slate-300">
+                      <td className="px-2 py-2 text-white">
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm">{getProviderIcon(item.provider)}</span>
                           <span className="capitalize font-medium">{item.provider}</span>
@@ -780,7 +750,7 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
                       <td className="px-2 py-2 text-right text-orange-400 font-medium whitespace-nowrap">
                         {item.durationFormatted}
                       </td>
-                      <td className="px-2 py-2 text-right text-slate-200 font-bold">
+                      <td className="px-2 py-2 text-right text-white font-bold">
                         {item.totalGb}
                       </td>
                     </tr>
@@ -790,19 +760,18 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
             </table>
           </div>
 
-          {/* Technology Summary Pills */}
           {hasTechData && (
-            <div className="mt-4 pt-3 border-t border-slate-700">
-              <h5 className="text-xs font-semibold text-slate-400 mb-2">By Technology</h5>
-              <div className="flex flex-wrap gap-2">
+            <div className="mt-4 pt-3 border-t">
+              <h5 className="text-xs font-semibold text-white mb-2">By Technology</h5>
+              <div className="flex flex-wrap text-white gap-2">
                 {Object.entries(filteredTechSummary).map(([tech, data]) => (
                   <div
                     key={tech}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${getTechBadgeColor(tech)}`}
+                    className={`inline-flex items-center gap-2 text-white px-3 py-1.5 rounded-lg border ${getTechBadgeColor(tech)}`}
                   >
                     <span className="font-medium">{tech}</span>
-                    <span className="text-xs opacity-70">
-                      ↓{formatBytes(data.downloadKb, "GB")} | ↑{formatBytes(data.uploadKb, "GB")}
+                    <span className="text-xs text-white">
+                      ↓{formatBytes(data.downloadKb, "GB")} GB | ↑{formatBytes(data.uploadKb, "GB")} GB
                     </span>
                   </div>
                 ))}
@@ -817,21 +786,21 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
 
 const DataVolumeCard = ({ volume, sessionWiseVolume }) => (
   <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-    <h4 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
       <Activity className="h-4 w-4" />
       Data Volume (Total)
     </h4>
 
     <div className="grid grid-cols-2 gap-3 text-sm">
       <div className="bg-slate-800 p-3 rounded hover:bg-slate-750 transition-colors">
-        <div className="text-slate-400 text-xs mb-1 flex items-center gap-1">
+        <div className="text-white text-xs mb-1 flex items-center gap-1">
           <Download className="h-3 w-3" />
           Download Volume
         </div>
         <div className="text-blue-400 font-semibold">{volume.dlGb || "N/A"} GB</div>
       </div>
       <div className="bg-slate-800 p-3 rounded hover:bg-slate-750 transition-colors">
-        <div className="text-slate-400 text-xs mb-1 flex items-center gap-1">
+        <div className="text-white text-xs mb-1 flex items-center gap-1">
           <Upload className="h-3 w-3" />
           Upload Volume
         </div>
@@ -841,20 +810,20 @@ const DataVolumeCard = ({ volume, sessionWiseVolume }) => (
 
     {sessionWiseVolume && sessionWiseVolume.length > 0 && (
       <div className="mt-4">
-        <h5 className="text-sm font-semibold text-slate-200 mb-2">Session-wise Volume</h5>
+        <h5 className="text-sm font-semibold text-white mb-2">Session-wise Volume</h5>
         <div className="overflow-x-auto bg-slate-800/50 rounded">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700">
-                <th className="text-left px-3 py-2 text-slate-400 font-medium">Session</th>
-                <th className="text-right px-3 py-2 text-slate-400 font-medium">Download (GB)</th>
-                <th className="text-right px-3 py-2 text-slate-400 font-medium">Upload (GB)</th>
+                <th className="text-left px-3 py-2 text-white font-medium">Session</th>
+                <th className="text-right px-3 py-2 text-white font-medium">Download (GB)</th>
+                <th className="text-right px-3 py-2 text-white font-medium">Upload (GB)</th>
               </tr>
             </thead>
             <tbody>
               {sessionWiseVolume.map((item, idx) => (
                 <tr key={idx} className="border-b border-slate-800 hover:bg-slate-700/30 transition-colors">
-                  <td className="px-3 py-2 text-slate-300">{item.session}</td>
+                  <td className="px-3 py-2 text-white">{item.session}</td>
                   <td className="px-3 py-2 text-right text-blue-400">{item.dl}</td>
                   <td className="px-3 py-2 text-right text-green-400">{item.ul}</td>
                 </tr>
@@ -866,7 +835,5 @@ const DataVolumeCard = ({ volume, sessionWiseVolume }) => (
     )}
   </div>
 );
-
-
 
 export default OverviewTab;

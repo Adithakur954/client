@@ -51,7 +51,7 @@ const ManageSessionsPage = () => {
     };
 
     const handleViewOnMap = (sessionId) => {
-        navigate(`/map-view?sessionId=${sessionId}`);
+        navigate(`/debug-map?sessionId=${sessionId}`);
     };
 
     const formatDate = (dateString) => {
