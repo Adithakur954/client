@@ -29,30 +29,29 @@ const OPERATOR_COLORS = {
     gradient: 'linear-gradient(135deg, #e60000 0%, #ff1744 100%)',
     light: '#ffebee',
   },
+  yas:{
+    primary: '#7b1fa2',
+    gradient: 'linear-gradient(135deg, #7b1fa2 0%, #ab47bc 100%)',
+    light: '#f3e5f5',
+  }
 };
 
 const CHART_COLORS = ['#0a3d91', '#ff0000', '#ffc107', '#e60000'];
 
 // Allowed telecom operators
-const ALLOWED_OPERATORS = ['jio', 'airtel', 'vi', 'vodafone'];
+const ALLOWED_OPERATORS = ['jio', 'airtel', 'vi', 'vodafone', 'yas' ];
 
 // Helper function to get operator color config
 const getOperatorConfig = (name) => {
   const nameLower = name.toLowerCase();
   if (nameLower.includes('jio')) return OPERATOR_COLORS.jio;
   if (nameLower.includes('airtel')) return OPERATOR_COLORS.airtel;
+  if (nameLower.includes('yas')) return OPERATOR_COLORS.yas;
   if (nameLower.includes('vi') || nameLower.includes('vodafone')) return OPERATOR_COLORS.vi;
   return { primary: CHART_COLORS[0], gradient: CHART_COLORS[0], light: '#f5f5f5' };
 };
 
-// Helper function to get operator icon
-const getOperatorIcon = (name) => {
-  const nameLower = name.toLowerCase();
-  if (nameLower.includes('jio')) return '📶';
-  if (nameLower.includes('airtel')) return '📡';
-  if (nameLower.includes('vi') || nameLower.includes('vodafone')) return '📱';
-  return '📊';
-};
+
 
 const CoverageRankingChart = () => {
   const [settings, setSettings] = useState({ rsrpMin: -95, rsrpMax: 0 });
@@ -86,7 +85,7 @@ const CoverageRankingChart = () => {
           color: config.primary,
           gradient: config.gradient,
           lightColor: config.light,
-          icon: getOperatorIcon(item.name),
+         
           rank: index + 1,
         };
       });
@@ -124,7 +123,7 @@ const CoverageRankingChart = () => {
 
   return (
     <ChartCard
-      title={`Operator Coverage Ranking (RSRP ${settings.rsrpMin} to ${settings.rsrpMax} dBm)`}
+      title={` Coverage Ranking (RSRP ${settings.rsrpMin} to ${settings.rsrpMax} dBm)`}
       dataset={chartData}
       exportFileName="coverage_rank"
       isLoading={isLoading}
@@ -340,7 +339,7 @@ const CoverageRankingChart = () => {
               gap: 1,
             }}
           >
-            📊 Operator Rankings
+             Operator Rankings
           </Typography>
 
           {/* Legend Items */}
@@ -356,7 +355,7 @@ const CoverageRankingChart = () => {
                 cursor: 'pointer',
                 border: `2px solid ${item.color}20`,
                 '&:hover': {
-                  transform: 'translateX(5px)',
+                  
                   boxShadow: `0 6px 20px ${item.color}40`,
                   borderColor: item.color,
                 },
@@ -381,15 +380,15 @@ const CoverageRankingChart = () => {
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1.5,
-                  p: 1.5,
+                  gap: 1,
+                  p: 1,
                 }}
               >
                 {/* Rank Badge */}
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
+                    width: 28,
+                    height: 28,
                     borderRadius: '8px',
                     background: item.gradient,
                     display: 'flex',
@@ -427,7 +426,7 @@ const CoverageRankingChart = () => {
                   {/* Progress Bar */}
                   <Box
                     sx={{
-                      height: 6,
+                      height: 3,
                       backgroundColor: '#e0e0e0',
                       borderRadius: 3,
                       overflow: 'hidden',

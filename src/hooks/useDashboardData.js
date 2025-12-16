@@ -10,6 +10,10 @@ import {
   ensureNegative
 } from '../utils/dashboardUtils';
 
+// ============================================
+// CONFIGURATION
+// ============================================
+
 const SWR_CONFIG = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
@@ -44,6 +48,40 @@ const METRIC_ENDPOINT_MAP = {
 
 const NEGATIVE_METRICS = ['rsrp', 'rsrq'];
 
+// ============================================
+// METRIC FIELD MAPPING
+// ============================================
+
+const METRIC_TO_FIELD = {
+  samples: 'value',
+  rsrp: 'avg_rsrp',
+  rsrq: 'avg_rsrq', 
+  sinr: 'avg_sinr',
+  mos: 'avg_mos',
+  jitter: 'avg_jitter',
+  latency: 'avg_latency',
+  packetLoss: 'avg_packet_loss',
+  dlTpt: 'avg_dl_tpt',
+  ulTpt: 'avg_ul_tpt',
+};
+
+const METRIC_FIELD_FALLBACKS = {
+  samples: ['value', 'count', 'samples', 'sampleCount'],
+  rsrp: ['avg_rsrp', 'avgRsrp', 'rsrp', 'RSRP'],
+  rsrq: ['avg_rsrq', 'avgRsrq', 'rsrq', 'RSRQ'],
+  sinr: ['avg_sinr', 'avgSinr', 'sinr', 'SINR'],
+  mos: ['avg_mos', 'avgMos', 'mos', 'MOS'],
+  jitter: ['avg_jitter', 'avgJitter', 'jitter'],
+  latency: ['avg_latency', 'avgLatency', 'latency'],
+  packetLoss: ['avg_packet_loss', 'avgPacketLoss', 'packet_loss'],
+  dlTpt: ['avg_dl_tpt', 'avgDlTpt', 'dl_tpt', 'downloadSpeed'],
+  ulTpt: ['avg_ul_tpt', 'avgUlTpt', 'ul_tpt', 'uploadSpeed'],
+};
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 const createCacheKey = (base, filters) => {
   if (!filters || Object.keys(filters).length === 0) return base;
   
@@ -71,31 +109,75 @@ const createCacheKey = (base, filters) => {
 };
 
 const extractData = (response, fallback = []) => {
-  if (response === null || response === undefined) return fallback;
+  console.log('[extractData] Received response:', { 
+    type: typeof response, 
+    isArray: Array.isArray(response),
+    hasData: response?.Data ? 'yes' : 'no',
+    keys: typeof response === 'object' ? Object.keys(response || {}) : []
+  });
+
+  if (response === null || response === undefined) {
+    console.log('[extractData] Response is null/undefined, returning fallback');
+    return fallback;
+  }
   
-  if (Array.isArray(response)) return response;
-  
-  if (response?.Status === 0) return fallback;
-  
-  if (Array.isArray(response?.Data)) return response.Data;
-  if (Array.isArray(response?.data)) return response.data;
-  if (Array.isArray(response?.Result)) return response.Result;
-  if (Array.isArray(response?.result)) return response.result;
-  
-  if (typeof response === 'object' && !Array.isArray(response)) {
-    if (response.Data !== undefined) return response.Data;
-    if (response.data !== undefined) return response.data;
+  if (Array.isArray(response)) {
+    console.log('[extractData] Response is array, length:', response.length);
     return response;
   }
   
+  if (response?.Status === 0) {
+    console.log('[extractData] Response status is 0, returning fallback');
+    return fallback;
+  }
+  
+  if (Array.isArray(response?.Data)) {
+    console.log('[extractData] Extracting from response.Data, length:', response.Data.length);
+    return response.Data;
+  }
+  if (Array.isArray(response?.data)) {
+    console.log('[extractData] Extracting from response.data, length:', response.data.length);
+    return response.data;
+  }
+  if (Array.isArray(response?.Result)) {
+    console.log('[extractData] Extracting from response.Result, length:', response.Result.length);
+    return response.Result;
+  }
+  if (Array.isArray(response?.result)) {
+    console.log('[extractData] Extracting from response.result, length:', response.result.length);
+    return response.result;
+  }
+  
+  if (typeof response === 'object' && !Array.isArray(response)) {
+    if (response.Data !== undefined) {
+      console.log('[extractData] Returning response.Data');
+      return response.Data;
+    }
+    if (response.data !== undefined) {
+      console.log('[extractData] Returning response.data');
+      return response.data;
+    }
+    console.log('[extractData] Returning response object itself');
+    return response;
+  }
+  
+  console.log('[extractData] No match, returning fallback');
   return fallback;
 };
 
 const createFetcher = (apiFn, fallback = []) => {
   return async () => {
     try {
+      console.log('[createFetcher] Calling API function...');
       const response = await apiFn();
+      console.log('[createFetcher] API response received:', response);
+      
       const data = extractData(response, fallback);
+      console.log('[createFetcher] Extracted data:', { 
+        type: typeof data, 
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : 'N/A'
+      });
       
       if (data !== null && data !== undefined) {
         const isValidArray = Array.isArray(data) && data.length > 0;
@@ -103,16 +185,55 @@ const createFetcher = (apiFn, fallback = []) => {
         const isValidNumber = typeof data === 'number';
         
         if (isValidArray || isValidObject || isValidNumber) {
+          console.log('[createFetcher] Data is valid, returning');
           return data;
         }
       }
       
+      console.log('[createFetcher] Data is not valid, returning fallback');
       return fallback;
     } catch (error) {
+      console.error('[createFetcher] Error:', error);
       throw error;
     }
   };
 };
+
+const extractMetricValue = (item, metric) => {
+  if (!item || !metric) return null;
+
+  const primaryField = METRIC_TO_FIELD[metric];
+  if (primaryField && item[primaryField] !== undefined && item[primaryField] !== null) {
+    return toNumber(item[primaryField]);
+  }
+
+  const fallbacks = METRIC_FIELD_FALLBACKS[metric] || [];
+  for (const field of fallbacks) {
+    if (item[field] !== undefined && item[field] !== null) {
+      return toNumber(item[field]);
+    }
+  }
+
+  return null;
+};
+
+const isValidMetricValue = (value, metric) => {
+  if (value === null || value === undefined || isNaN(value)) return false;
+  
+  if (NEGATIVE_METRICS.includes(metric)) {
+    return value !== 0;
+  }
+  
+  if (metric === 'samples') {
+    return value > 0;
+  }
+  
+  return value >= 0;
+};
+
+// ============================================
+// DATA PROCESSING FUNCTIONS
+// ============================================
 
 const processMetricData = (rawData, metric) => {
   if (!Array.isArray(rawData) || rawData.length === 0) return [];
@@ -124,7 +245,8 @@ const processMetricData = (rawData, metric) => {
     const name = canonicalOperatorName(item?.operatorName || item?.name || item?.operator);
     if (!name || name === 'Unknown') continue;
     
-    const value = toNumber(item?.value ?? item?.avg ?? item?.average);
+    const value = extractMetricValue(item, metric);
+    if (!isValidMetricValue(value, metric)) continue;
     
     if (!merged.has(name)) {
       merged.set(name, { name, value, count: 1 });
@@ -144,38 +266,88 @@ const processMetricData = (rawData, metric) => {
 };
 
 const processOperatorMetrics = (rawData, metric) => {
-  if (!Array.isArray(rawData) || rawData.length === 0) return [];
-  
+  if (!Array.isArray(rawData) || rawData.length === 0) {
+    return [];
+  }
+
   if (metric === 'samples') {
     return groupOperatorSamplesByNetwork(rawData);
   }
-  
+
   const isNegative = NEGATIVE_METRICS.includes(metric);
   const grouped = {};
-  
-  rawData.forEach(item => {
-    const operatorName = canonicalOperatorName(item?.operatorName || item?.name || item?.operator);
-    const network = item?.network || item?.networkType;
-    const value = toNumber(item?.value ?? item?.avg);
+
+  rawData.forEach((item, index) => {
+    const operatorName = canonicalOperatorName(
+      item?.operatorName || item?.operator || item?.name
+    );
     
-    if (!operatorName || !network || operatorName === 'Unknown') return;
+    const network = item?.network || item?.networkType || item?.type;
+    const value = extractMetricValue(item, metric);
+
+    if (!operatorName || operatorName === 'Unknown') return;
+    if (!network) return;
     
-    if (!grouped[operatorName]) {
-      grouped[operatorName] = { name: operatorName };
+    const networkLower = network.toLowerCase();
+    if (networkLower.includes('edge') || 
+        networkLower === 'unknown' ||
+        networkLower.includes('no service')) {
+      return;
     }
-    
-    grouped[operatorName][network] = isNegative ? ensureNegative(value) : value;
+
+    if (!isValidMetricValue(value, metric)) {
+      return;
+    }
+
+    if (!grouped[operatorName]) {
+      grouped[operatorName] = { 
+        name: operatorName,
+        _networkCounts: {}
+      };
+    }
+
+    const operatorData = grouped[operatorName];
+    const finalValue = isNegative ? ensureNegative(value) : value;
+
+    if (operatorData[network] !== undefined) {
+      const currentCount = operatorData._networkCounts[network] || 1;
+      const currentSum = operatorData[network] * currentCount;
+      operatorData._networkCounts[network] = currentCount + 1;
+      operatorData[network] = (currentSum + finalValue) / operatorData._networkCounts[network];
+    } else {
+      operatorData[network] = finalValue;
+      operatorData._networkCounts[network] = 1;
+    }
   });
-  
-  return Object.values(grouped)
+
+  const result = Object.values(grouped)
     .map(item => {
-      const networks = Object.keys(item).filter(k => k !== 'name');
-      const total = networks.length > 0 
-        ? networks.reduce((sum, net) => sum + (item[net] || 0), 0) / networks.length
-        : 0;
-      return { ...item, total };
+      const { _networkCounts, ...cleanItem } = item;
+      
+      const networkKeys = Object.keys(cleanItem).filter(k => k !== 'name');
+      const validNetworks = networkKeys.filter(net => {
+        const val = cleanItem[net];
+        return typeof val === 'number' && !isNaN(val);
+      });
+
+      let total = 0;
+      if (validNetworks.length > 0) {
+        const sum = validNetworks.reduce((acc, net) => acc + cleanItem[net], 0);
+        total = sum / validNetworks.length;
+      }
+
+      return {
+        ...cleanItem,
+        total: isNegative ? ensureNegative(total) : total
+      };
+    })
+    .filter(item => {
+      const networks = Object.keys(item).filter(k => k !== 'name' && k !== 'total');
+      return networks.length > 0;
     })
     .sort((a, b) => isNegative ? a.total - b.total : b.total - a.total);
+
+  return result;
 };
 
 const processBandDistribution = (rawData) => {
@@ -233,6 +405,23 @@ const processUniqueList = (rawData, keyOptions) => {
   
   return Array.from(unique).sort();
 };
+
+const parseDurationToHours = (duration) => {
+  if (!duration || typeof duration !== 'string') return 0;
+  
+  const parts = duration.split(':');
+  if (parts.length !== 3) return 0;
+  
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  const seconds = parseInt(parts[2], 10) || 0;
+  
+  return parseFloat((hours + (minutes / 60) + (seconds / 3600)).toFixed(2));
+};
+
+// ============================================
+// HOOKS
+// ============================================
 
 export const useTotals = () => {
   return useSWR(
@@ -312,20 +501,20 @@ export const useMetricData = (metric, filters) => {
 };
 
 export const useOperatorMetrics = (metric, filters) => {
-  const cacheKey = useMemo(() => createCacheKey(`opMetric_${metric}`, filters), [metric, filters]);
+  const cacheKey = useMemo(() => createCacheKey('operatorMetricsAll', filters), [filters]);
   const query = useMemo(() => buildQueryString(filters), [filters]);
   
   const { data: rawData, ...rest } = useSWR(
     cacheKey,
     async () => {
-      const endpointMap = { samples: 'getOperatorSamplesV2', ...METRIC_ENDPOINT_MAP };
-      const endpoint = endpointMap[metric];
-      if (!endpoint || !adminApi[endpoint]) return [];
-      
-      const response = await adminApi[endpoint](query);
+      const response = await adminApi.getOperatorSamplesV2?.(query);
       return extractData(response, []);
     },
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.SHORT, fallbackData: [] }
+    { 
+      ...SWR_CONFIG, 
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      fallbackData: [] 
+    }
   );
   
   const processedData = useMemo(
@@ -697,61 +886,153 @@ export const useParallelMetrics = (metrics = [], filters) => {
   return { data: processedData, ...rest };
 };
 
-const parseDurationToHours = (duration) => {
-  if (!duration || typeof duration !== 'string') return 0;
-  
-  const parts = duration.split(':');
-  if (parts.length !== 3) return 0;
-  
-  const hours = parseInt(parts[0], 10) || 0;
-  const minutes = parseInt(parts[1], 10) || 0;
-  const seconds = parseInt(parts[2], 10) || 0;
-  
-  return parseFloat((hours + (minutes / 60) + (seconds / 3600)).toFixed(2));
-};
-
-const parseDurationToMinutes = (duration) => {
-  if (!duration || typeof duration !== 'string') return 0;
-  
-  const parts = duration.split(':');
-  if (parts.length !== 3) return 0;
-  
-  const hours = parseInt(parts[0], 10) || 0;
-  const minutes = parseInt(parts[1], 10) || 0;
-  const seconds = parseInt(parts[2], 10) || 0;
-  
-  return parseFloat(((hours * 60) + minutes + (seconds / 60)).toFixed(2));
-};
-
+/**
+ * ✅ APP DATA HOOK - Enhanced with detailed logging
+ */
 export const useAppData = () => {
-  const { data: rawData, ...rest } = useSWR(
+  console.log('🚀 [useAppData] Hook called');
+  
+  const { data: rawData, isLoading, error, ...rest } = useSWR(
     'appData',
-    createFetcher(() => adminApi.getAppValue(), []),
-    { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.MEDIUM, fallbackData: [] }
+    async () => {
+      console.log('📡 [useAppData] Fetching from API...');
+      const startTime = Date.now();
+      
+      try {
+        const response = await adminApi.getAppValue();
+        const elapsed = Date.now() - startTime;
+        
+        console.log(`✅ [useAppData] API call completed in ${elapsed}ms`, {
+          response,
+          type: typeof response,
+          isArray: Array.isArray(response),
+        });
+        
+        const extracted = extractData(response, []);
+        console.log('[useAppData] Extracted data:', {
+          type: typeof extracted,
+          isArray: Array.isArray(extracted),
+          length: Array.isArray(extracted) ? extracted.length : 'N/A',
+          sample: Array.isArray(extracted) && extracted.length > 0 ? extracted[0] : null
+        });
+        
+        return extracted;
+      } catch (err) {
+        console.error('❌ [useAppData] API call failed:', err);
+        throw err;
+      }
+    },
+    { 
+      ...SWR_CONFIG,
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      fallbackData: [],
+      loadingTimeout: 35000,
+      errorRetryInterval: 5000,
+      errorRetryCount: 3,
+      shouldRetryOnError: true,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      onSuccess: (data) => {
+        console.log('✅ [useAppData] SWR onSuccess:', {
+          type: typeof data,
+          isArray: Array.isArray(data),
+          length: Array.isArray(data) ? data.length : 'N/A'
+        });
+      },
+      onError: (err) => {
+        console.error('❌ [useAppData] SWR onError:', err);
+      },
+    }
   );
   
+  console.log('[useAppData] SWR state:', { 
+    hasData: !!rawData, 
+    isLoading, 
+    hasError: !!error,
+    dataType: typeof rawData,
+    dataLength: Array.isArray(rawData) ? rawData.length : 'N/A'
+  });
+  
   const processedData = useMemo(() => {
-    if (!Array.isArray(rawData) || rawData.length === 0) return [];
+    console.log('🔄 [useAppData] Processing data...', {
+      hasRawData: !!rawData,
+      isArray: Array.isArray(rawData),
+      length: Array.isArray(rawData) ? rawData.length : 'N/A'
+    });
     
-    return rawData.map(item => {
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      console.warn('⚠️ [useAppData] No raw data to process');
+      return [];
+    }
+
+    console.log('[useAppData] Processing', rawData.length, 'items');
+    console.log('[useAppData] Sample raw item:', rawData[0]);
+    
+    const processed = rawData.map((item, index) => {
       const durationStr = item?.durationHHMMSS || item?.avgDuration || '00:00:00';
       
-      return {
+      const processedItem = {
+        // Basic info
         appName: item?.appName || item?.AppName || 'Unknown',
-        avgDlTptMbps: toNumber(item?.avgDlTptMbps || item?.AvgDlTptMbps),
-        avgUlTptMbps: toNumber(item?.avgUlTptMbps || item?.AvgUlTptMbps),
-        avgMos: toNumber(item?.avgMos || item?.AvgMos),
-        sampleCount: toNumber(item?.sampleCount || item?.SampleCount),
-        avgRsrp: toNumber(item?.avgRsrp || item?.AvgRsrp),
-        avgRsrq: toNumber(item?.avgRsrq || item?.AvgRsrq),
-        avgSinr: toNumber(item?.avgSinr || item?.AvgSinr),
+        
+        // Sample count
+        sampleCount: toNumber(item?.sampleCount || item?.SampleCount || 0),
+        
+        // Signal quality metrics
+        avgRsrp: toNumber(item?.avgRsrp || item?.AvgRsrp || 0),
+        avgRsrq: toNumber(item?.avgRsrq || item?.AvgRsrq || 0),
+        avgSinr: toNumber(item?.avgSinr || item?.AvgSinr || 0),
+        
+        // Performance metrics
+        avgMos: toNumber(item?.avgMos || item?.AvgMos || 0),
+        avgJitter: toNumber(item?.avgJitter || item?.AvgJitter || 0),
+        avgLatency: toNumber(item?.avgLatency || item?.AvgLatency || 0),
+        avgPacketLoss: toNumber(item?.avgPacketLoss || item?.AvgPacketLoss || 0),
+        
+        // Throughput
+        avgDlTptMbps: toNumber(item?.avgDlTptMbps || item?.AvgDlTptMbps || 0),
+        avgUlTptMbps: toNumber(item?.avgUlTptMbps || item?.AvgUlTptMbps || 0),
+        
+        // Duration
         avgDuration: parseDurationToHours(durationStr),
         avgDurationFormatted: durationStr,
+        durationSeconds: toNumber(item?.durationSeconds || 0),
+        durationMinutes: toNumber(item?.durationMinutes || 0),
+        
+        // Timestamps
+        firstUsedAt: item?.firstUsedAt,
+        lastUsedAt: item?.lastUsedAt,
+        usageDate: item?.usageDate,
       };
+      
+      if (index === 0) {
+        console.log('[useAppData] Sample processed item:', processedItem);
+      }
+      
+      return processedItem;
     });
+
+    console.log('✅ [useAppData] Processing complete:', {
+      inputCount: rawData.length,
+      outputCount: processed.length,
+      sample: processed[0]
+    });
+    
+    return processed;
   }, [rawData]);
   
-  return { data: processedData, ...rest };
+  console.log('[useAppData] Returning:', {
+    dataCount: processedData.length,
+    isLoading,
+    hasError: !!error
+  });
+  
+  return { 
+    data: processedData, 
+    isLoading,
+    error,
+    ...rest 
+  };
 };
 
 export const usePrefetchDashboard = (filters) => {

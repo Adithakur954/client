@@ -44,15 +44,21 @@ const OPERATOR_COLORS = {
     gradient: 'linear-gradient(135deg, #e60000 0%, #ff1744 100%)',
     light: '#ffebee',
   },
+  yas:{
+    primary: '#7b1fa2',
+    gradient: 'linear-gradient(135deg, #7b1fa2 0%, #ab47bc 100%)',
+    light: '#f3e5f5',
+  }
 };
 
 const CHART_COLORS = ['#0a3d91', '#ff0000', '#ffc107', '#e60000', '#7b1fa2', '#0097a7'];
-const ALLOWED_OPERATORS = ['jio', 'airtel', 'vi', 'vodafone'];
+const ALLOWED_OPERATORS = ['jio', 'airtel', 'vi', 'vodafone','yas'];
 
 const getOperatorConfig = (name) => {
   const nameLower = name.toLowerCase();
   if (nameLower.includes('jio')) return OPERATOR_COLORS.jio;
   if (nameLower.includes('airtel')) return OPERATOR_COLORS.airtel;
+  if (nameLower.includes('yas')) return OPERATOR_COLORS.yas;
   if (nameLower.includes('vi') || nameLower.includes('vodafone')) return OPERATOR_COLORS.vi;
   return {
     primary: CHART_COLORS[0],
@@ -61,13 +67,7 @@ const getOperatorConfig = (name) => {
   };
 };
 
-const getOperatorIcon = (name) => {
-  const nameLower = name.toLowerCase();
-  if (nameLower.includes('jio')) return '📶';
-  if (nameLower.includes('airtel')) return '📡';
-  if (nameLower.includes('vi') || nameLower.includes('vodafone')) return '📱';
-  return '📊';
-};
+
 
 const OperatorRankingChart = () => {
   const [chartType, setChartType] = useState('coverage');
@@ -115,7 +115,7 @@ const OperatorRankingChart = () => {
           color: config.primary,
           gradient: config.gradient,
           lightColor: config.light,
-          icon: getOperatorIcon(item.name),
+          
           rank: index + 1,
         };
       });

@@ -1156,7 +1156,7 @@ const UnifiedMapView = () => {
     enableDataToggle && dataToggle === "sample"
   );
 
-  // 3. Prediction data (only when dataToggle is "prediction" or site mode)
+ 
   const {
     locations: predictionLocations,
     colorSettings: predictionColorSettings,

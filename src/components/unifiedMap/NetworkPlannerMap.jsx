@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { PolygonF } from "@react-google-maps/api";
 import { cellSiteApi } from "@/api/apiEndpoints";
+import toast from "react-hot-toast";
 
 // Helper to calculate sector polygon points
 function computeOffset(center, distanceMeters, headingDegrees) {
@@ -327,6 +328,8 @@ const NetworkPlannerMap = ({
         } else if (error.message) {
           errMsg = error.message;
         }
+
+        toast.error(`Network Planner Error: ${errMsg}`);
         
         console.error(`❌ [NetworkPlanner ${instanceId.current}] ${errMsg}`, error);
         setError(errMsg);

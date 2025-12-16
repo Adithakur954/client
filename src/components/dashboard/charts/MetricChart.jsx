@@ -25,6 +25,9 @@ const isAllowedOperator = (name) => {
   if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) {
     return true;
   }
+  if (cleanName.includes('yas')) {
+    return true;
+  }
   
   return false;
 };
