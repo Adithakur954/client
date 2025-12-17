@@ -35,6 +35,7 @@ export const COLOR_SCHEMES = {
     Airtel: "#EF4444",
     "VI India": "#22C55E",
     BSNL: "#F59E0B",
+    Yas: "#C0C0C0", // Silver
     Unknown: "#6B7280",
   },
   technology: {
