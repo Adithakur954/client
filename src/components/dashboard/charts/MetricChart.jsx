@@ -428,7 +428,7 @@ const MetricChart = () => {
         <div className="h-96 flex flex-col items-center justify-center text-gray-500">
           <Activity size={48} className="mb-4 opacity-20" />
           <p className="text-lg font-medium">No data available</p>
-          <p className="text-sm mt-1">Showing Airtel, Jio & Vi only</p>
+         
           {hasActiveFilters && (
             <button
               onClick={clearAllFilters}

@@ -11,7 +11,7 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import AuthProvider, { useAuth } from "./context/AuthContext";
-import { localStorageProvider } from "./utils/localStorageProvider";
+import { indexedDBProvider } from "./utils/indexedDBProvider";
 import Spinner from "./components/common/Spinner";
 
 import LoginPage from "./pages/Login";
@@ -76,7 +76,7 @@ const NotFoundPage = () => (
 );
 
 const swrConfig = {
-  provider: localStorageProvider,
+  provider: indexedDBProvider,
 
   revalidateOnFocus: false,
   revalidateOnReconnect: true,

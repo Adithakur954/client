@@ -889,37 +889,110 @@ export const useParallelMetrics = (metrics = [], filters) => {
 /**
  * ✅ APP DATA HOOK - Enhanced with detailed logging
  */
+/**
+ * ✅ APP DATA HOOK - Fixed with better error handling and debugging
+ */
 export const useAppData = () => {
-  console.log('🚀 [useAppData] Hook called');
+  console.log('🔵 [useAppData] Hook called');
   
-  const { data: rawData, isLoading, error, ...rest } = useSWR(
+  const { data: rawData, isLoading, error, isValidating, mutate, ...rest } = useSWR(
     'appData',
     async () => {
       console.log('📡 [useAppData] Fetching from API...');
       const startTime = Date.now();
       
       try {
+        // Check if API method exists
+        if (!adminApi.getAppValue) {
+          console.error('❌ [useAppData] adminApi.getAppValue is undefined!');
+          throw new Error('API method getAppValue not found');
+        }
+        
         const response = await adminApi.getAppValue();
         const elapsed = Date.now() - startTime;
         
-        console.log(`✅ [useAppData] API call completed in ${elapsed}ms`, {
-          response,
-          type: typeof response,
-          isArray: Array.isArray(response),
-        });
+        console.log(`✅ [useAppData] API call completed in ${elapsed}ms`);
+        console.log('[useAppData] Raw API Response:', JSON.stringify(response, null, 2));
         
-        const extracted = extractData(response, []);
-        console.log('[useAppData] Extracted data:', {
-          type: typeof extracted,
-          isArray: Array.isArray(extracted),
-          length: Array.isArray(extracted) ? extracted.length : 'N/A',
-          sample: Array.isArray(extracted) && extracted.length > 0 ? extracted[0] : null
-        });
+        // Handle null/undefined response
+        if (response === null || response === undefined) {
+          console.warn('⚠️ [useAppData] API returned null/undefined');
+          return [];
+        }
+        
+        // Handle Status: 0 (API-level error)
+        if (response?.Status === 0) {
+          console.warn('⚠️ [useAppData] API returned Status: 0', response?.Message || response?.error);
+          return [];
+        }
+        
+        // Extract data from response
+        let extracted = null;
+        
+        // Direct array
+        if (Array.isArray(response)) {
+          extracted = response;
+          console.log('[useAppData] Response is direct array, length:', response.length);
+        }
+        // Nested in Data/data/Result/result
+        else if (Array.isArray(response?.Data)) {
+          extracted = response.Data;
+          console.log('[useAppData] Extracted from response.Data, length:', extracted.length);
+        }
+        else if (Array.isArray(response?.data)) {
+          extracted = response.data;
+          console.log('[useAppData] Extracted from response.data, length:', extracted.length);
+        }
+        else if (Array.isArray(response?.Result)) {
+          extracted = response.Result;
+          console.log('[useAppData] Extracted from response.Result, length:', extracted.length);
+        }
+        else if (Array.isArray(response?.result)) {
+          extracted = response.result;
+          console.log('[useAppData] Extracted from response.result, length:', extracted.length);
+        }
+        // Single object response - wrap in array
+        else if (typeof response === 'object' && response !== null) {
+          console.log('[useAppData] Response is object, checking for nested data...');
+          console.log('[useAppData] Response keys:', Object.keys(response));
+          
+          // Check if it's a single data item (has appName or similar)
+          if (response.appName || response.AppName) {
+            extracted = [response];
+            console.log('[useAppData] Single item response, wrapping in array');
+          } else {
+            // Try to find any array property
+            for (const key of Object.keys(response)) {
+              if (Array.isArray(response[key])) {
+                extracted = response[key];
+                console.log(`[useAppData] Found array in response.${key}, length:`, extracted.length);
+                break;
+              }
+            }
+          }
+        }
+        
+        if (!extracted) {
+          console.warn('⚠️ [useAppData] Could not extract data from response');
+          console.log('[useAppData] Full response for debugging:', response);
+          return [];
+        }
+        
+        if (extracted.length === 0) {
+          console.warn('⚠️ [useAppData] Extracted data is empty array');
+        } else {
+          console.log('[useAppData] First item sample:', extracted[0]);
+        }
         
         return extracted;
+        
       } catch (err) {
-        console.error('❌ [useAppData] API call failed:', err);
-        throw err;
+        console.error('❌ [useAppData] API call failed:', {
+          message: err.message,
+          name: err.name,
+          stack: err.stack,
+        });
+        throw err; // Re-throw to trigger SWR error handling
       }
     },
     { 
@@ -936,101 +1009,121 @@ export const useAppData = () => {
         console.log('✅ [useAppData] SWR onSuccess:', {
           type: typeof data,
           isArray: Array.isArray(data),
-          length: Array.isArray(data) ? data.length : 'N/A'
+          length: Array.isArray(data) ? data.length : 'N/A',
+          firstItem: Array.isArray(data) && data.length > 0 ? data[0] : null
         });
       },
-      onError: (err) => {
-        console.error('❌ [useAppData] SWR onError:', err);
+      onError: (err, key, config) => {
+        console.error('❌ [useAppData] SWR onError:', {
+          message: err?.message,
+          name: err?.name,
+          key,
+        });
+      },
+      onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+        console.log(`🔄 [useAppData] Retry attempt ${retryCount}/${config.errorRetryCount}`);
+        
+        // Don't retry for specific errors
+        if (error?.status === 404 || error?.status === 401) {
+          console.log('🛑 [useAppData] Not retrying for status:', error.status);
+          return;
+        }
+        
+        // Retry after delay
+        setTimeout(() => revalidate({ retryCount }), config.errorRetryInterval);
       },
     }
   );
   
-  console.log('[useAppData] SWR state:', { 
-    hasData: !!rawData, 
+  // Debug current state
+  console.log('🔵 [useAppData] Current SWR state:', { 
+    hasData: rawData !== undefined && rawData !== null, 
+    dataIsArray: Array.isArray(rawData),
+    dataLength: Array.isArray(rawData) ? rawData.length : 0,
     isLoading, 
+    isValidating,
     hasError: !!error,
-    dataType: typeof rawData,
-    dataLength: Array.isArray(rawData) ? rawData.length : 'N/A'
+    errorMessage: error?.message || null,
   });
   
-  const processedData = useMemo(() => {
-    console.log('🔄 [useAppData] Processing data...', {
-      hasRawData: !!rawData,
-      isArray: Array.isArray(rawData),
-      length: Array.isArray(rawData) ? rawData.length : 'N/A'
+  // Log actual error if exists
+  if (error) {
+    console.error('🔴 [useAppData] Error details:', {
+      message: error.message,
+      name: error.name,
+      status: error.status,
+      response: error.response,
     });
+  }
+  
+  const processedData = useMemo(() => {
+    console.log('🔄 [useAppData] Processing data...');
     
-    if (!Array.isArray(rawData) || rawData.length === 0) {
-      console.warn('⚠️ [useAppData] No raw data to process');
+    if (!rawData) {
+      console.warn('⚠️ [useAppData] rawData is null/undefined');
+      return [];
+    }
+    
+    if (!Array.isArray(rawData)) {
+      console.warn('⚠️ [useAppData] rawData is not an array:', typeof rawData);
+      return [];
+    }
+    
+    if (rawData.length === 0) {
+      console.warn('⚠️ [useAppData] rawData is empty array');
       return [];
     }
 
     console.log('[useAppData] Processing', rawData.length, 'items');
-    console.log('[useAppData] Sample raw item:', rawData[0]);
+    console.log('[useAppData] First raw item:', rawData[0]);
     
     const processed = rawData.map((item, index) => {
-      const durationStr = item?.durationHHMMSS || item?.avgDuration || '00:00:00';
-      
-      const processedItem = {
-        // Basic info
-        appName: item?.appName || item?.AppName || 'Unknown',
-        
-        // Sample count
-        sampleCount: toNumber(item?.sampleCount || item?.SampleCount || 0),
-        
-        // Signal quality metrics
-        avgRsrp: toNumber(item?.avgRsrp || item?.AvgRsrp || 0),
-        avgRsrq: toNumber(item?.avgRsrq || item?.AvgRsrq || 0),
-        avgSinr: toNumber(item?.avgSinr || item?.AvgSinr || 0),
-        
-        // Performance metrics
-        avgMos: toNumber(item?.avgMos || item?.AvgMos || 0),
-        avgJitter: toNumber(item?.avgJitter || item?.AvgJitter || 0),
-        avgLatency: toNumber(item?.avgLatency || item?.AvgLatency || 0),
-        avgPacketLoss: toNumber(item?.avgPacketLoss || item?.AvgPacketLoss || 0),
-        
-        // Throughput
-        avgDlTptMbps: toNumber(item?.avgDlTptMbps || item?.AvgDlTptMbps || 0),
-        avgUlTptMbps: toNumber(item?.avgUlTptMbps || item?.AvgUlTptMbps || 0),
-        
-        // Duration
-        avgDuration: parseDurationToHours(durationStr),
-        avgDurationFormatted: durationStr,
-        durationSeconds: toNumber(item?.durationSeconds || 0),
-        durationMinutes: toNumber(item?.durationMinutes || 0),
-        
-        // Timestamps
-        firstUsedAt: item?.firstUsedAt,
-        lastUsedAt: item?.lastUsedAt,
-        usageDate: item?.usageDate,
-      };
-      
-      if (index === 0) {
-        console.log('[useAppData] Sample processed item:', processedItem);
+      if (!item) {
+        console.warn(`[useAppData] Item at index ${index} is null/undefined`);
+        return null;
       }
       
-      return processedItem;
-    });
+      const durationStr = item?.durationHHMMSS || item?.avgDuration || '00:00:00';
+      
+      return {
+        appName: item?.appName || item?.AppName || item?.app_name || 'Unknown',
+        sampleCount: toNumber(item?.sampleCount || item?.SampleCount || item?.sample_count || 0),
+        avgRsrp: toNumber(item?.avgRsrp || item?.AvgRsrp || item?.avg_rsrp || 0),
+        avgRsrq: toNumber(item?.avgRsrq || item?.AvgRsrq || item?.avg_rsrq || 0),
+        avgSinr: toNumber(item?.avgSinr || item?.AvgSinr || item?.avg_sinr || 0),
+        avgMos: toNumber(item?.avgMos || item?.AvgMos || item?.avg_mos || 0),
+        avgJitter: toNumber(item?.avgJitter || item?.AvgJitter || item?.avg_jitter || 0),
+        avgLatency: toNumber(item?.avgLatency || item?.AvgLatency || item?.avg_latency || 0),
+        avgPacketLoss: toNumber(item?.avgPacketLoss || item?.AvgPacketLoss || item?.avg_packet_loss || 0),
+        avgDlTptMbps: toNumber(item?.avgDlTptMbps || item?.AvgDlTptMbps || item?.avg_dl_tpt_mbps || 0),
+        avgUlTptMbps: toNumber(item?.avgUlTptMbps || item?.AvgUlTptMbps || item?.avg_ul_tpt_mbps || 0),
+        avgDuration: parseDurationToHours(durationStr),
+        avgDurationFormatted: durationStr,
+        durationSeconds: toNumber(item?.durationSeconds || item?.duration_seconds || 0),
+        durationMinutes: toNumber(item?.durationMinutes || item?.duration_minutes || 0),
+        firstUsedAt: item?.firstUsedAt || item?.first_used_at,
+        lastUsedAt: item?.lastUsedAt || item?.last_used_at,
+        usageDate: item?.usageDate || item?.usage_date,
+      };
+    }).filter(Boolean); // Remove nulls
 
-    console.log('✅ [useAppData] Processing complete:', {
-      inputCount: rawData.length,
-      outputCount: processed.length,
-      sample: processed[0]
-    });
+    console.log('✅ [useAppData] Processing complete:', processed.length, 'items');
+    
+    if (processed.length > 0) {
+      console.log('[useAppData] First processed item:', processed[0]);
+    }
     
     return processed;
   }, [rawData]);
   
-  console.log('[useAppData] Returning:', {
-    dataCount: processedData.length,
-    isLoading,
-    hasError: !!error
-  });
-  
   return { 
     data: processedData, 
+    rawData, // Also expose raw data for debugging
     isLoading,
+    isValidating,
     error,
+    mutate, // Expose mutate for manual refresh
+    refresh: () => mutate(), // Helper function
     ...rest 
   };
 };

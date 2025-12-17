@@ -331,7 +331,7 @@ const NetworkPlannerMap = ({
 
         toast.error(`Network Planner Error: ${errMsg}`);
         
-        console.error(`❌ [NetworkPlanner ${instanceId.current}] ${errMsg}`, error);
+        console.error(` [NetworkPlanner ${instanceId.current}] ${errMsg}`, error);
         setError(errMsg);
         setInternalSectors([]);
       } finally {

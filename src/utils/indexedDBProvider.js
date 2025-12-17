@@ -5,24 +5,22 @@ const STORE_NAME = 'cache';
 const DB_VERSION = 1;
 const CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-class IndexedDBCache {
+class IndexedDBCache extends Map {
   constructor() {
+    super();
     this.db = null;
-    this.memoryCache = new Map();
-    this.pendingWrites = new Map();
-    this.writeTimeout = null;
-    this.isReady = false;
-    this.readyPromise = this.init();
+    this.writeQueue = new Map();
+    this.writeTimer = null;
+    this.initPromise = this.init();
   }
 
   async init() {
     try {
       this.db = await this.openDB();
-      await this.loadToMemory();
-      this.isReady = true;
+      await this.cleanup(); // Remove old data first
+      await this.loadFromDB(); // Load remaining valid data
     } catch (error) {
-      // ✅ REMOVED: console.warn - Silent fallback to memory cache
-      this.isReady = true;
+      console.warn('IndexedDB initialization failed, falling back to in-memory cache:', error);
     }
   }
 
@@ -36,146 +34,124 @@ class IndexedDBCache {
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
+          // Create store with 'key' as the primary key
           db.createObjectStore(STORE_NAME, { keyPath: 'key' });
         }
       };
     });
   }
 
-  async loadToMemory() {
+  async cleanup() {
+    if (!this.db) return;
+    const transaction = this.db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const now = Date.now();
+
+    // Iterate efficiently using a cursor
+    const request = store.openCursor();
+    
+    request.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (cursor) {
+        if (cursor.value.timestamp && now - cursor.value.timestamp > CACHE_EXPIRY) {
+          cursor.delete();
+        }
+        cursor.continue();
+      }
+    };
+  }
+
+  async loadFromDB() {
     if (!this.db) return;
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const transaction = this.db.transaction(STORE_NAME, 'readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.getAll();
 
       request.onsuccess = () => {
-        const now = Date.now();
-        request.result.forEach(item => {
-          // Skip expired entries
-          if (item.timestamp && now - item.timestamp < CACHE_EXPIRY) {
-            this.memoryCache.set(item.key, item.value);
-          }
-        });
+        const entries = request.result;
+        if (Array.isArray(entries)) {
+          entries.forEach(item => {
+            // Populate the parent Map directly
+            super.set(item.key, item.value);
+          });
+        }
         resolve();
       };
-
-      request.onerror = () => reject(request.error);
+      
+      request.onerror = () => {
+        console.warn('Failed to load SWR cache from IndexedDB');
+        resolve(); // Resolve anyway to not block app
+      };
     });
   }
 
-  get(key) {
-    return this.memoryCache.get(key);
-  }
-
   set(key, value) {
-    const wrappedValue = {
-      data: value,
+    // 1. Update in-memory Map immediately (synchronous)
+    super.set(key, value);
+
+    // 2. Queue for async write (prevents UI blocking)
+    this.writeQueue.set(key, {
+      key,
+      value,
       timestamp: Date.now()
-    };
+    });
     
-    this.memoryCache.set(key, wrappedValue);
-    this.pendingWrites.set(key, wrappedValue);
-    this.scheduleBatchWrite();
-    
+    this.scheduleWrite();
     return this;
   }
 
   delete(key) {
-    this.memoryCache.delete(key);
-    this.pendingWrites.set(key, null); // null means delete
-    this.scheduleBatchWrite();
+    super.delete(key);
+    this.writeQueue.set(key, null); // null indicates deletion
+    this.scheduleWrite();
     return true;
   }
 
-  has(key) {
-    return this.memoryCache.has(key);
+  scheduleWrite() {
+    if (this.writeTimer) return;
+    
+    // Batch writes every 1 second
+    this.writeTimer = setTimeout(() => this.processWriteQueue(), 1000);
   }
 
-  keys() {
-    return this.memoryCache.keys();
-  }
+  async processWriteQueue() {
+    if (!this.db || this.writeQueue.size === 0) {
+      this.writeTimer = null;
+      return;
+    }
 
-  scheduleBatchWrite() {
-    if (this.writeTimeout) return;
-
-    this.writeTimeout = setTimeout(() => {
-      this.batchWrite();
-      this.writeTimeout = null;
-    }, 1000);
-  }
-
-  async batchWrite() {
-    if (!this.db || this.pendingWrites.size === 0) return;
-
-    const writes = new Map(this.pendingWrites);
-    this.pendingWrites.clear();
+    const currentQueue = new Map(this.writeQueue);
+    this.writeQueue.clear();
+    this.writeTimer = null;
 
     try {
       const transaction = this.db.transaction(STORE_NAME, 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
 
-      writes.forEach((value, key) => {
-        if (value === null) {
+      currentQueue.forEach((item, key) => {
+        if (item === null) {
           store.delete(key);
         } else {
-          store.put({ key, value: value.data, timestamp: value.timestamp });
+          store.put(item);
         }
       });
-
-      await new Promise((resolve, reject) => {
-        transaction.oncomplete = resolve;
-        transaction.onerror = () => reject(transaction.error);
-      });
-    } catch (error) {
-      // ✅ REMOVED: console.warn - Silent error handling
-      // Failed writes will be retried on next batch
+      
+      transaction.oncomplete = () => {
+        // Optional: Check if more writes came in while processing
+        if (this.writeQueue.size > 0) this.scheduleWrite();
+      };
+    } catch (err) {
+      console.error('IndexedDB batch write failed', err);
     }
-  }
-
-  async clear() {
-    this.memoryCache.clear();
-    this.pendingWrites.clear();
-
-    if (!this.db) return;
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction(STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.clear();
-
-      request.onsuccess = resolve;
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  // Map interface compatibility
-  forEach(callback) {
-    this.memoryCache.forEach(callback);
-  }
-
-  get size() {
-    return this.memoryCache.size;
-  }
-
-  [Symbol.iterator]() {
-    return this.memoryCache[Symbol.iterator]();
   }
 }
 
-let cacheInstance = null;
+// Create a singleton instance
+const cacheInstance = new IndexedDBCache();
 
+// SWR Provider function
 export const indexedDBProvider = () => {
-  if (!cacheInstance) {
-    cacheInstance = new IndexedDBCache();
-  }
-  return cacheInstance.memoryCache;
-};
-
-export const getIndexedDBCache = () => {
-  if (!cacheInstance) {
-    cacheInstance = new IndexedDBCache();
-  }
   return cacheInstance;
 };

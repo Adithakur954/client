@@ -103,7 +103,7 @@ const PROVIDER_COLORS = {
   "china unicom": "#D6001C", // Red
   "china telecom": "#2196F3", // Blue
   "ntt docomo": "#C8002D",   // Red
-  "softbank": "#C0C0C0",     // Silver
+  "Yas": "#C0C0C0",     // Silver
   "sk telecom": "#E4002B",   // Red
   
   // Australian Carriers
@@ -149,7 +149,7 @@ export const getProviderColor = (provider) => {
     return PROVIDER_COLORS.vi;
   }
   if (cleanProvider.includes('bsnl')) return PROVIDER_COLORS.bsnl;
-  if (cleanProvider.includes('mtnl')) return PROVIDER_COLORS.mtnl;
+  if (cleanProvider.includes('Yas')) return PROVIDER_COLORS.Yas;
   
   // US carriers
   if (cleanProvider.includes('verizon')) return PROVIDER_COLORS.verizon;

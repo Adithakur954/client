@@ -10,6 +10,7 @@ export const normalizeProviderName = (raw) => {
   if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) return "Jio";
   if (cleaned.includes("AIRTEL") || cleaned.includes("airtel")) return "Airtel";
   if (cleaned === "VI" || cleaned.includes("VIINDIA") || cleaned.includes("VODAFONE") || cleaned.includes("IDEA")) return "VI India";
+  if (cleaned.includes("YAS") || cleaned.includes("BROADBAND")) return "YAS";
   if (cleaned.includes("BSNL")) return "BSNL";
 
   return "Unknown";
