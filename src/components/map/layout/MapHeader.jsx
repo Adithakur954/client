@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import MapSidebarFloating from "./MapSidebarFloating";
+import DrawingControlsPanel from "./DrawingControlsPanel";
 
 export default function MapHeader({
   ui,
@@ -28,7 +29,7 @@ export default function MapHeader({
   onSearchToggle,
   thresholds = {},
   logs = [],
-  // ⭐ ADD THESE THREE PROPS ⭐
+  onFetchLogs,
   availableFilterOptions = { providers: [], technologies: [], bands: [] },
   rawLogsCount = 0,
   isLoading = false,
@@ -80,7 +81,7 @@ export default function MapHeader({
         </Button>
       </div>
 
-      <div className="relative" ref={dropdownRef}>
+      {/* <div className="relative" ref={dropdownRef}>
         <button
           className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
             dropOpen
@@ -225,6 +226,19 @@ export default function MapHeader({
             </div>
           </div>
         )}
+      </div> */}
+
+      <div className="relative">
+        <DrawingControlsPanel
+          ui={ui}
+          onUIChange={onUIChange}
+          hasLogs={hasLogs}
+          polygonStats={polygonStats}
+          onDownloadStatsCsv={onDownloadStatsCsv}
+          onDownloadRawCsv={onDownloadRawCsv}
+          onFetchLogs={onFetchLogs} // Pass the fetch handler
+          position="relative" // Custom prop to handle positioning inside header if needed
+        />
       </div>
 
       <div className="flex items-center gap-3">

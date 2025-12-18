@@ -7,7 +7,7 @@ export default function Header() {
   const { user, logout } = useAuth();
 
   return (
-    <header className="h-18 bg-slate-950 text-white  shadow-sm flex items-center justify-between px-8 flex-shrink-0">
+    <header className="h-16 bg-slate-950 text-white  shadow-sm flex items-center justify-between px-8 flex-shrink-0">
       <div>
         {/* Placeholder for breadcrumbs or page titles */}
       </div>

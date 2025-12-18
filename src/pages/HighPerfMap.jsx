@@ -8,14 +8,14 @@ import React, {
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { toast } from "react-toastify";
 import MapSearchBox from "@/components/map/MapSearchBox";
-import { Save, Clock } from "lucide-react";
+import { Save, X, Download, MapPin, Layers } from "lucide-react";
 
 import { adminApi, mapViewApi, settingApi } from "@/api/apiEndpoints";
 
 import MapHeader from "@/components/map/layout/MapHeader";
 import SessionDetailPanel from "@/components/map/layout/SessionDetail";
 import AllLogsPanelToggle from "@/components/map/layout/AllLogsPanelToggle";
-import TimeControlsPanel from "@/components/map/TimeControlsPanel";
+import { useNavigate } from "react-router-dom";
 
 import SessionsLayer from "@/components/map/overlays/SessionsLayer";
 import LogCirclesLayer from "@/components/map/layers/LogCirclesLayer";
@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { loadSavedViewport, saveViewport } from "@/utils/viewport";
 import { parseWKTToCoordinates } from "@/utils/wkt";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
+import { normalizeProviderName } from "@/utils/colorUtils";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
@@ -51,37 +52,18 @@ const toYmdLocal = (d) => {
 
 const extractLogsFromResponse = (response) => {
   if (!response) return [];
-  
   if (Array.isArray(response)) return response;
   if (Array.isArray(response.data)) return response.data;
   if (Array.isArray(response.Data)) return response.Data;
   if (Array.isArray(response.logs)) return response.logs;
   if (Array.isArray(response.result)) return response.result;
   if (Array.isArray(response.Result)) return response.Result;
-  
   return [];
-};
-
-export const normalizeProviderName = (raw) => {
-  if (!raw) return "Unknown";
-  const s = String(raw).trim();
-  if (/^\/+$/.test(s)) return "Unknown";
-  if (s.replace(/\s+/g, "") === "404011") return "Unknown";
-
-  const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
-
-  if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) return "Jio";
-  if (cleaned.includes("AIRTEL")) return "Airtel";
-  if (cleaned === "VI" || cleaned.includes("VIINDIA") || cleaned.includes("VODAFONE") || cleaned.includes("IDEA")) return "VI India";
-  if (cleaned.includes("BSNL")) return "BSNL";
-
-  return "Unknown";
 };
 
 export const normalizeTechName = (tech) => {
   if (!tech) return "Unknown";
   const t = String(tech).trim().toUpperCase();
-
   if (t.includes("5G") || t.includes("NR")) return "5G";
   if (t.includes("LTE") || t.includes("4G")) return "4G";
   if (t.includes("3G")) return "3G";
@@ -133,14 +115,8 @@ const formatArea = (areaInMeters) => {
   return `${areaInMeters.toFixed(0)} m²`;
 };
 
-const getDayName = (index) => {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days[index] || '';
-};
-
 const fitMapToMostlyLogs = (map, points) => {
   if (!map || !Array.isArray(points) || points.length === 0) return;
-  
   const bounds = new window.google.maps.LatLngBounds();
   const lats = points.map(p => p.lat).filter(Number.isFinite).sort((a, b) => a - b);
   const lons = points.map(p => p.lon).filter(Number.isFinite).sort((a, b) => a - b);
@@ -157,26 +133,20 @@ const fitMapToMostlyLogs = (map, points) => {
 };
 
 export default function HighPerfMap() {
+  const navigate = useNavigate();
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
   const [map, setMap] = useState(null);
-
   const [isLoading, setIsLoading] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
-
   const [thresholds, setThresholds] = useState({});
   const [allSessions, setAllSessions] = useState([]);
   const [projectPolygons, setProjectPolygons] = useState([]);
-
   const [activeFilters, setActiveFilters] = useState(null);
   const [selectedMetric, setSelectedMetric] = useState("rsrp");
-
   const [selectedSessionData, setSelectedSessionData] = useState(null);
-  
   const [rawLogs, setRawLogs] = useState([]);
   const [displayedLogs, setDisplayedLogs] = useState([]);
-  
   const [colorBy, setColorBy] = useState(null);
-
   const [ui, setUi] = useState({
     showSessions: true,
     clusterSessions: true,
@@ -193,22 +163,12 @@ export default function HighPerfMap() {
     drawClearSignal: 0,
     showNeighbours: false,
     colorizeCells: true,
-    timeFilterEnabled: false,
-    timeMode: 'all',
-    currentHour: 12,
-    timeRange: [0, 23],
-    selectedDays: [0, 1, 2, 3, 4, 5, 6],
-    isTimePlaying: false,
-    timeSpeed: 1,
   });
 
   const [analysis, setAnalysis] = useState(null);
-  const [temporalAnalysis, setTemporalAnalysis] = useState(null);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
-  const [isTimeControlsOpen, setIsTimeControlsOpen] = useState(false);
   const [polygonName, setPolygonName] = useState("");
   const [showCoverageHoleOnly, setShowCoverageHoleOnly] = useState(false);
-
   const [visibleBounds, setVisibleBounds] = useState(null);
   const idleListenerRef = useRef(null);
   const idleTimerRef = useRef(null);
@@ -219,41 +179,24 @@ export default function HighPerfMap() {
     if (!rawLogs || rawLogs.length === 0) {
       return { providers: [], technologies: [], bands: [] };
     }
-
     const providerSet = new Set();
     const techSet = new Set();
     const bandSet = new Set();
-
     rawLogs.forEach(log => {
       const provider = normalizeProviderName(log.provider || log.Provider || log.carrier);
-      if (provider && provider !== "Unknown") {
-        providerSet.add(provider);
-      }
-
+      if (provider && provider !== "Unknown") providerSet.add(provider);
       const tech = normalizeTechName(log.network || log.Network || log.technology);
-      if (tech && tech !== "Unknown") {
-        techSet.add(tech);
-      }
-
+      if (tech && tech !== "Unknown") techSet.add(tech);
       const band = String(log.band || log.Band || "").trim();
-      if (band && band !== "-1" && band !== "" && band !== "undefined") {
-        bandSet.add(band);
-      }
+      if (band && band !== "-1" && band !== "" && band !== "undefined") bandSet.add(band);
     });
-
     return {
       providers: Array.from(providerSet).sort().map(name => ({ id: name, name })),
       technologies: Array.from(techSet).sort().map(name => ({ id: name, name })),
-      bands: Array.from(bandSet).sort((a, b) => {
-        const numA = parseInt(a);
-        const numB = parseInt(b);
-        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-        return a.localeCompare(b);
-      }).map(name => ({ id: name, name })),
+      bands: Array.from(bandSet).sort((a, b) => parseInt(a) - parseInt(b)).map(name => ({ id: name, name })),
     };
   }, [rawLogs]);
 
-  // Fetch thresholds on mount
   useEffect(() => {
     const fetchThresholds = async () => {
       try {
@@ -278,18 +221,12 @@ export default function HighPerfMap() {
     fetchThresholds();
   }, []);
 
-  useEffect(()=>{
-    console.log(thresholds,"when threshold has value")
-  },[thresholds])
-
   const fetchAllSessions = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await adminApi.getSessions();
       const valid = (data || []).filter(
-        (s) =>
-          Number.isFinite(parseFloat(s.start_lat)) &&
-          Number.isFinite(parseFloat(s.start_lon))
+        (s) => Number.isFinite(parseFloat(s.start_lat)) && Number.isFinite(parseFloat(s.start_lon))
       );
       setAllSessions(valid);
     } catch (e) {
@@ -299,116 +236,73 @@ export default function HighPerfMap() {
     }
   }, []);
 
-  // Fetch sessions on initial load when no filters
   useEffect(() => {
     if (!isLoaded) return;
-    
-    if (!activeFilters) {
-      fetchAllSessions();
-    }
+    if (!activeFilters) fetchAllSessions();
   }, [isLoaded, activeFilters, fetchAllSessions]);
 
   const fetchLogsFromApi = useCallback(async (dateFilters) => {
-  setLogsLoading(true);
-  try {
-    const apiParams = {
-      StartDate: toYmdLocal(dateFilters.startDate),
-      EndDate: toYmdLocal(dateFilters.endDate),
-    };
+    setLogsLoading(true);
+    try {
+      const apiParams = {
+        StartDate: toYmdLocal(dateFilters.startDate),
+        EndDate: toYmdLocal(dateFilters.endDate),
+      };
+      if (dateFilters.provider && dateFilters.provider !== "ALL") apiParams.Provider = dateFilters.provider;
+      if (dateFilters.technology && dateFilters.technology !== "ALL") apiParams.Technology = dateFilters.technology;
+      if (dateFilters.band && dateFilters.band !== "ALL") apiParams.Band = dateFilters.band;
 
-    if (dateFilters.provider && dateFilters.provider !== "ALL") {
-      apiParams.Provider = dateFilters.provider;
-    }
-    if (dateFilters.technology && dateFilters.technology !== "ALL") {
-      apiParams.Technology = dateFilters.technology;
-    }
-    if (dateFilters.band && dateFilters.band !== "ALL") {
-      apiParams.Band = dateFilters.band;
-    }
+      const response = await mapViewApi.getLogsByDateRange(apiParams);
+      let fetched = [];
+      let appSummaryData = null;
 
-    const response = await mapViewApi.getLogsByDateRange(apiParams);
-
-    // ⭐ Handle response structure: { data: [], app_summary: {} }
-    let fetched = [];
-    let appSummaryData = null;
-
-    if (response) {
-      // Get logs from response.data or response directly
-      if (response.data && Array.isArray(response.data)) {
-        fetched = response.data;
-      } else if (Array.isArray(response)) {
-        fetched = response;
+      if (response) {
+        if (response.data && Array.isArray(response.data)) fetched = response.data;
+        else if (Array.isArray(response)) fetched = response;
+        if (response.app_summary) appSummaryData = response.app_summary;
       }
 
-      // ⭐ Get app_summary from response
-      if (response.app_summary) {
-        appSummaryData = response.app_summary;
+      if (!fetched || fetched.length === 0) {
+        toast.warn("No logs found for the selected date range.");
+        setRawLogs([]);
+        setDisplayedLogs([]);
+        setAppSummary(null);
+        return [];
       }
-    }
 
-    if (!fetched || fetched.length === 0) {
-      toast.warn("No logs found for the selected date range.");
+      setRawLogs(fetched);
+      setAppSummary(appSummaryData);
+      
+      if (map) {
+        const points = fetched.map(log => ({ lat: parseFloat(log.lat), lon: parseFloat(log.lon) })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+        if (points.length > 0) fitMapToMostlyLogs(map, points);
+      }
+
+      toast.success(`Loaded ${fetched.length} logs.`);
+      return fetched;
+    } catch (error) {
+      toast.error(`Failed to fetch logs: ${error?.message || "Unknown error"}`);
       setRawLogs([]);
       setDisplayedLogs([]);
       setAppSummary(null);
       return [];
+    } finally {
+      setLogsLoading(false);
     }
-
-    setRawLogs(fetched);
-    setAppSummary(appSummaryData); // ⭐ Store the full app_summary
-    
-    if (map) {
-      const points = fetched
-        .map(log => ({
-          lat: parseFloat(log.lat),
-          lon: parseFloat(log.lon),
-        }))
-        .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon));
-      
-      if (points.length > 0) {
-        fitMapToMostlyLogs(map, points);
-      }
-    }
-
-    toast.success(`Loaded ${fetched.length} logs.`);
-    return fetched;
-  } catch (error) {
-    toast.error(`Failed to fetch logs: ${error?.message || "Unknown error"}`);
-    setRawLogs([]);
-    setDisplayedLogs([]);
-    setAppSummary(null);
-    return [];
-  } finally {
-    setLogsLoading(false);
-  }
-}, [map]);
+  }, [map]);
 
   const applyLocalFilters = useCallback((logs, filters) => {
     if (!logs || logs.length === 0) return [];
-
     let filtered = [...logs];
-
     if (filters.provider && filters.provider !== "ALL") {
-      filtered = filtered.filter(log => {
-        const logProvider = normalizeProviderName(log.provider || log.Provider || log.carrier);
-        return logProvider === filters.provider;
-      });
+      filtered = filtered.filter(log => normalizeProviderName(log.provider || log.Provider || log.carrier) === filters.provider);
     }
-
     if (filters.technology && filters.technology !== "ALL") {
-      filtered = filtered.filter(log => {
-        const logTech = normalizeTechName(log.network || log.Network || log.technology);
-        return logTech === filters.technology;
-      });
+      filtered = filtered.filter(log => normalizeTechName(log.network || log.Network || log.technology) === filters.technology);
     }
-
     if (filters.band && filters.band !== "ALL") {
-      filtered = filtered.filter(log => {
-        const logBand = String(log.band || log.Band || "").trim();
-        return logBand === filters.band;
-      });
+      filtered = filtered.filter(log => String(log.band || log.Band || "").trim() === filters.band);
     }
-
     if (filters.coverageHoleOnly) {
       const threshold = thresholds.coveragehole || -110;
       filtered = filtered.filter(log => {
@@ -416,40 +310,47 @@ export default function HighPerfMap() {
         return Number.isFinite(rsrp) && rsrp < threshold;
       });
     }
-
     return filtered;
   }, [thresholds]);
 
-  const handleApplyFilters = useCallback(async (filters) => {
-    const dateChanged = 
-      !activeFilters ||
-      toYmdLocal(filters.startDate) !== toYmdLocal(activeFilters.startDate) ||
-      toYmdLocal(filters.endDate) !== toYmdLocal(activeFilters.endDate);
+  const handleFetchLogsForPolygon = useCallback(() => {
+    if (!analysis || !analysis.geometry) {
+      toast.error("Please draw a shape first.");
+      return;
+    }
 
-    const apiFiltersChanged = dateChanged ||
-      filters.provider !== activeFilters?.provider ||
-      filters.technology !== activeFilters?.technology ||
-      filters.band !== activeFilters?.band;
+    if (analysis.intersectingSessions && analysis.intersectingSessions.length > 0) {
+      const sessionIds = analysis.intersectingSessions.map(s => s.id).join(",");
+      toast.info(`Navigating to view logs for ${analysis.intersectingSessions.length} sessions...`);
+      navigate(`/debug-map?sessionId=${sessionIds}`);
+      return;
+    }
+
+    if (activeFilters) {
+      toast.info("Fetching logs for selected area...");
+      fetchLogsFromApi(activeFilters);
+    } else {
+      toast.info("Please select a Date Range or Provider to fetch logs.");
+      setIsSearchOpen(true);
+    }
+  }, [analysis, activeFilters, fetchLogsFromApi, navigate]);
+
+  const handleApplyFilters = useCallback(async (filters) => {
+    const dateChanged = !activeFilters || toYmdLocal(filters.startDate) !== toYmdLocal(activeFilters.startDate) || toYmdLocal(filters.endDate) !== toYmdLocal(activeFilters.endDate);
+    const apiFiltersChanged = dateChanged || filters.provider !== activeFilters?.provider || filters.technology !== activeFilters?.technology || filters.band !== activeFilters?.band;
 
     setActiveFilters(filters);
     setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
     setSelectedSessionData(null);
     setAnalysis(null);
-    setTemporalAnalysis(null);
-    setUi(u => ({ 
-      ...u, 
-      showLogsCircles: true,
-      showSessions: false,
-    }));
+    setUi(u => ({ ...u, showLogsCircles: true, showSessions: false }));
     setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
     setColorBy(filters.colorBy || null);
 
     let logsToFilter = rawLogs;
-
     if (apiFiltersChanged) {
       logsToFilter = await fetchLogsFromApi(filters);
     }
-
     const filtered = applyLocalFilters(logsToFilter, filters);
     setDisplayedLogs(filtered);
   }, [activeFilters, rawLogs, fetchLogsFromApi, applyLocalFilters]);
@@ -460,7 +361,6 @@ export default function HighPerfMap() {
     setRawLogs([]);
     setDisplayedLogs([]);
     setAnalysis(null);
-    setTemporalAnalysis(null);
     setColorBy(null);
     setAppSummary(null);
     setUi((u) => ({
@@ -477,26 +377,19 @@ export default function HighPerfMap() {
   const handleUIChange = (partial) => setUi((prev) => ({ ...prev, ...partial }));
 
   const handleSessionMarkerClick = async (session) => {
-  setIsLoading(true);
-  try {
-    const response = await mapViewApi.getNetworkLog(session.id);
-    const logs = extractLogsFromResponse(response);
-    
-    setSelectedSessionData({ 
-      session, 
-      logs 
-    });
-    
-    if (logs.length === 0) {
-      toast.warn(`No logs found for session ${session.id}`);
+    setIsLoading(true);
+    try {
+      const response = await mapViewApi.getNetworkLog(session.id);
+      const logs = extractLogsFromResponse(response);
+      setSelectedSessionData({ session, logs });
+      if (logs.length === 0) toast.warn(`No logs found for session ${session.id}`);
+    } catch (e) {
+      toast.error(`Failed to fetch logs for session ${session.id}: ${e?.message || "Unknown error"}`);
+      setSelectedSessionData(null);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (e) {
-    toast.error(`Failed to fetch logs for session ${session.id}: ${e?.message || "Unknown error"}`);
-    setSelectedSessionData(null);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     const loadPolygons = async () => {
@@ -507,11 +400,7 @@ export default function HighPerfMap() {
       setIsLoading(true);
       try {
         const rows = await mapViewApi.getProjectPolygons({ projectId: ui.selectedProjectId });
-        const parsed = (rows || []).map((r) => ({
-          id: r.id,
-          name: r.name,
-          rings: parseWKTToCoordinates(r.wkt),
-        }));
+        const parsed = (rows || []).map((r) => ({ id: r.id, name: r.name, rings: parseWKTToCoordinates(r.wkt) }));
         setProjectPolygons(parsed);
       } catch (err) {
         toast.error("Failed to load project polygons");
@@ -537,12 +426,7 @@ export default function HighPerfMap() {
         if (b) {
           const ne = b.getNorthEast();
           const sw = b.getSouthWest();
-          setVisibleBounds({
-            north: ne.lat(),
-            east: ne.lng(),
-            south: sw.lat(),
-            west: sw.lng(),
-          });
+          setVisibleBounds({ north: ne.lat(), east: ne.lng(), south: sw.lat(), west: sw.lng() });
         }
       }, 120);
     });
@@ -550,9 +434,7 @@ export default function HighPerfMap() {
 
   const onMapUnmount = useCallback(() => {
     try {
-      if (idleListenerRef.current) {
-        window.google?.maps?.event?.removeListener?.(idleListenerRef.current);
-      }
+      if (idleListenerRef.current) window.google?.maps?.event?.removeListener?.(idleListenerRef.current);
     } catch {}
     idleListenerRef.current = null;
     setMap(null);
@@ -563,7 +445,6 @@ export default function HighPerfMap() {
       toast.error("No polygon stats available. Draw a shape first.");
       return;
     }
-
     const csvRows = [
       ["Metric", "Value"],
       ["Shape Type", analysis.type || "N/A"],
@@ -574,40 +455,9 @@ export default function HighPerfMap() {
       ["Max", analysis.stats.max?.toFixed(2) || "N/A"],
       ["Selected Metric", selectedMetric],
     ];
-
     if (analysis.grid) {
-      csvRows.push(
-        ["Grid Cells", analysis.grid.cells],
-        ["Cell Size (meters)", analysis.grid.cellSizeMeters]
-      );
+      csvRows.push(["Grid Cells", analysis.grid.cells], ["Cell Size (meters)", analysis.grid.cellSizeMeters]);
     }
-
-    if (analysis.timeFilter) {
-      csvRows.push(
-        ["", ""],
-        ["Time Filter", ""],
-        ["Mode", analysis.timeFilter.mode],
-      );
-      if (analysis.timeFilter.mode === 'single') {
-        csvRows.push(["Hour", `${analysis.timeFilter.currentHour}:00`]);
-      } else if (analysis.timeFilter.mode === 'range') {
-        csvRows.push([
-          "Time Range", 
-          `${analysis.timeFilter.timeRange[0]}:00 - ${analysis.timeFilter.timeRange[1]}:00`
-        ]);
-      }
-      csvRows.push(["Days Selected", analysis.timeFilter.selectedDays.join(', ')]);
-    }
-
-    if (analysis.temporalPatterns) {
-      csvRows.push(
-        ["", ""],
-        ["Temporal Analysis", ""],
-        ["Peak Hour", `${analysis.temporalPatterns.peakHour}:00`],
-        ["Peak Day", getDayName(analysis.temporalPatterns.peakDay)],
-      );
-    }
-
     const csvContent = csvRows.map((row) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -616,7 +466,6 @@ export default function HighPerfMap() {
     link.download = `polygon_stats_${selectedMetric}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-
     toast.success("Stats CSV downloaded!");
   }, [analysis, selectedMetric]);
 
@@ -625,51 +474,19 @@ export default function HighPerfMap() {
       toast.error("No logs inside polygon. Draw a shape with data first.");
       return;
     }
-
     const logsInside = analysis.logs;
-
-    const headers = [
-      "latitude",
-      "longitude",
-      "rsrp",
-      "rsrq",
-      "sinr",
-      "dl_throughput",
-      "ul_throughput",
-      "mos",
-      "lte_bler",
-      "timestamp",
-      "carrier",
-      "technology",
-    ];
-
+    const headers = ["latitude", "longitude", "rsrp", "rsrq", "sinr", "dl_throughput", "ul_throughput", "mos", "lte_bler", "timestamp", "carrier", "technology"];
     const csvRows = [
       headers.join(","),
       ...logsInside.map((log) => {
-        return headers
-          .map((h) => {
-            let val =
-              log[h] ??
-              log[h.replace("_", "-")] ??
-              log[h.replace("dl_throughput", "dl_tpt")] ??
-              log[h.replace("ul_throughput", "ul_thpt")] ??
-              "";
-
-            if (h === "latitude" && !val) {
-              val = log.lat ?? log.latitude ?? log.Latitude ?? "";
-            }
-            if (h === "longitude" && !val) {
-              val = log.lng ?? log.lon ?? log.longitude ?? log.Longitude ?? "";
-            }
-
-            return typeof val === "string" && val.includes(",")
-              ? `"${val}"`
-              : val;
-          })
-          .join(",");
+        return headers.map((h) => {
+          let val = log[h] ?? log[h.replace("_", "-")] ?? log[h.replace("dl_throughput", "dl_tpt")] ?? log[h.replace("ul_throughput", "ul_thpt")] ?? "";
+          if (h === "latitude" && !val) val = log.lat ?? log.latitude ?? log.Latitude ?? "";
+          if (h === "longitude" && !val) val = log.lng ?? log.lon ?? log.longitude ?? log.Longitude ?? "";
+          return typeof val === "string" && val.includes(",") ? `"${val}"` : val;
+        }).join(",");
       }),
     ];
-
     const csvContent = csvRows.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -678,13 +495,8 @@ export default function HighPerfMap() {
     link.download = `polygon_raw_logs_${selectedMetric}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-
     toast.success(`Raw CSV downloaded (${logsInside.length} logs inside polygon)!`);
   }, [analysis, selectedMetric]);
-
-  const handleTimeAnalysis = useCallback((patterns) => {
-    setTemporalAnalysis(patterns);
-  }, []);
 
   const handleSavePolygon = async () => {
     if (!analysis || !analysis.geometry) {
@@ -695,20 +507,13 @@ export default function HighPerfMap() {
       toast.warn("Please provide a name for the polygon.");
       return;
     }
-
     let wktString = null;
     const geometry = analysis.geometry;
-
     if (geometry.type === "polygon" && geometry.polygon) {
       wktString = coordinatesToWktPolygon(geometry.polygon);
     } else if (geometry.type === "rectangle" && geometry.rectangle) {
       const { ne, sw } = geometry.rectangle;
-      const rectCoords = [
-        { lng: sw.lng, lat: ne.lat },
-        { lng: ne.lng, lat: ne.lat },
-        { lng: ne.lng, lat: sw.lat },
-        { lng: sw.lng, lat: sw.lat },
-      ];
+      const rectCoords = [{ lng: sw.lng, lat: ne.lat }, { lng: ne.lng, lat: ne.lat }, { lng: ne.lng, lat: sw.lat }, { lng: sw.lng, lat: sw.lat }];
       wktString = coordinatesToWktPolygon(rectCoords);
     } else if (geometry.type === "circle" && geometry.circle) {
       const { center, radius } = geometry.circle;
@@ -717,28 +522,16 @@ export default function HighPerfMap() {
       for (let i = 0; i < numPoints; i++) {
         const angle = (i / numPoints) * 360;
         const latOffset = (radius / 111111) * Math.cos((angle * Math.PI) / 180);
-        const lngOffset =
-          (radius / (111111 * Math.cos((center.lat * Math.PI) / 180))) *
-          Math.sin((angle * Math.PI) / 180);
-        circleCoords.push({
-          lat: center.lat + latOffset,
-          lng: center.lng + lngOffset,
-        });
+        const lngOffset = (radius / (111111 * Math.cos((center.lat * Math.PI) / 180))) * Math.sin((angle * Math.PI) / 180);
+        circleCoords.push({ lat: center.lat + latOffset, lng: center.lng + lngOffset });
       }
       wktString = coordinatesToWktPolygon(circleCoords);
     }
-
     if (!wktString) {
       toast.error("Could not convert the drawn shape to WKT format.");
       return;
     }
-
-    const payload = {
-      Name: polygonName,
-      WKT: wktString,
-      SessionIds: Array.isArray(analysis.session) ? analysis.session : [],
-    };
-
+    const payload = { Name: polygonName, WKT: wktString, SessionIds: Array.isArray(analysis.session) ? analysis.session : [] };
     setIsLoading(true);
     try {
       const response = await mapViewApi.savePolygon(payload);
@@ -756,16 +549,15 @@ export default function HighPerfMap() {
     }
   };
 
+  const handleClearAnalysis = useCallback(() => {
+    setAnalysis(null);
+    setUi(prev => ({ ...prev, drawClearSignal: (prev.drawClearSignal || 0) + 1 }));
+  }, []);
+
   const mapOptions = useMemo(() => {
     const standardMapTypes = ["roadmap", "satellite", "hybrid", "terrain"];
     const styleKey = ui.basemapStyle || "roadmap";
-
-    const options = {
-      disableDefaultUI: false,
-      zoomControl: true,
-      gestureHandling: "greedy",
-    };
-
+    const options = { disableDefaultUI: false, zoomControl: true, gestureHandling: "greedy" };
     if (standardMapTypes.includes(styleKey)) {
       options.mapId = MAP_ID;
       options.mapTypeId = styleKey;
@@ -776,12 +568,11 @@ export default function HighPerfMap() {
       options.mapId = MAP_ID;
       options.mapTypeId = "roadmap";
     }
-
     return options;
   }, [ui.basemapStyle]);
 
-  if (loadError) return <div>Error loading Google Maps.</div>;
-  if (!isLoaded) return <div className="p-4">Loading map…</div>;
+  if (loadError) return <div className="flex items-center justify-center h-screen text-red-600">Error loading Google Maps.</div>;
+  if (!isLoaded) return <div className="flex items-center justify-center h-screen text-gray-600">Loading map...</div>;
 
   return (
     <div className="h-screen w-full flex flex-col bg-white">
@@ -802,6 +593,7 @@ export default function HighPerfMap() {
         availableFilterOptions={availableFilterOptions}
         rawLogsCount={rawLogs.length}
         isLoading={logsLoading}
+        onFetchLogs={handleFetchLogsForPolygon}
       />
 
       <div className="relative flex-1">
@@ -856,6 +648,7 @@ export default function HighPerfMap() {
               logs={displayedLogs}
               selectedMetric={selectedMetric}
               thresholds={thresholds}
+              sessions={allSessions}
               pixelateRect={ui.drawPixelateRect}
               cellSizeMeters={ui.drawCellSizeMeters || 100}
               onSummary={setAnalysis}
@@ -863,40 +656,9 @@ export default function HighPerfMap() {
               maxCells={1500}
               onDrawingsChange={() => {}}
               colorizeCells={ui.colorizeCells}
-              timeSettings={{
-                timeFilterEnabled: ui.timeFilterEnabled,
-                timeMode: ui.timeMode,
-                currentHour: ui.currentHour,
-                timeRange: ui.timeRange,
-                selectedDays: ui.selectedDays,
-              }}
-              onTimeAnalysis={handleTimeAnalysis}
             />
           )}
         </GoogleMap>
-
-        {ui.drawEnabled && (
-          <button
-            onClick={() => setIsTimeControlsOpen(!isTimeControlsOpen)}
-            className={`absolute top-4 right-4 z-40 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg transition-all ${
-              isTimeControlsOpen
-                ? "bg-purple-600 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>Time Filter</span>
-          </button>
-        )}
-
-        {isTimeControlsOpen && ui.drawEnabled && (
-          <TimeControlsPanel
-            ui={ui}
-            onUIChange={handleUIChange}
-            hasLogs={displayedLogs.length > 0}
-            onClose={() => setIsTimeControlsOpen(false)}
-          />
-        )}
 
         {activeFilters && (ui.showLogsCircles || ui.showHeatmap) && (
           <MapLegend
@@ -907,138 +669,122 @@ export default function HighPerfMap() {
           />
         )}
 
+        
         {analysis && (
-          <div className="absolute bottom-4 left-4 z-30 bg-white/95 dark:bg-gray-900/95 rounded-lg shadow-xl p-4 min-w-[280px] max-w-[320px] border border-gray-200 max-h-[80vh] overflow-y-auto">
-            <div className="font-semibold mb-2 text-gray-800 dark:text-white flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📊</span>
-                Selection Stats
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsSaveDialogOpen(true)}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save
-              </Button>
-            </div>
-            
-            <div className="text-sm text-gray-700 dark:text-gray-200 space-y-1.5">
-              <div className="flex justify-between border-b border-gray-100 pb-1">
-                <span className="text-gray-600">Shape:</span>
-                <span className="font-medium capitalize">{analysis.type}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-1">
-                <span className="text-gray-600">Area:</span>
-                <span className="font-medium">{formatArea(analysis.area)}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-1">
-                <span className="text-gray-600">Total Logs:</span>
-                <span className="font-medium">{analysis.count}</span>
-              </div>
+  <div className="absolute bottom-4 left-4 z-30 bg-white rounded-lg shadow-lg w-[260px] border border-gray-200">
+    {/* Header */}
+    <div className="flex items-center justify-between px-2.5 py-1.5 bg-blue-600 rounded-t-lg">
+      <h3 className="font-semibold text-white text-xs">Stats</h3>
+      <button onClick={handleClearAnalysis} className="text-white/80 hover:text-white">
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
 
-              {analysis.timeFilter && (
-                <div className="mt-3 pt-2 border-t-2 border-purple-200">
-                  <div className="font-medium text-purple-700 mb-2 flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    Time Filter Active
-                  </div>
-                  <div className="text-xs space-y-1 bg-purple-50 p-2 rounded">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Mode:</span>
-                      <span className="font-medium capitalize">{analysis.timeFilter.mode}</span>
-                    </div>
-                    {analysis.timeFilter.mode === 'single' && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Hour:</span>
-                        <span className="font-medium">{analysis.timeFilter.currentHour}:00</span>
-                      </div>
-                    )}
-                    {analysis.timeFilter.mode === 'range' && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Range:</span>
-                        <span className="font-medium">
-                          {analysis.timeFilter.timeRange[0]}:00 - {analysis.timeFilter.timeRange[1]}:00
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Days:</span>
-                      <span className="font-medium">
-                        {analysis.timeFilter.selectedDays.length}/7 selected
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {analysis.temporalPatterns && (
-                <div className="mt-3 pt-2 border-t-2 border-blue-200">
-                  <div className="font-medium text-blue-700 mb-2">📈 Temporal Patterns</div>
-                  <div className="text-xs space-y-1 bg-blue-50 p-2 rounded">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Peak Hour:</span>
-                      <span className="font-medium text-blue-600">
-                        {analysis.temporalPatterns.peakHour}:00
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Peak Day:</span>
-                      <span className="font-medium text-blue-600">
-                        {getDayName(analysis.temporalPatterns.peakDay)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {analysis.grid && (
-                <div className="mt-2 pt-2 border-t border-gray-200">
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Cell Size:</span>
-                    <span className="font-medium">{analysis.grid.cellSizeMeters}m</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Active Grid Cells:</span>
-                    <span className="font-medium">{analysis.grid.cellsWithLogs}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Grid Area:</span>
-                    <span className="font-medium">{formatArea(analysis.grid.totalGridArea)}</span>
-                  </div>
-                </div>
-              )}
-
-              {analysis.stats?.count > 0 ? (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Mean:</span>
-                    <span className="font-medium text-blue-600">
-                      {analysis.stats.mean?.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Median:</span>
-                    <span className="font-medium text-green-600">
-                      {analysis.stats.median?.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Range:</span>
-                    <span className="font-medium text-orange-600">
-                      {analysis.stats.min?.toFixed(2)} → {analysis.stats.max?.toFixed(2)}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="text-gray-500 italic text-center py-2">
-                  No metric values in selection
-                </div>
-              )}
-            </div>
+    {/* Content */}
+    <div className="p-2.5 text-xs space-y-2">
+      {/* Basic Info - Super Compact */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="bg-gray-50 rounded px-2 py-1">
+          <div className="text-[10px] text-gray-500">Shape</div>
+          <div className="font-medium text-gray-800 capitalize">{analysis.type}</div>
+        </div>
+        <div className="bg-gray-50 rounded px-2 py-1">
+          <div className="text-[10px] text-gray-500">Area</div>
+          <div className="font-medium text-gray-800">{formatArea(analysis.area)}</div>
+        </div>
+        <div className="bg-gray-50 rounded px-2 py-1">
+          <div className="text-[10px] text-gray-500">Logs</div>
+          <div className="font-medium text-gray-800">{analysis.count || 0}</div>
+        </div>
+        
+        {!activeFilters && analysis.intersectingSessions?.length > 0 && (
+          <div className="bg-blue-50 rounded px-2 py-1 border border-blue-100">
+            <div className="text-[10px] text-blue-600">Sessions</div>
+            <div className="font-bold text-blue-700">{analysis.intersectingSessions.length}</div>
           </div>
         )}
+        
+        {analysis.grid && (
+          <>
+            <div className="bg-gray-50 rounded px-2 py-1">
+              <div className="text-[10px] text-gray-500">Cell Size</div>
+              <div className="font-medium text-gray-700">{analysis.grid.cellSizeMeters}m</div>
+            </div>
+            <div className="bg-gray-50 rounded px-2 py-1">
+              <div className="text-[10px] text-gray-500">Cells</div>
+              <div className="font-medium text-gray-700">{analysis.grid.cellsWithLogs}</div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Stats Grid */}
+      {analysis.stats?.count > 0 && (
+        <div className="grid grid-cols-4 gap-1.5">
+          <div className="bg-blue-50 rounded p-1.5 text-center border border-blue-100">
+            <div className="text-xs font-bold text-blue-600">{analysis.stats.mean?.toFixed(1)}</div>
+            <div className="text-[9px] text-gray-500">Avg</div>
+          </div>
+          <div className="bg-green-50 rounded p-1.5 text-center border border-green-100">
+            <div className="text-xs font-bold text-green-600">{analysis.stats.median?.toFixed(1)}</div>
+            <div className="text-[9px] text-gray-500">Med</div>
+          </div>
+          <div className="bg-orange-50 rounded p-1.5 text-center border border-orange-100">
+            <div className="text-xs font-bold text-orange-500">{analysis.stats.min?.toFixed(1)}</div>
+            <div className="text-[9px] text-gray-500">Min</div>
+          </div>
+          <div className="bg-red-50 rounded p-1.5 text-center border border-red-100">
+            <div className="text-xs font-bold text-red-500">{analysis.stats.max?.toFixed(1)}</div>
+            <div className="text-[9px] text-gray-500">Max</div>
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* Actions */}
+    <div className="px-2.5 py-2 border-t border-gray-200 bg-gray-50 rounded-b-lg space-y-1.5">
+      <Button
+        size="sm"
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs py-1.5 h-auto"
+        onClick={handleFetchLogsForPolygon}
+      >
+        {analysis.intersectingSessions?.length > 0 && !activeFilters
+          ? `View ${analysis.intersectingSessions.length} Sessions`
+          : 'Fetch Logs'}
+      </Button>
+      
+      <div className="flex gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 text-[11px] py-1 h-auto px-2"
+          onClick={() => setIsSaveDialogOpen(true)}
+        >
+          <Save className="h-3 w-3 mr-1" />
+          Save
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="px-2 py-1 h-auto"
+          onClick={handleDownloadStatsCsv}
+          title="Stats CSV"
+        >
+          <Download className="h-3 w-3" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="px-2 py-1 h-auto"
+          onClick={handleDownloadRawCsv}
+          title="Raw CSV"
+        >
+          <Download className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
 
         <SessionDetailPanel
           sessionData={selectedSessionData}
@@ -1059,38 +805,47 @@ export default function HighPerfMap() {
         />
 
         {(isLoading || logsLoading) && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-black/70 backdrop-blur-sm">
-            <div className="bg-white rounded-lg shadow-xl p-6 flex items-center gap-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="text-lg font-medium text-gray-700">Loading…</span>
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl p-6 flex items-center gap-4 border border-gray-200">
+              <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
+              <span className="text-lg font-medium text-gray-700">Loading...</span>
             </div>
           </div>
         )}
 
+        {/* Save Polygon Dialog */}
         <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] bg-white">
             <DialogHeader>
-              <DialogTitle>Save Polygon Analysis</DialogTitle>
+              <DialogTitle className="text-gray-800">Save Polygon Analysis</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
+                <Label htmlFor="name" className="text-right text-gray-700">
                   Name
                 </Label>
                 <Input
                   id="name"
                   value={polygonName}
                   onChange={(e) => setPolygonName(e.target.value)}
-                  className="col-span-3"
+                  className="col-span-3 bg-white border-gray-300 text-gray-800"
                   placeholder="e.g., Sector 15 Coverage Gap"
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsSaveDialogOpen(false)}
+                className="border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
                 Cancel
               </Button>
-              <Button onClick={handleSavePolygon} disabled={!polygonName.trim() || isLoading}>
+              <Button 
+                onClick={handleSavePolygon} 
+                disabled={!polygonName.trim() || isLoading}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
                 {isLoading ? "Saving..." : "Save Polygon"}
               </Button>
             </DialogFooter>

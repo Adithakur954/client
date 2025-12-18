@@ -24,6 +24,7 @@ import MapLegend from "@/components/map/MapLegend";
 import { useNeighborCollisions } from "@/hooks/useNeighborCollisions";
 import NeighborHeatmapLayer from "@/components/unifiedMap/NeighborHeatmapLayer";
 import SiteLegend from "@/components/unifiedMap/SiteLegend";
+import { normalizeProviderName } from "@/utils/colorUtils"; 
 
 import {
   useBestNetworkCalculation,
@@ -378,6 +379,7 @@ const parseLogEntry = (log, sessionId) => {
 
   const lat = parseFloat(latValue);
   const lng = parseFloat(lngValue);
+  const rawProvider = String(log.m_alpha_long ?? log.Provider ?? log.operator ?? log.Operator ?? "").trim();
 
   if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) return null;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
@@ -396,7 +398,7 @@ const parseLogEntry = (log, sessionId) => {
     ul_tpt: parseFloat(log.ul_tpt ?? log.ul_thpt ?? log.UL ?? log.ul_throughput ?? log.UlThpt) || null,
     mos: parseFloat(log.mos ?? log.MOS ?? log.Mos) || null,
     lte_bler: parseFloat(log.lte_bler_json ?? log.LTE_BLER ?? log.LteBler) || null,
-    provider: String(log.m_alpha_long ?? log.Provider ?? log.operator ?? log.Operator ?? "").trim(),
+    provider: normalizeProviderName(rawProvider),
     technology: String(log.network ?? log.technology ?? log.Network ?? log.Technology ?? "").trim(),
     band: String(log.band ?? log.Band ?? "").trim(),
     pci: parseInt(log.pci ?? log.PCI ?? log.Pci) || null,

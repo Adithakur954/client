@@ -6,10 +6,9 @@ import { mapViewApi } from '../api/apiEndpoints';
 import Spinner from '../components/common/Spinner';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-// 1. IMPORT THE SHARED OPTIONS
-import { GOOGLE_MAPS_LOADER_OPTIONS } from '@/lib/googleMapsLoader'; 
+import { GOOGLE_MAPS_LOADER_OPTIONS } from '@/lib/googleMapsLoader';
+import { toast } from 'react-toastify';
 
-// Explicit container style
 const containerStyle = {
   width: '100%',
   height: '100%',
@@ -23,8 +22,6 @@ const DEFAULT_CENTER = {
   lng: 77.2090
 };
 
-
-
 const SessionMapDebug = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -32,17 +29,27 @@ const SessionMapDebug = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [map, setMap] = useState(null);
+  const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0 });
 
-  const sessionId = searchParams.get('sessionId');
+  // ✅ Parse session IDs - supports both single and comma-separated values
+  const sessionIdParam = searchParams.get('sessionId') || searchParams.get('sessionIds');
+  
+  const sessionIds = React.useMemo(() => {
+    if (!sessionIdParam) return [];
+    // Split by comma and filter out empty values
+    return sessionIdParam
+      .split(',')
+      .map(id => id.trim())
+      .filter(id => id && id !== 'undefined' && id !== 'null');
+  }, [sessionIdParam]);
 
-  // 3. USE THE IMPORTED SHARED OPTIONS
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
-  // ✅ Fetch Data
+  // ✅ Fetch Data for Multiple Sessions
   useEffect(() => {
-    const fetchData = async () => {
-      if (!sessionId) {
-        setError('No session ID provided');
+    const fetchAllSessionsData = async () => {
+      if (sessionIds.length === 0) {
+        setError('No session ID(s) provided');
         setLoading(false);
         return;
       }
@@ -50,41 +57,74 @@ const SessionMapDebug = () => {
       try {
         setLoading(true);
         setError(null);
-        console.log("📡 Fetching logs for session:", sessionId);
+        setFetchProgress({ current: 0, total: sessionIds.length });
         
-        const response = await mapViewApi.getNetworkLog({ session_id: sessionId });
+        console.log("📡 Fetching logs for sessions:", sessionIds);
         
-        let rawData = [];
-        if (Array.isArray(response)) {
-          rawData = response;
-        } else if (response?.data) {
-          rawData = Array.isArray(response.data) ? response.data : 
-                   Array.isArray(response.data.Data) ? response.data.Data : 
-                   [];
-        } else if (response?.Data) {
-          rawData = Array.isArray(response.Data) ? response.Data : [];
-        }
-        
-        const validPoints = rawData
-          .map((log, index) => {
-            const lat = parseFloat(log.lat || log.Lat || log.latitude); //yeh madagasar ke liye hai 
-            const lng = parseFloat(log.lon || log.lng || log.Lng || log.longitude);
-            const rsrp = parseFloat(log.rsrp || log.RSRP || -120);
-            
-            return {
-              lat,
-              lng,
-              rsrp,
-              id: log.id || `point-${index}`,
-            };
-          })
-          .filter(pt => !isNaN(pt.lat) && !isNaN(pt.lng));
+        const allValidPoints = [];
+        const errors = [];
 
-        if (validPoints.length === 0) {
-          setError('No valid location data found for this session');
+        // Fetch logs for each session ID
+        for (let i = 0; i < sessionIds.length; i++) {
+          const sessionId = sessionIds[i];
+          setFetchProgress({ current: i + 1, total: sessionIds.length });
+          
+          try {
+            console.log(`📍 Fetching session ${i + 1}/${sessionIds.length}: ${sessionId}`);
+            
+            const response = await mapViewApi.getNetworkLog({ session_id: sessionId });
+            
+            let rawData = [];
+            if (Array.isArray(response)) {
+              rawData = response;
+            } else if (response?.data) {
+              rawData = Array.isArray(response.data) ? response.data : 
+                       Array.isArray(response.data.Data) ? response.data.Data : 
+                       [];
+            } else if (response?.Data) {
+              rawData = Array.isArray(response.Data) ? response.Data : [];
+            }
+            
+            const validPoints = rawData
+              .map((log, index) => {
+                const lat = parseFloat(log.lat || log.Lat || log.latitude); 
+                const lng = parseFloat(log.lon || log.lng || log.Lng || log.longitude);
+                const rsrp = parseFloat(log.rsrp || log.RSRP || -120);
+                
+                return {
+                  lat,
+                  lng,
+                  rsrp,
+                  sessionId, // ✅ Track which session this point belongs to
+                  id: log.id || `session-${sessionId}-point-${index}`,
+                };
+              })
+              .filter(pt => !isNaN(pt.lat) && !isNaN(pt.lng));
+
+            allValidPoints.push(...validPoints);
+            console.log(`✅ Session ${sessionId}: ${validPoints.length} points`);
+            
+          } catch (err) {
+            console.error(`❌ Error fetching session ${sessionId}:`, err);
+            errors.push(`Session ${sessionId}: ${err.message}`);
+          }
+        }
+
+        if (allValidPoints.length === 0) {
+          if (errors.length > 0) {
+            setError(`Failed to load data:\n${errors.join('\n')}`);
+          } else {
+            setError('No valid location data found for the selected session(s)');
+          }
+        } else {
+          if (errors.length > 0) {
+            toast.warning(`Loaded ${allValidPoints.length} points, but some sessions failed`);
+          } else {
+            toast.success(`Loaded ${allValidPoints.length} points from ${sessionIds.length} session(s)`);
+          }
         }
         
-        setLogs(validPoints);
+        setLogs(allValidPoints);
         
       } catch (err) {
         console.error("❌ Error fetching logs:", err);
@@ -94,8 +134,8 @@ const SessionMapDebug = () => {
       }
     };
 
-    fetchData();
-  }, [sessionId]);
+    fetchAllSessionsData();
+  }, [sessionIds]);
 
   // ✅ Auto-fit map to points
   useEffect(() => {
@@ -122,14 +162,24 @@ const SessionMapDebug = () => {
     return '#FF0000'; 
   };
 
+  // ✅ Loading state with progress
   if (!isLoaded || loading) {
     return (
       <div className="flex items-center justify-center h-screen w-screen bg-gray-900">
         <div className="text-center">
           <Spinner />
           <p className="mt-4 text-white">
-            {loading ? 'Loading session data...' : 'Loading map...'}
+            {loading 
+              ? fetchProgress.total > 1 
+                ? `Loading session ${fetchProgress.current} of ${fetchProgress.total}...`
+                : 'Loading session data...'
+              : 'Loading map...'}
           </p>
+          {sessionIds.length > 1 && (
+            <p className="mt-2 text-gray-400 text-sm">
+              {sessionIds.length} sessions selected
+            </p>
+          )}
         </div>
       </div>
     );
@@ -155,7 +205,7 @@ const SessionMapDebug = () => {
       <div className="flex items-center justify-center h-screen w-screen bg-gray-900 text-white">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Error</h2>
-          <p className="text-red-400">{error}</p>
+          <p className="text-red-400 whitespace-pre-line">{error}</p>
           <Button onClick={() => navigate(-1)} className="mt-4">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Go Back
@@ -196,6 +246,8 @@ const SessionMapDebug = () => {
           />
         ))}
       </GoogleMap>
+      
+      
       
       <Button
         onClick={() => navigate(-1)}

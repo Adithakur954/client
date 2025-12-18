@@ -1,4 +1,3 @@
-// DrawingToolsLayer.jsx
 import React, { useEffect, useRef, useCallback } from "react";
 import { toast } from "react-toastify";
 
@@ -8,12 +7,13 @@ import { toast } from "react-toastify";
  * ============================================================================
  */
 
-function toLatLng(log) {
+function toLatLng(item) {
+  // Handles both logs (lat) and sessions (start_lat)
   const lat = Number(
-    log.lat ?? log.latitude ?? log.start_lat ?? log.Latitude ?? log.LAT
+    item.lat ?? item.latitude ?? item.start_lat ?? item.Latitude ?? item.LAT
   );
   const lng = Number(
-    log.lng ?? log.lon ?? log.longitude ?? log.start_lon ?? log.LNG
+    item.lng ?? item.lon ?? item.longitude ?? item.start_lon ?? item.LNG
   );
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   return new window.google.maps.LatLng(lat, lng);
@@ -88,7 +88,8 @@ function buildPolygonBounds(polygon) {
   return bounds;
 }
 
-function analyzeInside(type, overlay, logs, selectedMetric) {
+// Generic function to filter items (logs or sessions) inside an overlay
+function filterItemsInside(type, overlay, items) {
   const gm = window.google.maps;
   const poly = gm.geometry?.poly;
   const spherical = gm.geometry?.spherical;
@@ -97,13 +98,15 @@ function analyzeInside(type, overlay, logs, selectedMetric) {
   if (type === "rectangle" || type === "circle") bb = overlay.getBounds?.();
   else if (type === "polygon") bb = buildPolygonBounds(overlay);
 
-  const pre = logs.filter((l) => {
-    const pt = toLatLng(l);
+  // 1. Rough Bounds Check
+  const pre = items.filter((item) => {
+    const pt = toLatLng(item);
     return pt && (!bb || bb.contains(pt));
   });
 
-  const inside = pre.filter((l) => {
-    const pt = toLatLng(l);
+  // 2. Exact Shape Check
+  const inside = pre.filter((item) => {
+    const pt = toLatLng(item);
     if (!pt) return false;
     if (type === "rectangle") return overlay.getBounds().contains(pt);
     if (type === "polygon") return poly?.containsLocation?.(pt, overlay) ?? false;
@@ -114,10 +117,14 @@ function analyzeInside(type, overlay, logs, selectedMetric) {
     return false;
   });
 
+  return inside;
+}
+
+function analyzeInside(type, overlay, logs, selectedMetric) {
+  const inside = filterItemsInside(type, overlay, logs);
   const vals = inside
     .map((l) => getMetricValue(l, selectedMetric))
     .filter((v) => Number.isFinite(v));
-
   return { inside, stats: computeStats(vals) };
 }
 
@@ -168,7 +175,6 @@ function pixelateShape(
   const bounds = getShapeBounds(type, overlay);
 
   if (!bounds) {
-    console.warn("Could not determine bounds for shape");
     return { cellsDrawn: 0, totalCells: 0, cellsWithLogs: 0, cellData: [] };
   }
 
@@ -241,17 +247,6 @@ function pixelateShape(
         zIndex: 50,
       });
 
-      gm.event.addListener(rect, 'click', () => {
-        console.log('Cell clicked:', {
-          row: i,
-          col: j,
-          center: { lat: cellCenter.lat(), lng: cellCenter.lng() },
-          logsCount: inCell.length,
-          stats: cellStats,
-          logs: inCell.map(x => x.log)
-        });
-      });
-
       gridOverlaysRef.push(rect);
       cellsDrawn++;
 
@@ -286,7 +281,6 @@ function pixelateShape(
 
 function serializeOverlay(type, overlay) {
   if (!overlay) return null;
-
   if (type === "polygon") {
     const path = overlay.getPath()?.getArray?.() || [];
     const coords = path.map((p) => ({ lat: p.lat(), lng: p.lng() }));
@@ -299,7 +293,6 @@ function serializeOverlay(type, overlay) {
       bounds: { south: sw.lat(), west: sw.lng(), north: ne.lat(), east: ne.lng() },
     };
   }
-
   if (type === "rectangle") {
     const b = overlay.getBounds?.();
     const sw = b.getSouthWest();
@@ -312,7 +305,6 @@ function serializeOverlay(type, overlay) {
       },
     };
   }
-
   if (type === "circle") {
     const c = overlay.getCenter?.();
     const r = overlay.getRadius?.();
@@ -334,6 +326,7 @@ export default function DrawingToolsLayer({
   map,
   enabled,
   logs,
+  sessions, // <--- NEW PROP
   selectedMetric,
   thresholds,
   pixelateRect = false,
@@ -349,7 +342,6 @@ export default function DrawingToolsLayer({
   const lastClearSignalRef = useRef(clearSignal);
   const callbacksRef = useRef({ onSummary, onDrawingsChange });
 
-  // Update callbacks ref
   useEffect(() => {
     callbacksRef.current = { onSummary, onDrawingsChange };
   }, [onSummary, onDrawingsChange]);
@@ -361,9 +353,6 @@ export default function DrawingToolsLayer({
     const { type, overlay, id } = shapeObj;
     const gm = window.google.maps;
     
-    console.log('🔍 Analyzing shape:', id);
-    
-    // Clear existing grid overlays for this shape
     if (shapeObj.gridOverlays && shapeObj.gridOverlays.length > 0) {
       shapeObj.gridOverlays.forEach((rect) => rect?.setMap?.(null));
       shapeObj.gridOverlays = [];
@@ -371,9 +360,14 @@ export default function DrawingToolsLayer({
 
     const allLogs = logs || [];
     const geometry = serializeOverlay(type, overlay);
+    
+    // Analyze Logs
     const { inside, stats } = analyzeInside(type, overlay, allLogs, selectedMetric);
     
-    // Extract unique sessions
+    // NEW: Analyze Sessions (intersecting markers)
+    const intersectingSessions = filterItemsInside(type, overlay, sessions || []);
+
+    // Extract unique sessions from LOGS (if logs exist)
     const uniqueSessionsMap = new Map();
     inside.forEach((log) => {
       const sessionKey = log.session_id;
@@ -381,16 +375,9 @@ export default function DrawingToolsLayer({
         uniqueSessionsMap.set(sessionKey, log.session_id);
       }
     });
-    const uniqueSessions = Array.from(uniqueSessionsMap.values());
-    const uniqueSessionCount = uniqueSessions.length;
+    const uniqueSessionsFromLogs = Array.from(uniqueSessionsMap.values());
 
-    console.log("🔄 Shape analysis complete:", {
-      id,
-      total: inside.length,
-      sessions: uniqueSessionCount,
-    });
-    
-    // Calculate area
+    // Calculate Area
     let areaInMeters = 0;
     const spherical = gm.geometry?.spherical;
     if (spherical) {
@@ -439,7 +426,6 @@ export default function DrawingToolsLayer({
       };
     }
 
-    // Update entry
     const entry = {
       id,
       type,
@@ -447,8 +433,9 @@ export default function DrawingToolsLayer({
       selectedMetric,
       stats,
       count: inside.length,
-      session: uniqueSessions,
-      sessionCount: uniqueSessionCount,
+      session: uniqueSessionsFromLogs,
+      intersectingSessions, // <--- EXPOSE FOUND SESSIONS
+      sessionCount: uniqueSessionsFromLogs.length,
       logs: inside,
       grid: gridInfo,
       createdAt: shapeObj.createdAt || new Date().toISOString(),
@@ -457,7 +444,6 @@ export default function DrawingToolsLayer({
       areaInSqKm: (areaInMeters / 1000000).toFixed(4),
     };
 
-    // Update stored data
     const existingIndex = collectedDrawingRef.current.findIndex(d => d.id === id);
     if (existingIndex >= 0) {
       collectedDrawingRef.current[existingIndex] = entry;
@@ -469,33 +455,23 @@ export default function DrawingToolsLayer({
     callbacksRef.current.onSummary?.(entry);
 
     return entry;
-  }, [logs, selectedMetric, thresholds, pixelateRect, cellSizeMeters, map, colorizeCells]);
+  }, [logs, sessions, selectedMetric, thresholds, pixelateRect, cellSizeMeters, map, colorizeCells]);
 
-  // Main DrawingManager setup - ONLY recreate when map or enabled changes
+  // Main DrawingManager setup
   useEffect(() => {
     if (!map) return;
-
     const gm = window.google?.maps;
     if (!gm?.drawing?.DrawingManager) {
-      console.error('Drawing library not loaded.');
       toast.error('Drawing library not loaded.');
       return;
     }
 
-    console.log('🎨 Setting up DrawingManager, enabled:', enabled);
-
-    // Clean up existing manager if it exists
     if (managerRef.current) {
-      console.log('🗑️ Cleaning up old DrawingManager');
       managerRef.current.setMap(null);
       managerRef.current = null;
     }
 
-    // Only create new manager if enabled
-    if (!enabled) {
-      console.log('⏸️ Drawing disabled, not creating manager');
-      return;
-    }
+    if (!enabled) return;
 
     const dm = new gm.drawing.DrawingManager({
       drawingMode: null,
@@ -504,44 +480,17 @@ export default function DrawingToolsLayer({
         position: gm.ControlPosition.TOP_CENTER,
         drawingModes: ["rectangle", "polygon", "circle"],
       },
-      polygonOptions: {
-        clickable: true,
-        editable: true,
-        draggable: true,
-        strokeWeight: 2,
-        strokeColor: "#1d4ed8",
-        fillColor: "#1d4ed8",
-        fillOpacity: 0.08
-      },
-      rectangleOptions: {
-        clickable: true,
-        editable: true,
-        draggable: true,
-        strokeWeight: 2,
-        strokeColor: "#1d4ed8",
-        fillColor: "#1d4ed8",
-        fillOpacity: 0.06
-      },
-      circleOptions: {
-        clickable: true,
-        editable: true,
-        draggable: true,
-        strokeWeight: 2,
-        strokeColor: "#1d4ed8",
-        fillColor: "#1d4ed8",
-        fillOpacity: 0.06
-      },
+      polygonOptions: { clickable: true, editable: true, draggable: true, strokeWeight: 2, strokeColor: "#1d4ed8", fillColor: "#1d4ed8", fillOpacity: 0.08 },
+      rectangleOptions: { clickable: true, editable: true, draggable: true, strokeWeight: 2, strokeColor: "#1d4ed8", fillColor: "#1d4ed8", fillOpacity: 0.06 },
+      circleOptions: { clickable: true, editable: true, draggable: true, strokeWeight: 2, strokeColor: "#1d4ed8", fillColor: "#1d4ed8", fillOpacity: 0.06 },
     });
     dm.setMap(map);
-    console.log('✅ DrawingManager created and attached to map');
 
     const handleComplete = (e) => {
-      console.log('✏️ Drawing completed:', e.type);
       const type = e.type;
       const overlay = e.overlay;
       const shapeId = Date.now();
 
-      // Create shape object to track
       const shapeObj = {
         id: shapeId,
         type,
@@ -551,70 +500,37 @@ export default function DrawingToolsLayer({
       };
 
       shapesRef.current.push(shapeObj);
-      console.log('📦 Shape added to shapesRef, total shapes:', shapesRef.current.length);
 
-      // Initial analysis
       const entry = reAnalyzeShape(shapeObj);
 
-      // Add event listeners for shape changes
       const listeners = [];
-
       if (type === "polygon") {
         const path = overlay.getPath();
-        listeners.push(
-          gm.event.addListener(path, 'set_at', () => {
-            console.log('🔧 Polygon vertex moved');
-            reAnalyzeShape(shapeObj);
-          })
-        );
-        listeners.push(
-          gm.event.addListener(path, 'insert_at', () => {
-            console.log('🔧 Polygon vertex added');
-            reAnalyzeShape(shapeObj);
-          })
-        );
-        listeners.push(
-          gm.event.addListener(path, 'remove_at', () => {
-            console.log('🔧 Polygon vertex removed');
-            reAnalyzeShape(shapeObj);
-          })
-        );
+        listeners.push(gm.event.addListener(path, 'set_at', () => reAnalyzeShape(shapeObj)));
+        listeners.push(gm.event.addListener(path, 'insert_at', () => reAnalyzeShape(shapeObj)));
+        listeners.push(gm.event.addListener(path, 'remove_at', () => reAnalyzeShape(shapeObj)));
       } else if (type === "rectangle") {
-        listeners.push(
-          gm.event.addListener(overlay, 'bounds_changed', () => {
-            console.log('🔧 Rectangle resized/moved');
-            reAnalyzeShape(shapeObj);
-          })
-        );
+        listeners.push(gm.event.addListener(overlay, 'bounds_changed', () => reAnalyzeShape(shapeObj)));
       } else if (type === "circle") {
-        listeners.push(
-          gm.event.addListener(overlay, 'radius_changed', () => {
-            console.log('🔧 Circle radius changed');
-            reAnalyzeShape(shapeObj);
-          })
-        );
-        listeners.push(
-          gm.event.addListener(overlay, 'center_changed', () => {
-            console.log('🔧 Circle moved');
-            reAnalyzeShape(shapeObj);
-          })
-        );
+        listeners.push(gm.event.addListener(overlay, 'radius_changed', () => reAnalyzeShape(shapeObj)));
+        listeners.push(gm.event.addListener(overlay, 'center_changed', () => reAnalyzeShape(shapeObj)));
       }
 
       shapeObj.listeners = listeners;
       dm.setDrawingMode(null);
 
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} drawn: ${entry.count} logs found`, {
-        position: "bottom-right",
-        autoClose: 3000,
-      });
+      // Notification
+      let msg = `${type.charAt(0).toUpperCase() + type.slice(1)} drawn.`;
+      if(entry.intersectingSessions?.length > 0) {
+        msg += ` Found ${entry.intersectingSessions.length} sessions inside.`;
+      }
+      toast.success(msg, { position: "bottom-right", autoClose: 3000 });
     };
 
     const listener = gm.event.addListener(dm, "overlaycomplete", handleComplete);
     managerRef.current = dm;
 
     return () => {
-      console.log('🧹 Cleanup DrawingManager effect');
       gm.event.removeListener(listener);
       if (managerRef.current) {
         managerRef.current.setMap(null);
@@ -623,27 +539,16 @@ export default function DrawingToolsLayer({
     };
   }, [map, enabled, reAnalyzeShape]);
 
-  // Clear drawings effect - ONLY when clearSignal actually changes
+  // Clear drawings effect
   useEffect(() => {
-    // Skip if clearSignal hasn't changed or is 0
-    if (clearSignal === 0 || clearSignal === lastClearSignalRef.current) {
-      return;
-    }
-
-    console.log('🗑️ Clear signal detected:', clearSignal, 'previous:', lastClearSignalRef.current);
+    if (clearSignal === 0 || clearSignal === lastClearSignalRef.current) return;
     lastClearSignalRef.current = clearSignal;
     
-    // Clear all shapes and their event listeners
     shapesRef.current.forEach((shapeObj) => {
-      // Remove event listeners
       if (shapeObj.listeners) {
-        shapeObj.listeners.forEach(listener => {
-          window.google.maps.event.removeListener(listener);
-        });
+        shapeObj.listeners.forEach(listener => window.google.maps.event.removeListener(listener));
       }
-      // Remove shape from map
       shapeObj.overlay?.setMap?.(null);
-      // Remove grid overlays
       if (shapeObj.gridOverlays) {
         shapeObj.gridOverlays.forEach((rect) => rect?.setMap?.(null));
       }
@@ -653,22 +558,16 @@ export default function DrawingToolsLayer({
     collectedDrawingRef.current = [];
     callbacksRef.current.onDrawingsChange?.([]);
     callbacksRef.current.onSummary?.(null);
-    
-    toast.info('All drawings cleared', {
-      position: "bottom-right",
-      autoClose: 2000,
-    });
+    toast.info('All drawings cleared', { position: "bottom-right", autoClose: 2000 });
   }, [clearSignal]);
 
-  // Re-analyze all shapes when settings change
+  // Re-analyze on prop change
   useEffect(() => {
     if (shapesRef.current.length === 0) return;
-
-    console.log('⚙️ Settings changed, re-analyzing', shapesRef.current.length, 'shapes...');
     shapesRef.current.forEach((shapeObj) => {
       reAnalyzeShape(shapeObj);
     });
-  }, [selectedMetric, thresholds, pixelateRect, cellSizeMeters, colorizeCells, reAnalyzeShape]);
+  }, [logs, sessions, selectedMetric, thresholds, pixelateRect, cellSizeMeters, colorizeCells, reAnalyzeShape]);
 
   return null;
 }

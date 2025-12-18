@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Check, ChevronDown, X } from 'lucide-react';
 import ChartCard from '../ChartCard';
-import { TOOLTIP_STYLE, CHART_COLORS } from '@/components/constants/dashboardConstants';
+import { CHART_COLORS } from '@/components/constants/dashboardConstants';
 import { useBandDistributionRaw } from '@/hooks/useDashboardData.js';
 import { canonicalOperatorName } from '@/utils/dashboardUtils';
 import { formatNumber } from '@/utils/chartUtils';
@@ -32,7 +32,6 @@ const MultiSelectDropdown = ({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -43,8 +42,6 @@ const MultiSelectDropdown = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isAllSelected = selected.length === 0 || selected.length === options.length;
-  
   const handleToggle = (option) => {
     if (selected.includes(option)) {
       onChange(selected.filter(item => item !== option));
@@ -72,7 +69,6 @@ const MultiSelectDropdown = ({
     <div className="space-y-2">
       <label className="block text-sm font-medium text-gray-700">{label}</label>
       <div className="relative" ref={dropdownRef}>
-        {/* Dropdown Trigger */}
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
@@ -84,10 +80,8 @@ const MultiSelectDropdown = ({
           <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
 
-        {/* Dropdown Menu */}
         {isOpen && (
           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-            {/* Select All / Clear All */}
             <div className="sticky top-0 bg-gray-50 border-b border-gray-200 p-2 flex gap-2">
               <button
                 type="button"
@@ -105,32 +99,27 @@ const MultiSelectDropdown = ({
               </button>
             </div>
 
-            {/* Options */}
             <div className="py-1">
-              {options.map((option) => {
-                const isSelected = selected.length === 0 || selected.includes(option);
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => handleToggle(option)}
-                    className={`w-full px-3 py-2 text-sm text-left flex items-center justify-between hover:bg-gray-50 ${
-                      selected.includes(option) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                    }`}
-                  >
-                    <span className="truncate">{option}</span>
-                    {selected.includes(option) && (
-                      <Check className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                    )}
-                  </button>
-                );
-              })}
+              {options.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => handleToggle(option)}
+                  className={`w-full px-3 py-2 text-sm text-left flex items-center justify-between hover:bg-gray-50 ${
+                    selected.includes(option) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                  }`}
+                >
+                  <span className="truncate">{option}</span>
+                  {selected.includes(option) && (
+                    <Check className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Selected Tags */}
       {selected.length > 0 && selected.length <= 3 && (
         <div className="flex flex-wrap gap-1 mt-1">
           {selected.map(item => (
@@ -155,12 +144,28 @@ const MultiSelectDropdown = ({
 };
 
 // ============================================
+// SIMPLE CUSTOM TOOLTIP
+// ============================================
+const SimpleTooltip = ({ active, payload }) => {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const item = payload[0]?.payload;
+  if (!item) return null;
+
+  return (
+    <div className="bg-white px-3 py-2 shadow-lg rounded-lg border border-gray-200">
+      <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+      <p className="text-sm text-gray-600">
+        Samples: <span className="font-medium text-blue-600">{formatNumber(item.value)}</span>
+      </p>
+    </div>
+  );
+};
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 const BandDistributionChart = ({ filters: globalFilters }) => {
-  // ============================================
-  // SWR HOOK - SINGLE SOURCE OF TRUTH
-  // ============================================
   const { 
     data: rawData, 
     isLoading, 
@@ -168,17 +173,11 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     mutate 
   } = useBandDistributionRaw(globalFilters);
 
-  // ============================================
-  // LOCAL FILTER STATES - NOW ARRAYS FOR MULTI-SELECT
-  // ============================================
-  const [selectedOperators, setSelectedOperators] = useState([]); // Empty = All
-  const [selectedNetworks, setSelectedNetworks] = useState([]);   // Empty = All
+  const [selectedOperators, setSelectedOperators] = useState([]);
+  const [selectedNetworks, setSelectedNetworks] = useState([]);
   const [topN, setTopN] = useState(15);
   const [sortBy, setSortBy] = useState('count');
 
-  // ============================================
-  // NORMALIZE DATA FROM HOOK
-  // ============================================
   const data = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
     
@@ -190,9 +189,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     }));
   }, [rawData]);
 
-  // ============================================
-  // DERIVED DATA - OPERATORS & NETWORKS
-  // ============================================
   const { operators, networks } = useMemo(() => {
     if (!data || data.length === 0) return { operators: [], networks: [] };
     
@@ -202,47 +198,31 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     return { operators: ops, networks: nets };
   }, [data]);
 
-  // ============================================
-  // CHART DATA PREPARATION - UPDATED FOR MULTI-SELECT
-  // ============================================
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
     
-    // Apply multi-select filters
     let filtered = data.filter(item => {
-      // Operator filter: if empty array, show all; otherwise check if included
       const operatorMatch = selectedOperators.length === 0 || 
                            selectedOperators.includes(item.operatorName);
-      
-      // Network filter: if empty array, show all; otherwise check if included
       const networkMatch = selectedNetworks.length === 0 || 
                           selectedNetworks.includes(item.network);
-      
       return operatorMatch && networkMatch;
     });
     
-    // Aggregate by band
     const aggregated = filtered.reduce((acc, item) => {
       const key = `Band ${item.band}`;
       if (!acc[key]) {
-        acc[key] = {
-          name: key,
-          value: 0,
-          details: []
-        };
+        acc[key] = { name: key, value: 0 };
       }
       acc[key].value += item.count;
-      acc[key].details.push(item);
       return acc;
     }, {});
     
     let result = Object.values(aggregated);
     
-    // Sort
     if (sortBy === 'count') {
       result.sort((a, b) => b.value - a.value);
     } else {
-      // Sort by band number
       result.sort((a, b) => {
         const bandA = parseInt(a.name.replace('Band ', '')) || 0;
         const bandB = parseInt(b.name.replace('Band ', '')) || 0;
@@ -253,9 +233,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     return result.slice(0, topN);
   }, [data, selectedOperators, selectedNetworks, topN, sortBy]);
 
-  // ============================================
-  // STATS FOR INFO PANEL
-  // ============================================
   const stats = useMemo(() => {
     const totalSamples = chartData.reduce((sum, item) => sum + item.value, 0);
     const totalBands = chartData.length;
@@ -264,9 +241,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     return { totalSamples, totalBands, avgSamplesPerBand };
   }, [chartData]);
 
-  // ============================================
-  // RESET FILTERS
-  // ============================================
   const handleReset = () => {
     setSelectedOperators([]);
     setSelectedNetworks([]);
@@ -274,12 +248,8 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     setSortBy('count');
   };
 
-  // ============================================
-  // SETTINGS RENDER
-  // ============================================
   const settingsRender = () => (
     <div className="space-y-4">
-      {/* Multi-Select Operator Filter */}
       <MultiSelectDropdown
         label="Operators"
         options={operators}
@@ -289,7 +259,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
         allLabel="All Operators"
       />
 
-      {/* Multi-Select Network Filter */}
       <MultiSelectDropdown
         label="Network Types"
         options={networks}
@@ -299,7 +268,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
         allLabel="All Networks"
       />
 
-      {/* Top N */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
           Show Top Bands
@@ -319,7 +287,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
         </select>
       </div>
 
-      {/* Sort By */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
           Sort By
@@ -334,7 +301,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
         </select>
       </div>
 
-      {/* Stats Info */}
       <div className="pt-3 border-t border-gray-200">
         <div className="text-xs text-gray-600 space-y-1">
           <div className="flex justify-between">
@@ -349,22 +315,9 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
             <span>Avg per Band:</span>
             <span className="font-semibold text-gray-900">{formatNumber(stats.avgSamplesPerBand)}</span>
           </div>
-          {selectedOperators.length > 0 && (
-            <div className="flex justify-between">
-              <span>Operators:</span>
-              <span className="font-semibold text-blue-600">{selectedOperators.length} selected</span>
-            </div>
-          )}
-          {selectedNetworks.length > 0 && (
-            <div className="flex justify-between">
-              <span>Networks:</span>
-              <span className="font-semibold text-blue-600">{selectedNetworks.length} selected</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div className="flex gap-2">
         <button
           onClick={handleReset}
@@ -382,84 +335,8 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     </div>
   );
 
-  // ============================================
-  // CUSTOM TOOLTIP
-  // ============================================
-  const CustomTooltip = ({ active, payload }) => {
-    if (!active || !payload || payload.length === 0) return null;
-
-    const item = payload[0]?.payload;
-    if (!item) return null;
-
-    // Group details by operator for better display
-    const operatorBreakdown = useMemo(() => {
-      if (!item.details || item.details.length === 0) return [];
-      
-      const grouped = item.details.reduce((acc, detail) => {
-        const key = detail.operatorName;
-        if (!acc[key]) {
-          acc[key] = { operator: key, total: 0, networks: {} };
-        }
-        acc[key].total += detail.count;
-        acc[key].networks[detail.network] = (acc[key].networks[detail.network] || 0) + detail.count;
-        return acc;
-      }, {});
-      
-      return Object.values(grouped).sort((a, b) => b.total - a.total);
-    }, [item.details]);
-
-    return (
-      <div style={TOOLTIP_STYLE}>
-        <p className="font-semibold text-gray-900 mb-2 border-b pb-1">
-          {item.name}
-        </p>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-gray-600">Total Samples:</span>
-            <span className="text-sm font-bold text-blue-600">
-              {formatNumber(item.value)}
-            </span>
-          </div>
-          
-          {operatorBreakdown.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-gray-200">
-              <p className="text-xs font-medium text-gray-700 mb-1">By Operator:</p>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {operatorBreakdown.slice(0, 5).map((op, idx) => (
-                  <div key={idx} className="text-xs">
-                    <div className="flex justify-between font-medium text-gray-800">
-                      <span>{op.operator}</span>
-                      <span>{formatNumber(op.total)}</span>
-                    </div>
-                    <div className="pl-2 text-gray-500">
-                      {Object.entries(op.networks).map(([net, count]) => (
-                        <div key={net} className="flex justify-between">
-                          <span>{net}:</span>
-                          <span>{formatNumber(count)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {operatorBreakdown.length > 5 && (
-                  <p className="text-xs text-gray-400 italic">
-                    +{operatorBreakdown.length - 5} more operators
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // ============================================
-  // ACTIVE FILTERS DISPLAY
-  // ============================================
   const ActiveFiltersDisplay = () => {
     const hasFilters = selectedOperators.length > 0 || selectedNetworks.length > 0;
-    
     if (!hasFilters) return null;
     
     return (
@@ -500,9 +377,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     );
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
   return (
     <ChartCard
       title="Frequency Band Distribution"
@@ -517,7 +391,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
         onApply: () => console.log('✅ Settings applied')
       }}
     >
-      {/* Active Filters Display */}
       <ActiveFiltersDisplay />
       
       {chartData.length > 0 ? (
@@ -546,7 +419,8 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
               tick={{ fill: '#111827', fontSize: 11, fontWeight: 600 }}
             />
             
-            <Tooltip content={<CustomTooltip />} />
+            {/* Simple Tooltip */}
+            <Tooltip content={<SimpleTooltip />} />
             
             <Bar 
               dataKey="value" 

@@ -10,10 +10,6 @@ import {
   ensureNegative
 } from '../utils/dashboardUtils';
 
-// ============================================
-// CONFIGURATION
-// ============================================
-
 const SWR_CONFIG = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
@@ -48,10 +44,6 @@ const METRIC_ENDPOINT_MAP = {
 
 const NEGATIVE_METRICS = ['rsrp', 'rsrq'];
 
-// ============================================
-// METRIC FIELD MAPPING
-// ============================================
-
 const METRIC_TO_FIELD = {
   samples: 'value',
   rsrp: 'avg_rsrp',
@@ -77,10 +69,6 @@ const METRIC_FIELD_FALLBACKS = {
   dlTpt: ['avg_dl_tpt', 'avgDlTpt', 'dl_tpt', 'downloadSpeed'],
   ulTpt: ['avg_ul_tpt', 'avgUlTpt', 'ul_tpt', 'uploadSpeed'],
 };
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
 
 const createCacheKey = (base, filters) => {
   if (!filters || Object.keys(filters).length === 0) return base;
@@ -109,75 +97,49 @@ const createCacheKey = (base, filters) => {
 };
 
 const extractData = (response, fallback = []) => {
-  console.log('[extractData] Received response:', { 
-    type: typeof response, 
-    isArray: Array.isArray(response),
-    hasData: response?.Data ? 'yes' : 'no',
-    keys: typeof response === 'object' ? Object.keys(response || {}) : []
-  });
-
   if (response === null || response === undefined) {
-    console.log('[extractData] Response is null/undefined, returning fallback');
     return fallback;
   }
   
   if (Array.isArray(response)) {
-    console.log('[extractData] Response is array, length:', response.length);
     return response;
   }
   
   if (response?.Status === 0) {
-    console.log('[extractData] Response status is 0, returning fallback');
     return fallback;
   }
   
   if (Array.isArray(response?.Data)) {
-    console.log('[extractData] Extracting from response.Data, length:', response.Data.length);
     return response.Data;
   }
   if (Array.isArray(response?.data)) {
-    console.log('[extractData] Extracting from response.data, length:', response.data.length);
     return response.data;
   }
   if (Array.isArray(response?.Result)) {
-    console.log('[extractData] Extracting from response.Result, length:', response.Result.length);
     return response.Result;
   }
   if (Array.isArray(response?.result)) {
-    console.log('[extractData] Extracting from response.result, length:', response.result.length);
     return response.result;
   }
   
   if (typeof response === 'object' && !Array.isArray(response)) {
     if (response.Data !== undefined) {
-      console.log('[extractData] Returning response.Data');
       return response.Data;
     }
     if (response.data !== undefined) {
-      console.log('[extractData] Returning response.data');
       return response.data;
     }
-    console.log('[extractData] Returning response object itself');
     return response;
   }
   
-  console.log('[extractData] No match, returning fallback');
   return fallback;
 };
 
 const createFetcher = (apiFn, fallback = []) => {
   return async () => {
     try {
-      console.log('[createFetcher] Calling API function...');
       const response = await apiFn();
-      console.log('[createFetcher] API response received:', response);
-      
       const data = extractData(response, fallback);
-      console.log('[createFetcher] Extracted data:', { 
-        type: typeof data, 
-        isArray: Array.isArray(data),
-        length: Array.isArray(data) ? data.length : 'N/A'
-      });
       
       if (data !== null && data !== undefined) {
         const isValidArray = Array.isArray(data) && data.length > 0;
@@ -185,15 +147,12 @@ const createFetcher = (apiFn, fallback = []) => {
         const isValidNumber = typeof data === 'number';
         
         if (isValidArray || isValidObject || isValidNumber) {
-          console.log('[createFetcher] Data is valid, returning');
           return data;
         }
       }
       
-      console.log('[createFetcher] Data is not valid, returning fallback');
       return fallback;
     } catch (error) {
-      console.error('[createFetcher] Error:', error);
       throw error;
     }
   };
@@ -230,10 +189,6 @@ const isValidMetricValue = (value, metric) => {
   
   return value >= 0;
 };
-
-// ============================================
-// DATA PROCESSING FUNCTIONS
-// ============================================
 
 const processMetricData = (rawData, metric) => {
   if (!Array.isArray(rawData) || rawData.length === 0) return [];
@@ -419,10 +374,6 @@ const parseDurationToHours = (duration) => {
   return parseFloat((hours + (minutes / 60) + (seconds / 3600)).toFixed(2));
 };
 
-// ============================================
-// HOOKS
-// ============================================
-
 export const useTotals = () => {
   return useSWR(
     'totals',
@@ -508,7 +459,9 @@ export const useOperatorMetrics = (metric, filters) => {
     cacheKey,
     async () => {
       const response = await adminApi.getOperatorSamplesV2?.(query);
-      return extractData(response, []);
+      const extracted = extractData(response, []);
+      console.log('[useOperatorMetrics] Raw API data:', extracted);
+      return extracted;
     },
     { 
       ...SWR_CONFIG, 
@@ -517,10 +470,11 @@ export const useOperatorMetrics = (metric, filters) => {
     }
   );
   
-  const processedData = useMemo(
-    () => processOperatorMetrics(rawData || [], metric),
-    [rawData, metric]
-  );
+  const processedData = useMemo(() => {
+    const processed = processOperatorMetrics(rawData || [], metric);
+    console.log('[useOperatorMetrics] Processed data for metric:', metric, processed);
+    return processed;
+  }, [rawData, metric]);
   
   return { data: processedData, ...rest };
 };
@@ -662,12 +616,46 @@ export const useQualityRanking = (rsrqMin = -10, rsrqMax = 0) => {
   return { data: ranking, ...rest };
 };
 
+export const useHoles = () =>{
+  const {data:rawData, ...rest} = useSWR(
+    "holes" , 
+    async() =>{
+      try {
+        const response = await adminApi.getHoles();
+        console.log(response,"get holees respones")
+        return extractData(response, []);
+      } catch (error) {
+        throw error ;
+      }
+    },{
+      ...SWR_CONFIG,
+      revalidateOnMount: true,
+      fallbackData: [] 
+    }
+  );
+  const processedData = useMemo(()=>{
+    if(!rawData || !Array.isArray(rawData)){
+      return [];
+    }
+    const processed = rawData.map(item => ({
+    id: item?.id,
+    rsrp: item?.value || null,
+    rsrq: item?.value || null ,
+  }));
+  return processed;
+
+  }, [rawData])
+
+  return {data: processedData, ...rest};
+};
+
 export const useHandsetPerformance = () => {
   const { data: rawData, ...rest } = useSWR(
     'handsetAvg',
     async () => {
       try {
         const response = await adminApi.getHandsetDistributionV2();
+        
         return extractData(response, []);
       } catch (error) {
         throw error;
@@ -718,7 +706,12 @@ export const useOperatorsAndNetworks = () => {
     error: operatorsError 
   } = useSWR(
     'operators',
-    createFetcher(() => adminApi.getOperatorsV2?.(), []),
+    async () => {
+      const response = await adminApi.getOperatorsV2?.();
+      const extracted = extractData(response, []);
+      console.log('[useOperatorsAndNetworks] Raw operators data:', extracted);
+      return extracted;
+    },
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.LONG, fallbackData: [] }
   );
 
@@ -728,7 +721,12 @@ export const useOperatorsAndNetworks = () => {
     error: networksError 
   } = useSWR(
     'networks',
-    createFetcher(() => adminApi.getNetworksV2?.(), []),
+    async () => {
+      const response = await adminApi.getNetworksV2?.();
+      const extracted = extractData(response, []);
+      console.log('[useOperatorsAndNetworks] Raw networks data:', extracted);
+      return extracted;
+    },
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.LONG, fallbackData: [] }
   );
 
@@ -746,9 +744,12 @@ export const useOperatorsAndNetworks = () => {
     
     const list = processUniqueList(rawOperators, operatorKeys);
     
-    return list
+    const processed = list
       .map(op => canonicalOperatorName(op))
       .filter(op => op && op !== 'Unknown' && op !== 'unknown');
+    
+    console.log('[useOperatorsAndNetworks] Processed operators:', processed);
+    return processed;
   }, [rawOperators]);
 
   const networks = useMemo(() => {
@@ -763,7 +764,9 @@ export const useOperatorsAndNetworks = () => {
       'name', 'Name'
     ];
     
-    return processUniqueList(rawNetworks, networkKeys);
+    const processed = processUniqueList(rawNetworks, networkKeys);
+    console.log('[useOperatorsAndNetworks] Processed networks:', processed);
+    return processed;
   }, [rawNetworks]);
 
   return { 
@@ -886,86 +889,49 @@ export const useParallelMetrics = (metrics = [], filters) => {
   return { data: processedData, ...rest };
 };
 
-/**
- * ✅ APP DATA HOOK - Enhanced with detailed logging
- */
-/**
- * ✅ APP DATA HOOK - Fixed with better error handling and debugging
- */
 export const useAppData = () => {
-  console.log('🔵 [useAppData] Hook called');
-  
   const { data: rawData, isLoading, error, isValidating, mutate, ...rest } = useSWR(
     'appData',
     async () => {
-      console.log('📡 [useAppData] Fetching from API...');
-      const startTime = Date.now();
-      
       try {
-        // Check if API method exists
         if (!adminApi.getAppValue) {
-          console.error('❌ [useAppData] adminApi.getAppValue is undefined!');
           throw new Error('API method getAppValue not found');
         }
         
         const response = await adminApi.getAppValue();
-        const elapsed = Date.now() - startTime;
         
-        console.log(`✅ [useAppData] API call completed in ${elapsed}ms`);
-        console.log('[useAppData] Raw API Response:', JSON.stringify(response, null, 2));
-        
-        // Handle null/undefined response
         if (response === null || response === undefined) {
-          console.warn('⚠️ [useAppData] API returned null/undefined');
           return [];
         }
         
-        // Handle Status: 0 (API-level error)
         if (response?.Status === 0) {
-          console.warn('⚠️ [useAppData] API returned Status: 0', response?.Message || response?.error);
           return [];
         }
         
-        // Extract data from response
         let extracted = null;
         
-        // Direct array
         if (Array.isArray(response)) {
           extracted = response;
-          console.log('[useAppData] Response is direct array, length:', response.length);
         }
-        // Nested in Data/data/Result/result
         else if (Array.isArray(response?.Data)) {
           extracted = response.Data;
-          console.log('[useAppData] Extracted from response.Data, length:', extracted.length);
         }
         else if (Array.isArray(response?.data)) {
           extracted = response.data;
-          console.log('[useAppData] Extracted from response.data, length:', extracted.length);
         }
         else if (Array.isArray(response?.Result)) {
           extracted = response.Result;
-          console.log('[useAppData] Extracted from response.Result, length:', extracted.length);
         }
         else if (Array.isArray(response?.result)) {
           extracted = response.result;
-          console.log('[useAppData] Extracted from response.result, length:', extracted.length);
         }
-        // Single object response - wrap in array
         else if (typeof response === 'object' && response !== null) {
-          console.log('[useAppData] Response is object, checking for nested data...');
-          console.log('[useAppData] Response keys:', Object.keys(response));
-          
-          // Check if it's a single data item (has appName or similar)
           if (response.appName || response.AppName) {
             extracted = [response];
-            console.log('[useAppData] Single item response, wrapping in array');
           } else {
-            // Try to find any array property
             for (const key of Object.keys(response)) {
               if (Array.isArray(response[key])) {
                 extracted = response[key];
-                console.log(`[useAppData] Found array in response.${key}, length:`, extracted.length);
                 break;
               }
             }
@@ -973,26 +939,13 @@ export const useAppData = () => {
         }
         
         if (!extracted) {
-          console.warn('⚠️ [useAppData] Could not extract data from response');
-          console.log('[useAppData] Full response for debugging:', response);
           return [];
-        }
-        
-        if (extracted.length === 0) {
-          console.warn('⚠️ [useAppData] Extracted data is empty array');
-        } else {
-          console.log('[useAppData] First item sample:', extracted[0]);
         }
         
         return extracted;
         
       } catch (err) {
-        console.error('❌ [useAppData] API call failed:', {
-          message: err.message,
-          name: err.name,
-          stack: err.stack,
-        });
-        throw err; // Re-throw to trigger SWR error handling
+        throw err;
       }
     },
     { 
@@ -1005,81 +958,30 @@ export const useAppData = () => {
       shouldRetryOnError: true,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      onSuccess: (data) => {
-        console.log('✅ [useAppData] SWR onSuccess:', {
-          type: typeof data,
-          isArray: Array.isArray(data),
-          length: Array.isArray(data) ? data.length : 'N/A',
-          firstItem: Array.isArray(data) && data.length > 0 ? data[0] : null
-        });
-      },
-      onError: (err, key, config) => {
-        console.error('❌ [useAppData] SWR onError:', {
-          message: err?.message,
-          name: err?.name,
-          key,
-        });
-      },
       onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
-        console.log(`🔄 [useAppData] Retry attempt ${retryCount}/${config.errorRetryCount}`);
-        
-        // Don't retry for specific errors
         if (error?.status === 404 || error?.status === 401) {
-          console.log('🛑 [useAppData] Not retrying for status:', error.status);
           return;
         }
-        
-        // Retry after delay
         setTimeout(() => revalidate({ retryCount }), config.errorRetryInterval);
       },
     }
   );
   
-  // Debug current state
-  console.log('🔵 [useAppData] Current SWR state:', { 
-    hasData: rawData !== undefined && rawData !== null, 
-    dataIsArray: Array.isArray(rawData),
-    dataLength: Array.isArray(rawData) ? rawData.length : 0,
-    isLoading, 
-    isValidating,
-    hasError: !!error,
-    errorMessage: error?.message || null,
-  });
-  
-  // Log actual error if exists
-  if (error) {
-    console.error('🔴 [useAppData] Error details:', {
-      message: error.message,
-      name: error.name,
-      status: error.status,
-      response: error.response,
-    });
-  }
-  
   const processedData = useMemo(() => {
-    console.log('🔄 [useAppData] Processing data...');
-    
     if (!rawData) {
-      console.warn('⚠️ [useAppData] rawData is null/undefined');
       return [];
     }
     
     if (!Array.isArray(rawData)) {
-      console.warn('⚠️ [useAppData] rawData is not an array:', typeof rawData);
       return [];
     }
     
     if (rawData.length === 0) {
-      console.warn('⚠️ [useAppData] rawData is empty array');
       return [];
     }
-
-    console.log('[useAppData] Processing', rawData.length, 'items');
-    console.log('[useAppData] First raw item:', rawData[0]);
     
     const processed = rawData.map((item, index) => {
       if (!item) {
-        console.warn(`[useAppData] Item at index ${index} is null/undefined`);
         return null;
       }
       
@@ -1105,25 +1007,19 @@ export const useAppData = () => {
         lastUsedAt: item?.lastUsedAt || item?.last_used_at,
         usageDate: item?.usageDate || item?.usage_date,
       };
-    }).filter(Boolean); // Remove nulls
+    }).filter(Boolean);
 
-    console.log('✅ [useAppData] Processing complete:', processed.length, 'items');
-    
-    if (processed.length > 0) {
-      console.log('[useAppData] First processed item:', processed[0]);
-    }
-    
     return processed;
   }, [rawData]);
   
   return { 
     data: processedData, 
-    rawData, // Also expose raw data for debugging
+    rawData,
     isLoading,
     isValidating,
     error,
-    mutate, // Expose mutate for manual refresh
-    refresh: () => mutate(), // Helper function
+    mutate,
+    refresh: () => mutate(),
     ...rest 
   };
 };

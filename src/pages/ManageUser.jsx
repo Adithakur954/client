@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-
 import { adminApi } from '../api/apiEndpoints';
 import { toast } from 'react-toastify';
 import DataTable from '../components/common/DataTable';
@@ -7,16 +6,15 @@ import Spinner from '../components/common/Spinner';
 import UserFormDialog from '../components/users/UserFormDialog';
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
-
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent,CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from '@/components/ui/label';
 
 const ManageUsersPage = () => {
@@ -26,7 +24,6 @@ const ManageUsersPage = () => {
     const [currentUser, setCurrentUser] = useState(null);
     const [filters, setFilters] = useState({ UserName: '', MobileNo: '', EmailId: '' });
     const [isFetchingDetails, setIsFetchingDetails] = useState(false);
-    
     const [currentPage, setCurrentPage] = useState(1);
     const [usersPerPage] = useState(10);
 
@@ -54,19 +51,20 @@ const ManageUsersPage = () => {
     }, [fetchUsers]);
 
     const handleOpenDialog = async (user = null) => {
-        if (user) { 
+        if (user) {
             setIsDialogOpen(true);
             setIsFetchingDetails(true);
             try {
                 const response = await adminApi.getUserById(user.id);
-                setCurrentUser(response.Data);
+                const userData = response.Data?.ob_user || response.Data || response;
+                setCurrentUser(userData);
             } catch (error) {
                 toast.error("Failed to fetch latest user details.");
-                setIsDialogOpen(false); 
+                setIsDialogOpen(false);
             } finally {
                 setIsFetchingDetails(false);
             }
-        } else { 
+        } else {
             setCurrentUser(null);
             setIsDialogOpen(true);
         }
@@ -78,19 +76,16 @@ const ManageUsersPage = () => {
     };
 
     const handleSaveUser = () => {
-        // This is now just a callback to refresh data and close the dialog
         fetchUsers();
         handleCloseDialog();
     };
 
     const handleDeleteUser = async (userOrId) => {
-        // accept either a user object or an id
         const userId = typeof userOrId === 'object'
             ? (userOrId.id ?? userOrId.UserId ?? userOrId.user_id ?? userOrId.userId)
             : userOrId;
 
         if (!userId) {
-            console.error('Delete user missing id:', userOrId);
             toast.error('Cannot determine user id for delete.');
             return;
         }
@@ -101,8 +96,6 @@ const ManageUsersPage = () => {
 
         try {
             const response = await adminApi.deleteUser(userId);
-
-            // treat API-specific success shapes: many internal APIs return Status:1 and Message
             const ok =
                 response?.Status === 1 ||
                 response?.Status === '1' ||
@@ -119,23 +112,25 @@ const ManageUsersPage = () => {
                 fetchUsers();
             } else {
                 const msg = response?.Message || response?.message || 'Failed to delete user.';
-                console.error('Delete failed response:', response);
                 toast.error(msg);
             }
         } catch (error) {
-            console.error('Delete error:', error);
             toast.error(error?.message || 'Failed to delete user.');
         }
     };
-    
-   const handleFilterChange = (e) => {
+
+    const handleFilterChange = (e) => {
         const { name, value } = e.target;
-        setFilters(prev => ({...prev, [name]: value}));
+        setFilters(prev => ({ ...prev, [name]: value }));
     };
-    
+
     const handleReset = () => {
         setFilters({ UserName: '', MobileNo: '', EmailId: '' });
     };
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [users.length]);
 
     const indexOfLastUser = currentPage * usersPerPage;
     const indexOfFirstUser = indexOfLastUser - usersPerPage;
@@ -148,27 +143,82 @@ const ManageUsersPage = () => {
         }
     };
 
+    const getUserTypeLabel = (typeId) => {
+        const userTypes = {
+            0: 'Default',
+            1: 'Admin',
+            2: 'User',
+            3: 'Manager',
+        };
+        return userTypes[typeId] !== undefined ? userTypes[typeId] : typeId || '-';
+    };
+
+    const getStatusBadge = (isActive) => {
+        const statusConfig = {
+            1: { label: 'Active', className: 'bg-green-100 text-green-700 border border-green-300' },
+            2: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700 border border-yellow-300' },
+            0: { label: 'Inactive', className: 'bg-red-100 text-red-700 border border-red-300' },
+        };
+        const config = statusConfig[isActive] || { label: 'Unknown', className: 'bg-gray-100 text-gray-700 border border-gray-300' };
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.className}`}>
+                {config.label}
+            </span>
+        );
+    };
+
     const columns = [
-        { header: 'S. No.', render: (row, index) => <span>{indexOfFirstUser + index + 1}</span> },
-        { header: 'User Name', accessor: 'name' },
-        { header: 'User Type', accessor: 'user_type' },
-        { header: 'Email ID', accessor: 'email' },
-        { header: 'Mobile No.', accessor: 'mobileno' },
-        
+        {
+            header: 'S. No.',
+            render: (row, index) => <span className="text-gray-700 font-medium">{indexOfFirstUser + index + 1}</span>
+        },
+        {
+            header: 'User Name',
+            accessor: 'name',
+            render: (row) => <span className="text-gray-800 font-medium">{row.name || '-'}</span>
+        },
+        {
+            header: 'User Type',
+            accessor: 'm_user_type_id',
+            render: (row) => <span className="text-gray-700">{getUserTypeLabel(row.m_user_type_id)}</span>
+        },
+        {
+            header: 'Email ID',
+            accessor: 'email',
+            render: (row) => <span className="text-gray-700">{row.email || '-'}</span>
+        },
+        {
+            header: 'Mobile No.',
+            accessor: 'mobile',
+            render: (row) => <span className="text-gray-700">{row.mobile || '-'}</span>
+        },
+        {
+            header: 'Status',
+            accessor: 'isactive',
+            render: (row) => getStatusBadge(row.isactive)
+        },
         {
             header: 'Action',
             render: (user) => (
-                 <DropdownMenu>
+                <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button variant="ghost" className="h-8 w-8 p-0 text-gray-600 hover:text-gray-800 hover:bg-gray-100">
                             <span className="sr-only">Open menu</span>
                             <MoreHorizontal className="h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleOpenDialog(user)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteUser(user)} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                    <DropdownMenuContent align="end" className="bg-white border border-gray-200 shadow-lg">
+                        <DropdownMenuLabel className="text-gray-800">Actions</DropdownMenuLabel>
+                        <DropdownMenuItem 
+                            onClick={() => handleOpenDialog(user)}
+                            className="text-gray-700 hover:bg-gray-100 cursor-pointer"
+                        >
+                            Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => handleDeleteUser(user)}
+                            className="text-red-600 hover:bg-red-50 cursor-pointer"
+                        >
                             Delete
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -180,78 +230,136 @@ const ManageUsersPage = () => {
     if (loading && users.length === 0) return <Spinner />;
 
     return (
-        <div className="space-y-6 bg-gray-800 h-100% text-white">
+        <div className="space-y-6 bg-gray-50 min-h-screen p-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold">Manage Users</h1>
+                <h1 className="text-3xl font-bold text-gray-800">Manage Users</h1>
             </div>
 
-            <Card>
+            <Card className="bg-white border border-gray-200 shadow-sm">
                 <CardContent className="pt-6">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                         <div className="space-y-1.5">
-                            <Label htmlFor="UserName">User Name</Label>
-                            <Input id="UserName" name="UserName" value={filters.UserName} onChange={handleFilterChange} />
-                        </div>
-                         <div className="space-y-1.5">
-                            <Label htmlFor="MobileNo">Mobile No</Label>
-                            <Input id="MobileNo" name="MobileNo" value={filters.MobileNo} onChange={handleFilterChange} />
+                            <Label htmlFor="UserName" className="text-gray-700 font-medium">User Name</Label>
+                            <Input
+                                id="UserName"
+                                name="UserName"
+                                placeholder="Search by name..."
+                                value={filters.UserName}
+                                onChange={handleFilterChange}
+                                className="bg-white border-gray-300 text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                            />
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="EmailId">Email ID</Label>
-                            <Input id="EmailId" name="EmailId" value={filters.EmailId} onChange={handleFilterChange} />
+                            <Label htmlFor="MobileNo" className="text-gray-700 font-medium">Mobile No</Label>
+                            <Input
+                                id="MobileNo"
+                                name="MobileNo"
+                                placeholder="Search by mobile..."
+                                value={filters.MobileNo}
+                                onChange={handleFilterChange}
+                                className="bg-white border-gray-300 text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="EmailId" className="text-gray-700 font-medium">Email ID</Label>
+                            <Input
+                                id="EmailId"
+                                name="EmailId"
+                                placeholder="Search by email..."
+                                value={filters.EmailId}
+                                onChange={handleFilterChange}
+                                className="bg-white border-gray-300 text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                            />
                         </div>
                         <div className="flex gap-2">
-                            <Button onClick={fetchUsers} disabled={loading}>Search</Button>
-                            <Button variant="outline" onClick={handleReset} disabled={loading}>Reset</Button>
+                            <Button 
+                                onClick={fetchUsers} 
+                                disabled={loading}
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                                {loading ? 'Searching...' : 'Search'}
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                onClick={handleReset} 
+                                disabled={loading}
+                                className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                            >
+                                Reset
+                            </Button>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            <Card>
-                 <CardHeader>
-                    <div className="flex justify-end">
-                         <Button onClick={() => handleOpenDialog()}>Add New User</Button>
+            <Card className="bg-white border border-gray-200 shadow-sm">
+                <CardHeader className="border-b border-gray-200">
+                    <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-gray-800">
+                            Users List ({users.length} total)
+                        </span>
+                        <Button 
+                            onClick={() => handleOpenDialog()}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            Add New User
+                        </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
-                    {loading ? <div className="h-64 flex items-center justify-center"><Spinner/></div> : <DataTable columns={columns} data={currentUsers} />}
+                <CardContent className="p-0">
+                    {loading ? (
+                        <div className="h-64 flex items-center justify-center">
+                            <Spinner />
+                        </div>
+                    ) : users.length === 0 ? (
+                        <div className="h-64 flex items-center justify-center text-gray-500">
+                            No users found. Try adjusting your filters or add a new user.
+                        </div>
+                    ) : (
+                        <DataTable columns={columns} data={currentUsers} />
+                    )}
                 </CardContent>
-                <div className="flex items-center justify-between p-4 border-t">
-                    <div className="text-sm text-muted-foreground">
-                        Showing {users.length > 0 ? indexOfFirstUser + 1 : 0} to {Math.min(indexOfLastUser, users.length)} of {users.length} entries.
+
+                {users.length > 0 && (
+                    <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
+                        <div className="text-sm text-gray-600">
+                            Showing {indexOfFirstUser + 1} to {Math.min(indexOfLastUser, users.length)} of {users.length} entries
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => paginate(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                            >
+                                <ChevronLeft className="h-4 w-4 mr-1" />
+                                Previous
+                            </Button>
+                            <span className="text-sm text-gray-700 px-3">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => paginate(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                            >
+                                Next
+                                <ChevronRight className="h-4 w-4 ml-1" />
+                            </Button>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                         <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => paginate(currentPage - 1)}
-                            disabled={currentPage === 1}
-                        >
-                            <ChevronLeft className="h-4 w-4 mr-1" />
-                            Previous
-                        </Button>
-                        <span className="text-sm">
-                            Page {currentPage} of {totalPages}
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => paginate(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                        >
-                            Next
-                            <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
-                    </div>
-                </div>
+                )}
             </Card>
-            
+
             <UserFormDialog
                 isOpen={isDialogOpen}
                 onClose={handleCloseDialog}
                 onSave={handleSaveUser}
                 user={currentUser}
+                isLoading={isFetchingDetails}
             />
         </div>
     );

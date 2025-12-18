@@ -1,7 +1,6 @@
-// DrawingControlsPanel.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PenTool, XCircle, Download, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { PenTool, XCircle, Download, ChevronDown, ChevronUp, Info, Search, Map as MapIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 export default function DrawingControlsPanel({
@@ -11,6 +10,7 @@ export default function DrawingControlsPanel({
   polygonStats,
   onDownloadStatsCsv,
   onDownloadRawCsv,
+  onFetchLogs,
   position = "top-right",
 }) {
   const [dropOpen, setDropOpen] = useState(false);
@@ -50,55 +50,37 @@ export default function DrawingControlsPanel({
     "top-left": "top-20 left-4",
     "bottom-right": "bottom-4 right-4",
     "bottom-left": "bottom-4 left-4",
+    "relative": "",
   };
 
+  const hasShape = polygonStats && (polygonStats.area > 0 || polygonStats.geometry);
+  const sessionCount = polygonStats?.intersectingSessions?.length || 0;
+
   return (
-    <div className={`absolute ${positionClasses[position]} z-40`} ref={dropdownRef}>
-      {/* Main Toggle Button */}
+    <div className={`${positionClasses[position] || positionClasses["top-right"]} z-40`} ref={dropdownRef}>
       <button
         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg transition-all ${
           dropOpen
             ? "bg-blue-600 text-white"
-            : "bg-white text-gray-700 hover:bg-gray-50"
+            : "bg-slate-800 text-white hover:bg-slate-700 border border-slate-600"
         }`}
         onClick={() => setDropOpen((p) => !p)}
       >
         <PenTool className="w-4 h-4" />
-        <span>Draw / Analyze</span>
+        <span>Drawing Tool</span>
         {dropOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
       </button>
 
-      {/* Drawing Tools Dropdown */}
       {dropOpen && (
         <div className="absolute top-full right-0 mt-2 w-80 bg-white text-gray-900 rounded-lg shadow-2xl ring-1 ring-gray-200 p-4 z-50">
-          {!hasLogs && (
-            <div className="mb-3 p-2 rounded bg-amber-50 text-amber-800 text-xs">
-              ⚠️ Load/fetch logs first to enable drawing.
-            </div>
-          )}
+          
+          
 
-          {/* Edit Instructions */}
-          <div className="mb-3 p-3 rounded bg-blue-50 text-blue-800 text-xs border border-blue-200">
-            <div className="flex items-start gap-2">
-              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="font-semibold mb-1">Editing Shapes:</div>
-                <ul className="space-y-1 text-xs">
-                  <li>• <strong>Drag</strong> shapes to move them</li>
-                  <li>• <strong>Drag vertices</strong> to resize/reshape</li>
-                  <li>• <strong>Drag midpoints</strong> to add vertices (polygons)</li>
-                  <li>• Stats update automatically when edited</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <label className="flex items-center gap-2 font-medium text-sm mb-3">
+          <label className="flex items-center gap-2 font-medium text-sm mb-3 cursor-pointer">
             <input
               type="checkbox"
               checked={!!safeUi.drawEnabled}
               onChange={(e) => onUIChange?.({ drawEnabled: e.target.checked })}
-              disabled={!hasLogs}
               className="w-4 h-4"
             />
             Enable Drawing Tools
@@ -109,12 +91,36 @@ export default function DrawingControlsPanel({
               size="sm"
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               onClick={startDrawPolygon}
-              disabled={!hasLogs}
             >
               <PenTool className="h-4 w-4 mr-2" />
               Start Drawing Polygon
             </Button>
           </div>
+
+          {/* DYNAMIC FETCH BUTTON */}
+          {!hasLogs && hasShape && (
+            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-md animate-in fade-in slide-in-from-top-2">
+              <div className="text-xs text-indigo-700 mb-2 font-medium flex items-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                {sessionCount > 0 
+                  ? `Found ${sessionCount} sessions in this area.`
+                  : "Area defined. No sessions found yet."}
+              </div>
+              
+              <Button 
+                size="sm" 
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                onClick={() => {
+                   setDropOpen(false);
+                   onFetchLogs?.();
+                }}
+                disabled={sessionCount === 0}
+              >
+                <Search className="w-4 h-4 mr-2" />
+                {sessionCount > 0 ? `View Logs for ${sessionCount} Sessions` : "Fetch Logs"}
+              </Button>
+            </div>
+          )}
 
           <div className={`space-y-3 text-sm ${safeUi.drawEnabled ? "" : "opacity-50 pointer-events-none"}`}>
             <div className="flex items-center justify-between gap-2">

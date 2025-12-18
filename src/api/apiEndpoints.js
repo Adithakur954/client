@@ -378,6 +378,8 @@ export const adminApi = {
       params: { from: startDate, to: endDate } 
     }),
 
+    getHoles: ()=> api.get("/Admin/holes"),
+
   getNetworkDurations: async (startDate, endDate) => {
     const formatDateLocal = (d) => {
       if (!d) return null;

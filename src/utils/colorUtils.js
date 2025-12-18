@@ -1,20 +1,61 @@
 
-export const normalizeProviderName = (raw) => {
-  if (!raw) return "Unknown";
-  const s = String(raw).trim();
+export const normalizeProviderName = (rawName) => {
+  if (!rawName) return "Unknown";
+
+  const invalidValues = ["000 000", " 000 000 ", "404440", "404011"];
+  const s = String(rawName).trim();
+
+  // Handle only slashes like /, //, ///
   if (/^\/+$/.test(s)) return "Unknown";
-  if (s.replace(/\s+/g, "") === "404011") return "Unknown";
+
+  if (invalidValues.includes(s)) return "Unknown";
 
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
 
-  if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) return "Jio";
-  if (cleaned.includes("AIRTEL") || cleaned.includes("airtel")) return "Airtel";
-  if (cleaned === "VI" || cleaned.includes("VIINDIA") || cleaned.includes("VODAFONE") || cleaned.includes("IDEA")) return "VI India";
-  if (cleaned.includes("YAS") || cleaned.includes("BROADBAND")) return "YAS";
-  if (cleaned.includes("BSNL")) return "BSNL";
+  if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) {
+    return "Jio";
+  }
 
-  return "Unknown";
+  if (cleaned.includes("AIRTEL")) {
+    return "Airtel";
+  }
+
+  if (
+    cleaned === "VI" ||
+    cleaned.includes("VIINDIA") ||
+    cleaned.includes("VODAFONE") ||
+    cleaned.includes("IDEA")
+  ) {
+    return "VI India";
+  }
+
+  if (cleaned.includes("YAS") || cleaned.includes("BROADBAND")) {
+    return "YAS";
+  }
+
+  if (cleaned.includes("BSNL")) {
+    return "BSNL";
+  }
+
+  return s;
 };
+
+
+// export const fuunction =(rawname)=>{
+//   if(!rawname) return null;
+
+//   invalidArrays=["000 000","//////","404440","/","//","///"];
+
+//   if(invalidArrays.includes(rawname.trim())) return "Unknown";
+
+//   const cleaned = rawname.toUpperCase().replace(/[\s\-_]/g, "");
+//   if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) return "Jio";
+//   else if (cleaned.includes("AIRTEL") || cleaned.includes("airtel")) return "Airtel";
+//   else if (cleaned === "VI" || cleaned.includes("VIINDIA") || cleaned.includes("VODAFONE") || cleaned.includes("IDEA")) return "VI India";
+//   else if (cleaned.includes("YAS") || cleaned.includes("BROADBAND")) return "YAS";
+//   else if (cleaned.includes("BSNL")) return "BSNL";
+//   else return rawname;
+// }
 
 // Normalize technology names
 export const normalizeTechName = (tech) => {

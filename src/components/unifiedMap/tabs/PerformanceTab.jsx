@@ -73,11 +73,7 @@ export const PerformanceTab = ({ locations, expanded, chartRefs }) => {
         />
       )}
 
-      {/* Uncomment when ready to use */}
-      {/* <ThroughputTimelineChart 
-        ref={chartRefs?.throughputTimeline} 
-        locations={locations} 
-      /> */}
+      
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { adminApi } from '../api/apiEndpoints';
 import { toast } from 'react-toastify';
 import Spinner from '../components/common/Spinner';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox'; // ✅ Add checkbox import
 import {
     Table,
     TableBody,
@@ -12,12 +13,13 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Trash2, Map, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, Map, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const DriveTestSessionsPage = () => {
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedSessions, setSelectedSessions] = useState([]); // ✅ Track selected sessions
     const navigate = useNavigate();
 
     const [currentPage, setCurrentPage] = useState(1);
@@ -39,11 +41,41 @@ const DriveTestSessionsPage = () => {
         fetchSessions();
     }, [fetchSessions]);
 
+    // ✅ Toggle single session selection
+    const toggleSessionSelection = (sessionId) => {
+        setSelectedSessions(prev => 
+            prev.includes(sessionId) 
+                ? prev.filter(id => id !== sessionId)
+                : [...prev, sessionId]
+        );
+    };
+
+    // ✅ Toggle select all on current page
+    const toggleSelectAll = () => {
+        const currentPageIds = currentSessions.map(s => s.id);
+        const allSelected = currentPageIds.every(id => selectedSessions.includes(id));
+        
+        if (allSelected) {
+            // Deselect all on current page
+            setSelectedSessions(prev => prev.filter(id => !currentPageIds.includes(id)));
+        } else {
+            // Select all on current page
+            setSelectedSessions(prev => [...new Set([...prev, ...currentPageIds])]);
+        }
+    };
+
+    // ✅ Clear all selections
+    const clearSelection = () => {
+        setSelectedSessions([]);
+    };
+
     const handleDelete = async (sessionId) => {
         if (window.confirm('Are you sure you want to delete this session? This will also remove all associated log data.')) {
             try {
                 await adminApi.deleteSession(sessionId);
                 toast.success('Session deleted successfully');
+                // Remove from selection if it was selected
+                setSelectedSessions(prev => prev.filter(id => id !== sessionId));
                 fetchSessions();
             } catch (error) {
                 toast.error(`Failed to delete session: ${error.message}`);
@@ -51,10 +83,23 @@ const DriveTestSessionsPage = () => {
         }
     };
 
-    // ✅ FIX: Changed URL parameter to 'sessionId' (matches SessionMapDebug)
+    // ✅ View single session on map
     const handleViewOnMap = (sessionId) => {
         console.log("🗺️ Navigating to map for session:", sessionId);
         navigate(`/debug-map?sessionId=${encodeURIComponent(String(sessionId))}`);
+    };
+
+    // ✅ View multiple selected sessions on map
+    const handleViewSelectedOnMap = () => {
+        if (selectedSessions.length === 0) {
+            toast.warning('Please select at least one session');
+            return;
+        }
+        
+        // Join session IDs with comma
+        const sessionIdsParam = selectedSessions.join(',');
+        console.log("🗺️ Navigating to map for sessions:", selectedSessions);
+        navigate(`/debug-map?sessionId=${encodeURIComponent(sessionIdsParam)}`);
     };
 
     const formatDate = (dateString) => {
@@ -67,6 +112,10 @@ const DriveTestSessionsPage = () => {
     const currentSessions = sessions.slice(indexOfFirstSession, indexOfLastSession);
     const totalPages = Math.ceil(sessions.length / sessionsPerPage);
 
+    // Check if all current page sessions are selected
+    const allCurrentPageSelected = currentSessions.length > 0 && 
+        currentSessions.every(s => selectedSessions.includes(s.id));
+
     const paginate = (pageNumber) => {
         if (pageNumber > 0 && pageNumber <= totalPages) {
             setCurrentPage(pageNumber);
@@ -78,12 +127,48 @@ const DriveTestSessionsPage = () => {
     }
 
     return (
-        <div className="p-6 h-full bg-gray-800 text-white flex flex-col">
-            <h1 className="text-2xl font-semibold mb-4">Manage Drive Test Sessions</h1>
+        <div className="p-6 h-full   flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+                <h1 className="text-2xl font-bold">Manage Drive Test Sessions</h1>
+                
+                {/* ✅ Multi-select actions */}
+                {selectedSessions.length > 0 && (
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-300">
+                            {selectedSessions.length} session(s) selected
+                        </span>
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={clearSelection}
+                        >
+                            Clear Selection
+                        </Button>
+                        <Button 
+                            variant="default" 
+                            size="sm"
+                            onClick={handleViewSelectedOnMap}
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
+                            <MapPin className="h-4 w-4 mr-2" />
+                            View {selectedSessions.length} on Map
+                        </Button>
+                    </div>
+                )}
+            </div>
+
             <div className="rounded-lg border shadow-sm flex-grow overflow-y-auto">
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            {/* ✅ Select All Checkbox */}
+                            <TableHead className="w-[50px]">
+                                <Checkbox
+                                    checked={allCurrentPageSelected}
+                                    onCheckedChange={toggleSelectAll}
+                                    aria-label="Select all on this page"
+                                />
+                            </TableHead>
                             <TableHead>User Details</TableHead>
                             <TableHead>Start Time - End Time</TableHead>
                             <TableHead>Start Location</TableHead>
@@ -96,7 +181,18 @@ const DriveTestSessionsPage = () => {
                     </TableHeader>
                     <TableBody>
                         {currentSessions.map((session) => (
-                            <TableRow key={session.id}>
+                            <TableRow 
+                                key={session.id}
+                                className={selectedSessions.includes(session.id) ? 'bg-blue-900/30' : ''}
+                            >
+                                {/* ✅ Row Checkbox */}
+                                <TableCell>
+                                    <Checkbox
+                                        checked={selectedSessions.includes(session.id)}
+                                        onCheckedChange={() => toggleSessionSelection(session.id)}
+                                        aria-label={`Select session ${session.id}`}
+                                    />
+                                </TableCell>
                                 <TableCell className="whitespace-normal break-words max-w-[200px]">
                                     <div className="font-medium">{session.CreatedBy || 'Unknown User'} ({session.mobile || 'N/A'})</div>
                                     <div className="text-sm text-muted-foreground">
@@ -131,6 +227,11 @@ const DriveTestSessionsPage = () => {
             <div className="flex items-center justify-between p-4 border-t">
                 <div className="text-sm text-muted-foreground">
                     Showing {indexOfFirstSession + 1} to {Math.min(indexOfLastSession, sessions.length)} of {sessions.length} entries.
+                    {selectedSessions.length > 0 && (
+                        <span className="ml-2 text-blue-400">
+                            ({selectedSessions.length} selected across all pages)
+                        </span>
+                    )}
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
