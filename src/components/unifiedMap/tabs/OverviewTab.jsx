@@ -17,14 +17,20 @@ import { PCI_COLOR_PALETTE } from "@/components/map/layers/MultiColorCirclesLaye
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { mapViewApi } from "@/api/apiEndpoints";
+import {
+  normalizeProviderName,
+  normalizeTechName,
+  COLOR_SCHEMES,
+  getLogColor,
+} from "@/utils/colorUtils";
 
 const formatDuration = (seconds) => {
   if (!seconds || seconds <= 0) return "N/A";
-  
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   } else if (minutes > 0) {
@@ -80,11 +86,16 @@ export const OverviewTab = ({
       .filter((id) => id);
   }, [sessionParam]);
 
-  const isUnknownOrEmpty = (value) => {
+  const isUnknownOrEmpty = useCallback((value) => {
     if (!value) return true;
     const normalized = value.toString().trim().toLowerCase();
-    return normalized === "unknown" || normalized === "" || normalized === "null" || normalized === "undefined";
-  };
+    return (
+      normalized === "unknown" ||
+      normalized === "" ||
+      normalized === "null" ||
+      normalized === "undefined"
+    );
+  }, []);
 
   const fetchVolumeData = useCallback(async () => {
     if (!sessionIds.length) {
@@ -104,17 +115,25 @@ export const OverviewTab = ({
         throw new Error(response.message || "Failed to fetch volume data");
       }
 
-      const volumeData = response?.data?.tpt_provider_summary || response?.tpt_provider_summary || {};
+      const volumeData =
+        response?.data?.tpt_provider_summary ||
+        response?.tpt_provider_summary ||
+        {};
 
       if (Object.keys(volumeData).length > 0) {
-        toast.success(`Volume data loaded for ${Object.keys(volumeData).length} session(s)`);
+        toast.success(
+          `Volume data loaded for ${Object.keys(volumeData).length} session(s)`
+        );
         setProviderVolume(volumeData);
       } else {
         toast.warn("No volume data available");
         setProviderVolume({});
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to fetch volume data";
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to fetch volume data";
       setError(errorMessage);
       toast.error(errorMessage);
       setProviderVolume({});
@@ -130,7 +149,7 @@ export const OverviewTab = ({
       setProviderVolume({});
       setError(null);
     }
-  }, [sessionIds]);
+  }, [sessionIds, fetchVolumeData]);
 
   const topPCIs = useMemo(() => {
     if (!locations?.length || selectedMetric !== "pci") return [];
@@ -203,18 +222,21 @@ export const OverviewTab = ({
 
       Object.entries(providers).forEach(([provider, techs]) => {
         if (typeof techs !== "object" || techs === null) return;
-        if (isUnknownOrEmpty(provider)) return;
+
+        const normalizedProvider = normalizeProviderName(provider);
+        if (normalizedProvider === "Unknown") return;
 
         Object.entries(techs).forEach(([tech, volumeData]) => {
-          if (isUnknownOrEmpty(tech)) return;
+          const normalizedTech = normalizeTechName(tech);
+          if (normalizedTech === "Unknown") return;
 
           if (volumeData && typeof volumeData === "object") {
-            const key = `${provider.toLowerCase()}_${tech.toUpperCase()}`;
+            const key = `${normalizedProvider.toLowerCase()}_${normalizedTech}`;
 
             if (!aggregated[key]) {
               aggregated[key] = {
-                provider: provider,
-                technology: tech,
+                provider: normalizedProvider,
+                technology: normalizedTech,
                 downloadKb: 0,
                 uploadKb: 0,
                 durationSec: 0,
@@ -222,20 +244,22 @@ export const OverviewTab = ({
                 avgUlSpeedKbps: [],
                 sessionCount: 0,
                 sessions: [],
+                providerColor: getLogColor("provider", normalizedProvider),
+                techColor: getLogColor("technology", normalizedTech),
               };
             }
 
             aggregated[key].downloadKb += volumeData?.dl_kb || 0;
             aggregated[key].uploadKb += volumeData?.ul_kb || 0;
             aggregated[key].durationSec += volumeData?.duration_sec || 0;
-            
+
             if (volumeData?.avg_dl_speed_kbps) {
               aggregated[key].avgDlSpeedKbps.push(volumeData.avg_dl_speed_kbps);
             }
             if (volumeData?.avg_ul_speed_kbps) {
               aggregated[key].avgUlSpeedKbps.push(volumeData.avg_ul_speed_kbps);
             }
-            
+
             aggregated[key].sessionCount += 1;
             if (!aggregated[key].sessions.includes(sessionId)) {
               aggregated[key].sessions.push(sessionId);
@@ -246,12 +270,16 @@ export const OverviewTab = ({
     });
 
     const processed = Object.values(aggregated).map((item) => {
-      const avgDlSpeed = item.avgDlSpeedKbps.length > 0
-        ? item.avgDlSpeedKbps.reduce((a, b) => a + b, 0) / item.avgDlSpeedKbps.length
-        : 0;
-      const avgUlSpeed = item.avgUlSpeedKbps.length > 0
-        ? item.avgUlSpeedKbps.reduce((a, b) => a + b, 0) / item.avgUlSpeedKbps.length
-        : 0;
+      const avgDlSpeed =
+        item.avgDlSpeedKbps.length > 0
+          ? item.avgDlSpeedKbps.reduce((a, b) => a + b, 0) /
+            item.avgDlSpeedKbps.length
+          : 0;
+      const avgUlSpeed =
+        item.avgUlSpeedKbps.length > 0
+          ? item.avgUlSpeedKbps.reduce((a, b) => a + b, 0) /
+            item.avgUlSpeedKbps.length
+          : 0;
 
       return {
         provider: item.provider,
@@ -269,6 +297,8 @@ export const OverviewTab = ({
         avgUlSpeedFormatted: formatSpeed(avgUlSpeed),
         sessionCount: item.sessionCount,
         sessions: item.sessions,
+        providerColor: item.providerColor,
+        techColor: item.techColor,
       };
     });
 
@@ -282,26 +312,42 @@ export const OverviewTab = ({
   }, [providerVolume]);
 
   const volumeSummaryStats = useMemo(() => {
-    if (!processedProviderVolume || processedProviderVolume.length === 0) return null;
+    if (!processedProviderVolume || processedProviderVolume.length === 0)
+      return null;
 
-    const totalDownloadKb = processedProviderVolume.reduce((sum, item) => sum + (item.downloadKb || 0), 0);
-    const totalUploadKb = processedProviderVolume.reduce((sum, item) => sum + (item.uploadKb || 0), 0);
-    const totalDurationSec = processedProviderVolume.reduce((sum, item) => sum + (item.durationSec || 0), 0);
+    const totalDownloadKb = processedProviderVolume.reduce(
+      (sum, item) => sum + (item.downloadKb || 0),
+      0
+    );
+    const totalUploadKb = processedProviderVolume.reduce(
+      (sum, item) => sum + (item.uploadKb || 0),
+      0
+    );
+    const totalDurationSec = processedProviderVolume.reduce(
+      (sum, item) => sum + (item.durationSec || 0),
+      0
+    );
 
-    const allDlSpeeds = processedProviderVolume.map(item => item.avgDlSpeedKbps).filter(Boolean);
-    const allUlSpeeds = processedProviderVolume.map(item => item.avgUlSpeedKbps).filter(Boolean);
-    
-    const avgDlSpeed = allDlSpeeds.length > 0 
-      ? allDlSpeeds.reduce((a, b) => a + b, 0) / allDlSpeeds.length 
-      : 0;
-    const avgUlSpeed = allUlSpeeds.length > 0 
-      ? allUlSpeeds.reduce((a, b) => a + b, 0) / allUlSpeeds.length 
-      : 0;
+    const allDlSpeeds = processedProviderVolume
+      .map((item) => item.avgDlSpeedKbps)
+      .filter(Boolean);
+    const allUlSpeeds = processedProviderVolume
+      .map((item) => item.avgUlSpeedKbps)
+      .filter(Boolean);
+
+    const avgDlSpeed =
+      allDlSpeeds.length > 0
+        ? allDlSpeeds.reduce((a, b) => a + b, 0) / allDlSpeeds.length
+        : 0;
+    const avgUlSpeed =
+      allUlSpeeds.length > 0
+        ? allUlSpeeds.reduce((a, b) => a + b, 0) / allUlSpeeds.length
+        : 0;
 
     const byProvider = {};
     processedProviderVolume.forEach((item) => {
       if (isUnknownOrEmpty(item.provider)) return;
-      
+
       const providerKey = item.provider.toLowerCase();
       if (!byProvider[providerKey]) {
         byProvider[providerKey] = {
@@ -310,6 +356,7 @@ export const OverviewTab = ({
           uploadKb: 0,
           durationSec: 0,
           technologies: [],
+          color: item.providerColor,
         };
       }
       byProvider[providerKey].downloadKb += item.downloadKb || 0;
@@ -323,10 +370,15 @@ export const OverviewTab = ({
     const byTech = {};
     processedProviderVolume.forEach((item) => {
       if (isUnknownOrEmpty(item.technology)) return;
-      
+
       const techKey = item.technology.toUpperCase();
       if (!byTech[techKey]) {
-        byTech[techKey] = { downloadKb: 0, uploadKb: 0, durationSec: 0 };
+        byTech[techKey] = {
+          downloadKb: 0,
+          uploadKb: 0,
+          durationSec: 0,
+          color: item.techColor,
+        };
       }
       byTech[techKey].downloadKb += item.downloadKb || 0;
       byTech[techKey].uploadKb += item.uploadKb || 0;
@@ -344,7 +396,7 @@ export const OverviewTab = ({
       byTech,
       sessionsCount: sessionIds.length,
     };
-  }, [processedProviderVolume, sessionIds]);
+  }, [processedProviderVolume, sessionIds, isUnknownOrEmpty]);
 
   return (
     <div className="space-y-4">
@@ -355,7 +407,9 @@ export const OverviewTab = ({
         </div>
       )}
 
-      <div className={`grid ${expanded ? "grid-cols-4" : "grid-cols-2"} gap-3`}>
+      <div
+        className={`grid ${expanded ? "grid-cols-4" : "grid-cols-2"} gap-3`}
+      >
         <StatCard
           icon={MapPin}
           label="Total Samples"
@@ -397,7 +451,9 @@ export const OverviewTab = ({
             {selectedMetric?.toUpperCase() || "METRIC"} Statistics
           </h4>
 
-          <div className={`grid ${expanded ? "grid-cols-5" : "grid-cols-3"} gap-3`}>
+          <div
+            className={`grid ${expanded ? "grid-cols-5" : "grid-cols-3"} gap-3`}
+          >
             <MetricCard label="Average" value={stats.avg} />
             <MetricCard label="Minimum" value={stats.min} color="blue" />
             <MetricCard label="Maximum" value={stats.max} color="green" />
@@ -465,13 +521,27 @@ const IODistributionCard = ({ ioSummary }) => (
         <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/30 rounded-lg p-4 hover:shadow-lg hover:shadow-cyan-500/10 transition-all">
           <div className="flex items-center gap-3 mb-3">
             <div className="bg-cyan-500/20 p-2.5 rounded-lg">
-              <svg className="h-6 w-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              <svg
+                className="h-6 w-6 text-cyan-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
               </svg>
             </div>
             <div>
-              <div className="text-xs text-cyan-300 font-medium">Indoor Samples</div>
-              <div className="text-2xl font-bold text-cyan-400">{ioSummary.indoor.toLocaleString()}</div>
+              <div className="text-xs text-cyan-300 font-medium">
+                Indoor Samples
+              </div>
+              <div className="text-2xl font-bold text-cyan-400">
+                {ioSummary.indoor.toLocaleString()}
+              </div>
             </div>
           </div>
           <div className="flex items-center justify-between pt-3 border-t border-cyan-500/20">
@@ -487,13 +557,27 @@ const IODistributionCard = ({ ioSummary }) => (
         <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/30 rounded-lg p-4 hover:shadow-lg hover:shadow-green-500/10 transition-all">
           <div className="flex items-center gap-3 mb-3">
             <div className="bg-green-500/20 p-2.5 rounded-lg">
-              <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="h-6 w-6 text-green-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             </div>
             <div>
-              <div className="text-xs text-green-300 font-medium">Outdoor Samples</div>
-              <div className="text-2xl font-bold text-green-400">{ioSummary.outdoor.toLocaleString()}</div>
+              <div className="text-xs text-green-300 font-medium">
+                Outdoor Samples
+              </div>
+              <div className="text-2xl font-bold text-green-400">
+                {ioSummary.outdoor.toLocaleString()}
+              </div>
             </div>
           </div>
           <div className="flex items-center justify-between pt-3 border-t border-green-500/20">
@@ -527,7 +611,9 @@ const PCIReferenceCard = ({ topPCIs }) => (
             style={{ backgroundColor: item.color }}
           />
           <div className="flex-1 min-w-0">
-            <div className="text-white font-semibold truncate">PCI {item.pci}</div>
+            <div className="text-white font-semibold truncate">
+              PCI {item.pci}
+            </div>
             <div className="text-white">{item.count} pts</div>
           </div>
         </div>
@@ -545,90 +631,79 @@ const SessionDurationCard = ({ duration }) => (
     <div className="grid grid-cols-2 gap-3 text-sm">
       <div className="bg-slate-800 p-3 rounded hover:bg-slate-750 transition-colors">
         <div className="text-white text-xs mb-1">Duration</div>
-        <div className="text-white font-semibold">{duration.total_duration || "N/A"}</div>
+        <div className="text-white font-semibold">
+          {duration.total_duration || "N/A"}
+        </div>
       </div>
       <div className="bg-slate-800 p-3 rounded hover:bg-slate-750 transition-colors">
         <div className="text-white text-xs mb-1">Start Time</div>
         <div className="text-white font-semibold">
-          {duration.start_time ? new Date(duration.start_time).toLocaleTimeString() : "N/A"}
+          {duration.start_time
+            ? new Date(duration.start_time).toLocaleTimeString()
+            : "N/A"}
         </div>
       </div>
     </div>
   </div>
 );
 
-const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds, error }) => {
-  const [showDetails, setShowDetails] = useState(true);
-
-  const getTechBadgeColor = (tech) => {
-    const techBadgeColors = {
-      "2G": "bg-orange-500/20 border-orange-500/30 text-orange-400",
-      "3G": "bg-yellow-500/20 border-yellow-500/30 text-yellow-400",
-      "4G": "bg-blue-500/20 border-blue-500/30 text-blue-400",
-      "5G": "bg-purple-500/20 border-purple-500/30 text-purple-400",
-      "LTE": "bg-blue-500/20 border-blue-500/30 text-blue-400",
-      "WCDMA": "bg-yellow-500/20 border-yellow-500/30 text-yellow-400",
-      "GSM": "bg-orange-500/20 border-orange-500/30 text-orange-400",
-      "NR": "bg-purple-500/20 border-purple-500/30 text-purple-400",
+const ProviderVolumeCard = ({
+  providerVolume,
+  summaryStats,
+  loading,
+  sessionIds,
+  error,
+}) => {
+  const getTechBadgeStyle = (tech) => {
+    const color = getLogColor("technology", tech);
+    return {
+      backgroundColor: `${color}20`,
+      borderColor: `${color}50`,
+      color: color,
     };
-    return techBadgeColors[tech?.toUpperCase()] || "bg-slate-700 border-slate-600 text-white";
   };
 
-  const getProviderIcon = (provider) => {
-    const providerLower = provider?.toLowerCase() || "";
-    if (providerLower.includes("jio")) return "🔵";
-    if (providerLower.includes("airtel")) return "🔴";
-    if (providerLower.includes("vodafone") || providerLower.includes("vi")) return "🟣";
-    if (providerLower.includes("bsnl")) return "🟢";
-    return "📶";
-  };
-
-  const isKnownProvider = (provider) => {
-    if (!provider || typeof provider !== 'string') return false;
-    
-    const providerLower = provider.toLowerCase().trim();
-    
-    const knownProviders = [
-      'jio',
-      'airtel', 
-      'vi',
-      'vodafone',
-      'bsnl'
-    ];
-    
-    return knownProviders.some(known => providerLower.includes(known));
+  const getProviderBadgeStyle = (provider) => {
+    const color = getLogColor("provider", provider);
+    return {
+      backgroundColor: `${color}20`,
+      borderColor: `${color}50`,
+      color: color,
+    };
   };
 
   const filteredProviderVolume = useMemo(() => {
     if (!providerVolume || !Array.isArray(providerVolume)) return [];
-    
-    return providerVolume.filter(item => {
-      if (!isKnownProvider(item.provider)) {
-        return false;
-      }
+
+    return providerVolume.filter((item) => {
+      const normalizedProvider = normalizeProviderName(item.provider);
+      if (normalizedProvider === "Unknown") return false;
 
       const downloadValue = parseFloat(item.downloadGb) || 0;
       const uploadValue = parseFloat(item.uploadGb) || 0;
       const totalValue = parseFloat(item.totalGb) || 0;
-      
+
       return downloadValue > 0 || uploadValue > 0 || totalValue > 0;
     });
   }, [providerVolume]);
 
   const filteredTechSummary = useMemo(() => {
     if (!summaryStats?.byTech) return {};
-    
+
     const filtered = {};
-    
+
     Object.entries(summaryStats.byTech).forEach(([tech, data]) => {
+      const normalizedTech = normalizeTechName(tech);
+      if (normalizedTech === "Unknown") return;
+
       const dlValue = parseFloat(data.downloadKb) || 0;
       const ulValue = parseFloat(data.uploadKb) || 0;
-      
+
       if (dlValue > 0 || ulValue > 0) {
         filtered[tech] = data;
       }
     });
-    
+
     return filtered;
   }, [summaryStats]);
 
@@ -649,14 +724,18 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
         <div className="flex items-center justify-center py-8">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
-            <span className="text-white text-sm">Loading provider volume data...</span>
+            <span className="text-white text-sm">
+              Loading provider volume data...
+            </span>
           </div>
         </div>
       ) : error ? (
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
             <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
-            <div className="text-white text-sm">Failed to load provider volume data</div>
+            <div className="text-white text-sm">
+              Failed to load provider volume data
+            </div>
             <div className="text-xs text-white mt-1">{error}</div>
           </div>
         </div>
@@ -664,9 +743,8 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
             <Wifi className="h-8 w-8 text-white mx-auto mb-2" />
-            <div className="text-white text-sm">No valid provider volume data available</div>
-            <div className="text-xs text-white mt-1">
-              Only showing data for: Jio, Airtel, Vi/Vodafone, BSNL
+            <div className="text-white text-sm">
+              No valid provider volume data available
             </div>
           </div>
         </div>
@@ -676,8 +754,12 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-700 bg-slate-800">
-                  <th className="text-left px-2 py-2 text-white font-medium">Provider</th>
-                  <th className="text-left px-2 py-2 text-white font-medium">Tech</th>
+                  <th className="text-left px-2 py-2 text-white font-medium">
+                    Provider
+                  </th>
+                  <th className="text-left px-2 py-2 text-white font-medium">
+                    Tech
+                  </th>
                   <th className="text-right px-2 py-2 text-white font-medium whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <Download className="h-3 w-3" />
@@ -708,13 +790,18 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
                       Duration
                     </div>
                   </th>
-                  <th className="text-right px-2 py-2 text-white font-medium">Total</th>
+                  <th className="text-right px-2 py-2 text-white font-medium">
+                    Total
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProviderVolume.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-2 py-8 text-center text-white text-sm">
+                    <td
+                      colSpan="8"
+                      className="px-2 py-8 text-center text-white text-sm"
+                    >
                       No data available for known providers
                     </td>
                   </tr>
@@ -726,12 +813,20 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
                     >
                       <td className="px-2 py-2 text-white">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm">{getProviderIcon(item.provider)}</span>
-                          <span className="capitalize font-medium">{item.provider}</span>
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: item.providerColor }}
+                          />
+                          <span className="capitalize font-medium">
+                            {item.provider}
+                          </span>
                         </div>
                       </td>
                       <td className="px-2 py-2">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${getTechBadgeColor(item.technology)}`}>
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border"
+                          style={getTechBadgeStyle(item.technology)}
+                        >
                           {item.technology}
                         </span>
                       </td>
@@ -761,17 +856,21 @@ const ProviderVolumeCard = ({ providerVolume, summaryStats, loading, sessionIds,
           </div>
 
           {hasTechData && (
-            <div className="mt-4 pt-3 border-t">
-              <h5 className="text-xs font-semibold text-white mb-2">By Technology</h5>
+            <div className="mt-4 pt-3 border-t border-slate-700">
+              <h5 className="text-xs font-semibold text-white mb-2">
+                By Technology
+              </h5>
               <div className="flex flex-wrap text-white gap-2">
                 {Object.entries(filteredTechSummary).map(([tech, data]) => (
                   <div
                     key={tech}
-                    className={`inline-flex items-center gap-2 text-white px-3 py-1.5 rounded-lg border ${getTechBadgeColor(tech)}`}
+                    className="inline-flex items-center gap-2 text-white px-3 py-1.5 rounded-lg border"
+                    style={getTechBadgeStyle(tech)}
                   >
                     <span className="font-medium">{tech}</span>
-                    <span className="text-xs text-white">
-                      ↓{formatBytes(data.downloadKb, "GB")} GB | ↑{formatBytes(data.uploadKb, "GB")} GB
+                    <span className="text-xs opacity-80">
+                      {formatBytes(data.downloadKb, "GB")} GB /{" "}
+                      {formatBytes(data.uploadKb, "GB")} GB
                     </span>
                   </div>
                 ))}
@@ -797,35 +896,54 @@ const DataVolumeCard = ({ volume, sessionWiseVolume }) => (
           <Download className="h-3 w-3" />
           Download Volume
         </div>
-        <div className="text-blue-400 font-semibold">{volume.dlGb || "N/A"} GB</div>
+        <div className="text-blue-400 font-semibold">
+          {volume.dlGb || "N/A"} GB
+        </div>
       </div>
       <div className="bg-slate-800 p-3 rounded hover:bg-slate-750 transition-colors">
         <div className="text-white text-xs mb-1 flex items-center gap-1">
           <Upload className="h-3 w-3" />
           Upload Volume
         </div>
-        <div className="text-green-400 font-semibold">{volume.ulGb || "N/A"} GB</div>
+        <div className="text-green-400 font-semibold">
+          {volume.ulGb || "N/A"} GB
+        </div>
       </div>
     </div>
 
     {sessionWiseVolume && sessionWiseVolume.length > 0 && (
       <div className="mt-4">
-        <h5 className="text-sm font-semibold text-white mb-2">Session-wise Volume</h5>
+        <h5 className="text-sm font-semibold text-white mb-2">
+          Session-wise Volume
+        </h5>
         <div className="overflow-x-auto bg-slate-800/50 rounded">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700">
-                <th className="text-left px-3 py-2 text-white font-medium">Session</th>
-                <th className="text-right px-3 py-2 text-white font-medium">Download (GB)</th>
-                <th className="text-right px-3 py-2 text-white font-medium">Upload (GB)</th>
+                <th className="text-left px-3 py-2 text-white font-medium">
+                  Session
+                </th>
+                <th className="text-right px-3 py-2 text-white font-medium">
+                  Download (GB)
+                </th>
+                <th className="text-right px-3 py-2 text-white font-medium">
+                  Upload (GB)
+                </th>
               </tr>
             </thead>
             <tbody>
               {sessionWiseVolume.map((item, idx) => (
-                <tr key={idx} className="border-b border-slate-800 hover:bg-slate-700/30 transition-colors">
+                <tr
+                  key={idx}
+                  className="border-b border-slate-800 hover:bg-slate-700/30 transition-colors"
+                >
                   <td className="px-3 py-2 text-white">{item.session}</td>
-                  <td className="px-3 py-2 text-right text-blue-400">{item.dl}</td>
-                  <td className="px-3 py-2 text-right text-green-400">{item.ul}</td>
+                  <td className="px-3 py-2 text-right text-blue-400">
+                    {item.dl}
+                  </td>
+                  <td className="px-3 py-2 text-right text-green-400">
+                    {item.ul}
+                  </td>
                 </tr>
               ))}
             </tbody>

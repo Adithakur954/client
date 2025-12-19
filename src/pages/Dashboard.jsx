@@ -10,11 +10,11 @@ import OperatorNetworkChart from '@/components/dashboard/charts/OperatorNetworkC
 import MetricChart from '@/components/dashboard/charts/MetricChart';
 import BandDistributionChart from '@/components/dashboard/charts/BandDistributionChart';
 import HandsetPerformanceChart from '@/components/dashboard/charts/HandsetPerformanceChart';
-import CoverageRankingChart from '@/components/dashboard/charts/CoverageRankingChart';
 import QualityRankingChart from '@/components/dashboard/charts/QualityRankingChart';
 import StatCardSkeleton from '@/components/dashboard/skeletons/StatCardSkeleton';
 import { StatCard } from '@/components/dashboard';
 import AppChart from '@/components/dashboard/charts/AppChart';
+import HolesScatterChart from '@/components/dashboard/charts/HolesScatterChart';
 
 import { 
   useTotals, 
@@ -25,7 +25,7 @@ import {
   useRefreshDashboard
 } from '@/hooks/useDashboardData.js';
 
-import { usePersistedFilters, clearAllPersistedFilters } from '@/hooks/usePersistedFilters';
+import { usePersistedFilters } from '@/hooks/usePersistedFilters';
 
 // ✅ Memoized components to prevent unnecessary re-renders
 const MemoizedStatCard = memo(StatCard);
@@ -35,8 +35,8 @@ const MemoizedAppChart = memo(AppChart);
 const MemoizedMetricChart = memo(MetricChart);
 const MemoizedBandDistributionChart = memo(BandDistributionChart);
 const MemoizedHandsetPerformanceChart = memo(HandsetPerformanceChart);
-const MemoizedCoverageRankingChart = memo(CoverageRankingChart);
 const MemoizedQualityRankingChart = memo(QualityRankingChart);
+const MemoizedHolesScatterChart = memo(HolesScatterChart);
 
 const DashboardPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -99,7 +99,7 @@ const DashboardPage = () => {
       },
       {
         title: "Operators",
-        value: operatorCount || 0,
+        value: operatorCount-1 || 0,
         icon: Wifi,
         color: "bg-gradient-to-br from-sky-500 to-sky-600",
         description: "Unique network operators"
@@ -207,7 +207,7 @@ const DashboardPage = () => {
           )}
         </div>
 
-        {/* Charts Grid - NO lazy loading, let SWR handle optimization */}
+        {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           <MemoizedMonthlySamplesChart
@@ -240,10 +240,9 @@ const DashboardPage = () => {
             networks={networks}
           />
 
-          {/* ✅ Handset Performance - Load without any wrappers */}
           <MemoizedHandsetPerformanceChart />
 
-          <MemoizedCoverageRankingChart />
+          <MemoizedHolesScatterChart />
           
           <MemoizedQualityRankingChart />
         </div>

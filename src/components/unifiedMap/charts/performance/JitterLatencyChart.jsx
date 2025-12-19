@@ -13,19 +13,16 @@ import {
 import { ChartContainer } from "../../common/ChartContainer";
 import { EmptyState } from "../../common/EmptyState";
 import { CHART_CONFIG } from "@/utils/constants";
-import { normalizeProviderName, COLOR_SCHEMES } from "@/utils/colorUtils";
+import {
+  normalizeProviderName,
+  normalizeTechName,
+  getLogColor,
+  COLOR_SCHEMES,
+} from "@/utils/colorUtils";
 
 const getOperatorColor = (operator) => {
-  const scheme = COLOR_SCHEMES.provider;
-  if (scheme[operator]) return scheme[operator];
-  
-  const matchKey = Object.keys(scheme).find(
-    (key) => key.toLowerCase() === operator?.toLowerCase()
-  );
-  
-  if (matchKey) return scheme[matchKey];
-  
-  return scheme.Unknown || "#6B7280";
+  const normalized = normalizeProviderName(operator);
+  return getLogColor("provider", normalized, "#6B7280");
 };
 
 const LATENCY_RANGES = [
@@ -61,12 +58,14 @@ const MultiOperatorTooltip = ({ active, payload, label, unit = "ms" }) => {
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl min-w-[200px]">
       <div className="font-semibold text-white mb-2 border-b border-slate-700 pb-2 flex justify-between">
-        <span>{label} {unit}</span>
-        <span 
-          className="text-xs px-2 py-0.5 rounded" 
-          style={{ 
-            backgroundColor: rangeInfo?.rangeColor + '30',
-            color: rangeInfo?.rangeColor 
+        <span>
+          {label} {unit}
+        </span>
+        <span
+          className="text-xs px-2 py-0.5 rounded"
+          style={{
+            backgroundColor: rangeInfo?.rangeColor + "30",
+            color: rangeInfo?.rangeColor,
           }}
         >
           {rangeInfo?.quality}
@@ -74,7 +73,7 @@ const MultiOperatorTooltip = ({ active, payload, label, unit = "ms" }) => {
       </div>
       <div className="space-y-1.5">
         {payload
-          .filter(entry => entry.value > 0)
+          .filter((entry) => entry.value > 0)
           .sort((a, b) => b.value - a.value)
           .map((entry, index) => (
             <div key={index} className="flex items-center justify-between gap-4">
@@ -89,8 +88,12 @@ const MultiOperatorTooltip = ({ active, payload, label, unit = "ms" }) => {
                 <span className="font-semibold text-white text-sm">
                   {entry.value}
                 </span>
-                <span className="text-slate-400 text-xs ml-1">
-                  ({totalSamples > 0 ? ((entry.value / totalSamples) * 100).toFixed(1) : 0}%)
+                <span className="text-white text-xs ml-1">
+                  (
+                  {totalSamples > 0
+                    ? ((entry.value / totalSamples) * 100).toFixed(1)
+                    : 0}
+                  %)
                 </span>
               </div>
             </div>
@@ -104,13 +107,13 @@ const MultiOperatorTooltip = ({ active, payload, label, unit = "ms" }) => {
   );
 };
 
-const MultiOperatorDistributionChart = ({ 
-  data, 
-  ranges, 
-  title, 
-  operators, 
+const MultiOperatorDistributionChart = ({
+  data,
+  ranges,
+  title,
+  operators,
   unit = "ms",
-  valueKey = "latency"
+  valueKey = "latency",
 }) => {
   const distributionData = useMemo(() => {
     return ranges.map((range) => {
@@ -120,16 +123,20 @@ const MultiOperatorDistributionChart = ({
         rangeColor: range.color,
       };
 
-      operators.forEach(operator => {
+      operators.forEach((operator) => {
         const count = data.filter(
-          (d) => d.operator === operator && 
-                 d[valueKey] >= range.min && 
-                 d[valueKey] < range.max
+          (d) =>
+            d.operator === operator &&
+            d[valueKey] >= range.min &&
+            d[valueKey] < range.max
         ).length;
         rangeData[operator] = count;
       });
 
-      rangeData.total = operators.reduce((sum, op) => sum + (rangeData[op] || 0), 0);
+      rangeData.total = operators.reduce(
+        (sum, op) => sum + (rangeData[op] || 0),
+        0
+      );
 
       return rangeData;
     });
@@ -140,43 +147,47 @@ const MultiOperatorDistributionChart = ({
       <div className="text-sm font-medium text-white mb-3 text-center">
         {title}
       </div>
-      <div className="w-full" style={{ height: '280px', maxHeight: '280px' }}>
+      <div className="w-full" style={{ height: "280px", maxHeight: "280px" }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart 
-            data={distributionData} 
+          <BarChart
+            data={distributionData}
             margin={{ top: 10, right: 20, left: 10, bottom: 40 }}
           >
             <CartesianGrid {...CHART_CONFIG.grid} />
             <XAxis
               dataKey="range"
               tick={{ fill: "#ffffff", fontSize: 11 }}
-              label={{ 
-                value: unit, 
-                position: "bottom", 
-                fill: "#ffffff", 
-                fontSize: 11, 
-                offset: 0 
+              label={{
+                value: unit,
+                position: "bottom",
+                fill: "#ffffff",
+                fontSize: 11,
+                offset: 0,
               }}
             />
             <YAxis
               tick={{ fill: "#ffffff", fontSize: 11 }}
-              label={{ 
-                value: "Samples", 
-                angle: -90, 
-                position: "insideLeft", 
-                fill: "#ffffff", 
-                fontSize: 11 
+              label={{
+                value: "Samples",
+                angle: -90,
+                position: "insideLeft",
+                fill: "#ffffff",
+                fontSize: 11,
               }}
             />
-            <Tooltip content={(props) => <MultiOperatorTooltip {...props} unit={unit} />} />
-            <Legend 
-              wrapperStyle={{ paddingTop: '10px' }}
-              formatter={(value) => <span className="text-white text-xs">{value}</span>}
+            <Tooltip
+              content={(props) => <MultiOperatorTooltip {...props} unit={unit} />}
+            />
+            <Legend
+              wrapperStyle={{ paddingTop: "10px" }}
+              formatter={(value) => (
+                <span className="text-white text-xs">{value}</span>
+              )}
             />
             {operators.map((operator) => (
-              <Bar 
+              <Bar
                 key={operator}
-                dataKey={operator} 
+                dataKey={operator}
                 name={operator}
                 stackId="a"
                 fill={getOperatorColor(operator)}
@@ -185,16 +196,16 @@ const MultiOperatorDistributionChart = ({
           </BarChart>
         </ResponsiveContainer>
       </div>
-      
+
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-slate-700">
               <th className="text-left py-2 px-2 text-slate-400">Range</th>
-              {operators.map(op => (
-                <th 
-                  key={op} 
-                  className="text-center py-2 px-2" 
+              {operators.map((op) => (
+                <th
+                  key={op}
+                  className="text-center py-2 px-2"
                   style={{ color: getOperatorColor(op) }}
                 >
                   {op}
@@ -205,24 +216,26 @@ const MultiOperatorDistributionChart = ({
           </thead>
           <tbody>
             {distributionData.map((row, idx) => (
-              <tr 
-                key={idx} 
+              <tr
+                key={idx}
                 className="border-b border-slate-800 hover:bg-slate-800/50"
                 style={{ backgroundColor: `${row.rangeColor}10` }}
               >
                 <td className="py-2 px-2">
                   <div className="flex items-center gap-2">
-                    <div 
-                      className="w-2 h-2 rounded-full flex-shrink-0" 
+                    <div
+                      className="w-2 h-2 rounded-full flex-shrink-0"
                       style={{ backgroundColor: row.rangeColor }}
                     />
-                    <span className="text-white">{row.range} {unit}</span>
+                    <span className="text-white">
+                      {row.range} {unit}
+                    </span>
                     <span className="text-slate-500">({row.quality})</span>
                   </div>
                 </td>
-                {operators.map(op => (
+                {operators.map((op) => (
                   <td key={op} className="text-center py-2 px-2 text-white">
-                    {row[op] > 0 ? row[op] : '-'}
+                    {row[op] > 0 ? row[op] : "-"}
                   </td>
                 ))}
                 <td className="text-right py-2 px-2 font-semibold text-white">
@@ -239,29 +252,32 @@ const MultiOperatorDistributionChart = ({
 
 const OperatorQualityComparison = ({ data, operators, title, unit = "ms" }) => {
   const operatorStats = useMemo(() => {
-    return operators.map(operator => {
-      const operatorData = data.filter(d => d.operator === operator);
-      if (operatorData.length === 0) return null;
+    return operators
+      .map((operator) => {
+        const operatorData = data.filter((d) => d.operator === operator);
+        if (operatorData.length === 0) return null;
 
-      const values = operatorData.map(d => d.value);
-      const avg = values.reduce((a, b) => a + b, 0) / values.length;
-      const min = Math.min(...values);
-      const max = Math.max(...values);
+        const values = operatorData.map((d) => d.value);
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        const min = Math.min(...values);
+        const max = Math.max(...values);
 
-      return {
-        operator,
-        count: operatorData.length,
-        avg: avg.toFixed(2),
-        min: min.toFixed(2),
-        max: max.toFixed(2),
-        color: getOperatorColor(operator)
-      };
-    }).filter(Boolean).sort((a, b) => parseFloat(a.avg) - parseFloat(b.avg));
+        return {
+          operator,
+          count: operatorData.length,
+          avg: avg.toFixed(2),
+          min: min.toFixed(2),
+          max: max.toFixed(2),
+          color: getOperatorColor(operator),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => parseFloat(a.avg) - parseFloat(b.avg));
   }, [data, operators]);
 
   if (operatorStats.length === 0) return null;
 
-  const maxAvg = Math.max(...operatorStats.map(s => parseFloat(s.avg)));
+  const maxAvg = Math.max(...operatorStats.map((s) => parseFloat(s.avg)));
 
   return (
     <div className="bg-slate-800/50 rounded-lg p-4 flex-1 min-w-[280px] max-w-md">
@@ -269,9 +285,9 @@ const OperatorQualityComparison = ({ data, operators, title, unit = "ms" }) => {
       <div className="space-y-2">
         {operatorStats.map((stat, idx) => (
           <div key={idx} className="flex items-center gap-3">
-            <div 
+            <div
               className="w-16 text-xs font-medium truncate flex-shrink-0"
-              style={{ color: stat.color }}
+              style={{ color: "#fcfcfc" }}
             >
               {stat.operator}
             </div>
@@ -279,7 +295,10 @@ const OperatorQualityComparison = ({ data, operators, title, unit = "ms" }) => {
               <div
                 className="h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
                 style={{
-                  width: `${Math.max((parseFloat(stat.avg) / maxAvg) * 100, 15)}%`,
+                  width: `${Math.max(
+                    (parseFloat(stat.avg) / maxAvg) * 100,
+                    15
+                  )}%`,
                   backgroundColor: stat.color,
                 }}
               >
@@ -301,9 +320,9 @@ const OperatorQualityComparison = ({ data, operators, title, unit = "ms" }) => {
 const OperatorLegend = ({ operators }) => {
   return (
     <div className="flex flex-wrap gap-3 justify-center mb-4 p-3 bg-slate-800/50 rounded-lg">
-      {operators.map(operator => (
+      {operators.map((operator) => (
         <div key={operator} className="flex items-center gap-2">
-          <div 
+          <div
             className="w-3 h-3 rounded-full flex-shrink-0"
             style={{ backgroundColor: getOperatorColor(operator) }}
           />
@@ -314,37 +333,47 @@ const OperatorLegend = ({ operators }) => {
   );
 };
 
-const QualitySummaryByOperator = ({ data, ranges, operators, title, valueKey }) => {
+const QualitySummaryByOperator = ({
+  data,
+  ranges,
+  operators,
+  title,
+  valueKey,
+}) => {
   const summaryData = useMemo(() => {
-    return operators.map(operator => {
-      const operatorData = data.filter(d => d.operator === operator);
-      const operatorTotal = operatorData.length;
-      
-      const qualityBreakdown = ranges.map(range => {
-        const count = operatorData.filter(
-          d => d[valueKey] >= range.min && d[valueKey] < range.max
-        ).length;
-        const percentage = operatorTotal > 0 ? (count / operatorTotal) * 100 : 0;
+    return operators
+      .map((operator) => {
+        const operatorData = data.filter((d) => d.operator === operator);
+        const operatorTotal = operatorData.length;
+
+        const qualityBreakdown = ranges.map((range) => {
+          const count = operatorData.filter(
+            (d) => d[valueKey] >= range.min && d[valueKey] < range.max
+          ).length;
+          const percentage =
+            operatorTotal > 0 ? (count / operatorTotal) * 100 : 0;
+          return {
+            quality: range.quality,
+            count,
+            percentage: percentage.toFixed(1),
+            color: range.color,
+          };
+        });
+
+        const dominantQuality = qualityBreakdown.reduce(
+          (max, curr) => (curr.count > max.count ? curr : max),
+          qualityBreakdown[0]
+        );
+
         return {
-          quality: range.quality,
-          count,
-          percentage: percentage.toFixed(1),
-          color: range.color
+          operator,
+          total: operatorTotal,
+          color: getOperatorColor(operator),
+          qualityBreakdown,
+          dominantQuality,
         };
-      });
-
-      const dominantQuality = qualityBreakdown.reduce((max, curr) => 
-        curr.count > max.count ? curr : max
-      , qualityBreakdown[0]);
-
-      return {
-        operator,
-        total: operatorTotal,
-        color: getOperatorColor(operator),
-        qualityBreakdown,
-        dominantQuality
-      };
-    }).filter(s => s.total > 0);
+      })
+      .filter((s) => s.total > 0);
   }, [data, ranges, operators, valueKey]);
 
   return (
@@ -355,39 +384,44 @@ const QualitySummaryByOperator = ({ data, ranges, operators, title, valueKey }) 
           <div key={idx} className="bg-slate-800/30 rounded-lg p-2">
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <div 
+                <div
                   className="w-3 h-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: opSummary.color }}
                 />
-                <span className="text-sm font-medium text-white">{opSummary.operator}</span>
+                <span className="text-sm font-medium text-white">
+                  {opSummary.operator}
+                </span>
               </div>
               <div className="flex items-center gap-2">
-                <span 
+                <span
                   className="text-xs px-2 py-0.5 rounded"
-                  style={{ 
-                    backgroundColor: opSummary.dominantQuality.color + '30',
-                    color: opSummary.dominantQuality.color 
+                  style={{
+                    backgroundColor: opSummary.dominantQuality.color + "30",
+                    color: opSummary.dominantQuality.color,
                   }}
                 >
                   {opSummary.dominantQuality.quality}
                 </span>
-                <span className="text-xs text-slate-400">{opSummary.total} samples</span>
+                <span className="text-xs text-slate-400">
+                  {opSummary.total} samples
+                </span>
               </div>
             </div>
             <div className="h-2 bg-slate-700 rounded-full overflow-hidden flex">
-              {opSummary.qualityBreakdown.map((qb, i) => (
-                qb.count > 0 && (
-                  <div
-                    key={i}
-                    className="h-full first:rounded-l-full last:rounded-r-full"
-                    style={{
-                      width: `${qb.percentage}%`,
-                      backgroundColor: qb.color,
-                    }}
-                    title={`${qb.quality}: ${qb.percentage}%`}
-                  />
-                )
-              ))}
+              {opSummary.qualityBreakdown.map(
+                (qb, i) =>
+                  qb.count > 0 && (
+                    <div
+                      key={i}
+                      className="h-full first:rounded-l-full last:rounded-r-full"
+                      style={{
+                        width: `${qb.percentage}%`,
+                        backgroundColor: qb.color,
+                      }}
+                      title={`${qb.quality}: ${qb.percentage}%`}
+                    />
+                  )
+              )}
             </div>
           </div>
         ))}
@@ -399,7 +433,9 @@ const QualitySummaryByOperator = ({ data, ranges, operators, title, valueKey }) 
 const StatCard = ({ label, value, subValue, color }) => (
   <div className="bg-slate-800 rounded-lg p-3 text-center hover:bg-slate-750 transition-colors flex-1 min-w-[120px] max-w-[180px]">
     <div className="text-xs text-slate-400">{label}</div>
-    <div className="text-lg font-bold" style={{ color }}>{value}</div>
+    <div className="text-lg font-bold" style={{ color }}>
+      {value}
+    </div>
     {subValue && (
       <div className="text-[10px] text-slate-500 mt-1">{subValue}</div>
     )}
@@ -411,16 +447,25 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
     if (!locations?.length) return { data: [], operators: [] };
 
     const processedData = locations
-      .filter((loc) => loc.jitter != null || loc.latency != null || loc.packet_loss != null)
-      .map((loc) => ({
-        operator: normalizeProviderName(loc.provider || loc.operator || loc.operatorName),
-        jitter: parseFloat(loc.jitter) || 0,
-        latency: parseFloat(loc.latency) || 0,
-        packetLoss: parseFloat(loc.packet_loss) || 0,
-        dlTpt: parseFloat(loc.dl_tpt) || 0,
-        ulTpt: parseFloat(loc.ul_tpt) || 0,
-        speed: parseFloat(loc.speed) || 0,
-      }));
+      .filter(
+        (loc) =>
+          loc.jitter != null || loc.latency != null || loc.packet_loss != null
+      )
+      .map((loc) => {
+        const rawProvider = loc.provider || loc.operator || loc.operatorName || "";
+        const normalizedProvider = normalizeProviderName(rawProvider);
+
+        return {
+          operator: normalizedProvider,
+          jitter: parseFloat(loc.jitter) || 0,
+          latency: parseFloat(loc.latency) || 0,
+          packetLoss: parseFloat(loc.packet_loss) || 0,
+          dlTpt: parseFloat(loc.dl_tpt) || 0,
+          ulTpt: parseFloat(loc.ul_tpt) || 0,
+          speed: parseFloat(loc.speed) || 0,
+        };
+      })
+      .filter((d) => d.operator !== "Unknown");
 
     const operatorCounts = processedData.reduce((acc, d) => {
       acc[d.operator] = (acc[d.operator] || 0) + 1;
@@ -428,6 +473,7 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
     }, {});
 
     const uniqueOperators = Object.entries(operatorCounts)
+      .filter(([op]) => op !== "Unknown")
       .sort((a, b) => b[1] - a[1])
       .map(([op]) => op);
 
@@ -441,21 +487,27 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
       avg: (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2),
       min: Math.min(...values).toFixed(2),
       max: Math.max(...values).toFixed(2),
-      values
+      values,
     });
 
-    const latencyStats = calculateStats(data.map(d => d.latency));
-    const jitterStats = calculateStats(data.map(d => d.jitter));
-    const packetLossStats = calculateStats(data.map(d => d.packetLoss));
+    const latencyStats = calculateStats(data.map((d) => d.latency));
+    const jitterStats = calculateStats(data.map((d) => d.jitter));
+    const packetLossStats = calculateStats(data.map((d) => d.packetLoss));
 
     const operatorStats = operators.reduce((acc, op) => {
-      const opData = data.filter(d => d.operator === op);
+      const opData = data.filter((d) => d.operator === op);
       if (opData.length > 0) {
         acc[op] = {
           count: opData.length,
-          avgLatency: (opData.reduce((s, d) => s + d.latency, 0) / opData.length).toFixed(2),
-          avgJitter: (opData.reduce((s, d) => s + d.jitter, 0) / opData.length).toFixed(2),
-          avgPacketLoss: (opData.reduce((s, d) => s + d.packetLoss, 0) / opData.length).toFixed(2),
+          avgLatency: (
+            opData.reduce((s, d) => s + d.latency, 0) / opData.length
+          ).toFixed(2),
+          avgJitter: (
+            opData.reduce((s, d) => s + d.jitter, 0) / opData.length
+          ).toFixed(2),
+          avgPacketLoss: (
+            opData.reduce((s, d) => s + d.packetLoss, 0) / opData.length
+          ).toFixed(2),
         };
       }
       return acc;
@@ -466,13 +518,13 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
       jitter: jitterStats,
       packetLoss: packetLossStats,
       operatorStats,
-      totalSamples: data.length
+      totalSamples: data.length,
     };
   }, [data, operators]);
 
   const qualityScore = useMemo(() => {
     if (!stats) return null;
-    
+
     const avgLatency = parseFloat(stats.latency.avg);
     const avgJitter = parseFloat(stats.jitter.avg);
     const avgPacketLoss = parseFloat(stats.packetLoss.avg);
@@ -497,39 +549,43 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
   }
 
   return (
-    <ChartContainer ref={ref} title="Network Quality Metrics by Operator" icon={Activity}>
+    <ChartContainer
+      ref={ref}
+      title="Network Quality Metrics by Operator"
+      icon={Activity}
+    >
       <div className="space-y-4">
         <OperatorLegend operators={operators} />
 
         {stats && (
           <div className="flex flex-wrap justify-center gap-2">
-            <StatCard 
-              label="Operators" 
-              value={operators.length} 
+            <StatCard
+              label="Operators"
+              value={operators.length}
               subValue={`${stats.totalSamples.toLocaleString()} samples`}
               color="#60a5fa"
             />
-            <StatCard 
-              label="Avg Latency" 
-              value={`${stats.latency.avg} ms`} 
+            <StatCard
+              label="Avg Latency"
+              value={`${stats.latency.avg} ms`}
               subValue={`${stats.latency.min} - ${stats.latency.max} ms`}
               color="#f472b6"
             />
-            <StatCard 
-              label="Avg Jitter" 
-              value={`${stats.jitter.avg} ms`} 
+            <StatCard
+              label="Avg Jitter"
+              value={`${stats.jitter.avg} ms`}
               subValue={`${stats.jitter.min} - ${stats.jitter.max} ms`}
               color="#818cf8"
             />
-            <StatCard 
-              label="Avg Packet Loss" 
-              value={`${stats.packetLoss.avg}%`} 
+            <StatCard
+              label="Avg Packet Loss"
+              value={`${stats.packetLoss.avg}%`}
               subValue={`${stats.packetLoss.min} - ${stats.packetLoss.max}%`}
               color="#fb923c"
             />
-            <StatCard 
-              label="Quality Score" 
-              value={qualityScore?.label} 
+            <StatCard
+              label="Quality Score"
+              value={qualityScore?.label}
               color={qualityScore?.color}
             />
           </div>
@@ -537,36 +593,62 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
 
         {stats?.operatorStats && Object.keys(stats.operatorStats).length > 1 && (
           <div className="overflow-x-auto">
-            <div className="text-sm font-medium text-white mb-2">Operator Comparison</div>
+            <div className="text-sm font-medium text-white mb-2">
+              Operator Comparison
+            </div>
             <div className="inline-block min-w-full">
               <table className="w-full text-xs bg-slate-800/50 rounded-lg overflow-hidden">
                 <thead>
                   <tr className="bg-slate-700">
-                    <th className="text-left py-2 px-3 text-slate-300">Operator</th>
-                    <th className="text-center py-2 px-3 text-slate-300">Samples</th>
-                    <th className="text-center py-2 px-3 text-pink-400">Latency (ms)</th>
-                    <th className="text-center py-2 px-3 text-indigo-400">Jitter (ms)</th>
-                    <th className="text-center py-2 px-3 text-orange-400">Packet Loss (%)</th>
+                    <th className="text-left py-2 px-3 text-slate-300">
+                      Operator
+                    </th>
+                    <th className="text-center py-2 px-3 text-slate-300">
+                      Samples
+                    </th>
+                    <th className="text-center py-2 px-3 text-pink-400">
+                      Latency (ms)
+                    </th>
+                    <th className="text-center py-2 px-3 text-indigo-400">
+                      Jitter (ms)
+                    </th>
+                    <th className="text-center py-2 px-3 text-orange-400">
+                      Packet Loss (%)
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(stats.operatorStats).map(([op, opStats]) => (
-                    <tr key={op} className="border-t border-slate-700 hover:bg-slate-700/50">
+                    <tr
+                      key={op}
+                      className="border-t border-slate-700 hover:bg-slate-700/50"
+                    >
                       <td className="py-2 px-3">
                         <div className="flex items-center gap-2">
-                          <div 
+                          <div
                             className="w-2 h-2 rounded-full flex-shrink-0"
                             style={{ backgroundColor: getOperatorColor(op) }}
                           />
-                          <span className="font-medium" style={{ color: getOperatorColor(op) }}>
+                          <span
+                            className="font-medium"
+                            style={{ color: getOperatorColor(op) }}
+                          >
                             {op}
                           </span>
                         </div>
                       </td>
-                      <td className="text-center py-2 px-3 text-white">{opStats.count}</td>
-                      <td className="text-center py-2 px-3 text-white">{opStats.avgLatency}</td>
-                      <td className="text-center py-2 px-3 text-white">{opStats.avgJitter}</td>
-                      <td className="text-center py-2 px-3 text-white">{opStats.avgPacketLoss}</td>
+                      <td className="text-center py-2 px-3 text-white">
+                        {opStats.count}
+                      </td>
+                      <td className="text-center py-2 px-3 text-white">
+                        {opStats.avgLatency}
+                      </td>
+                      <td className="text-center py-2 px-3 text-white">
+                        {opStats.avgJitter}
+                      </td>
+                      <td className="text-center py-2 px-3 text-white">
+                        {opStats.avgPacketLoss}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -586,7 +668,7 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
               valueKey="latency"
             />
           </div>
-          
+
           <div className="bg-slate-800/50 rounded-lg p-4">
             <MultiOperatorDistributionChart
               data={data}
@@ -597,7 +679,7 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
               valueKey="jitter"
             />
           </div>
-          
+
           <div className="bg-slate-800/50 rounded-lg p-4">
             <MultiOperatorDistributionChart
               data={data}
@@ -612,19 +694,22 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
 
         <div className="flex flex-wrap justify-center gap-4">
           <OperatorQualityComparison
-            data={data.map(d => ({ operator: d.operator, value: d.latency }))}
+            data={data.map((d) => ({ operator: d.operator, value: d.latency }))}
             operators={operators}
             title="Average Latency by Operator"
             unit="ms"
           />
           <OperatorQualityComparison
-            data={data.map(d => ({ operator: d.operator, value: d.jitter }))}
+            data={data.map((d) => ({ operator: d.operator, value: d.jitter }))}
             operators={operators}
             title="Average Jitter by Operator"
             unit="ms"
           />
           <OperatorQualityComparison
-            data={data.map(d => ({ operator: d.operator, value: d.packetLoss }))}
+            data={data.map((d) => ({
+              operator: d.operator,
+              value: d.packetLoss,
+            }))}
             operators={operators}
             title="Average Packet Loss by Operator"
             unit="%"
@@ -632,7 +717,9 @@ export const JitterLatencyChart = React.forwardRef(({ locations }, ref) => {
         </div>
 
         <div className="bg-slate-800 rounded-lg p-4">
-          <div className="text-sm font-medium text-white mb-3">Quality Distribution by Operator</div>
+          <div className="text-sm font-medium text-white mb-3">
+            Quality Distribution by Operator
+          </div>
           <div className="flex flex-wrap gap-4">
             <QualitySummaryByOperator
               data={data}

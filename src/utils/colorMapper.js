@@ -21,8 +21,7 @@ export const defaultThresholds = {
 };
 
 export const getColorForValue = (value, metric) => {
-    if (value === null || value === undefined) return '#CCCCCC'; // Gray for missing data
-    
+    if (value === null || value === undefined) return '#CCCCCC';
     const thresholds = defaultThresholds[metric] || [];
     
     for (const threshold of thresholds) {
@@ -31,5 +30,5 @@ export const getColorForValue = (value, metric) => {
         }
     }
     
-    return '#CCCCCC'; // Default gray
+    return '#CCCCCC'; 
 };

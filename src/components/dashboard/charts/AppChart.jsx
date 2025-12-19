@@ -295,37 +295,7 @@ function AppChart() {
       </div>
 
       {/* Quick Presets */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
-          Quick Presets
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => setSelectedMetrics(["avgDlTptMbps", "avgUlTptMbps", "sampleCount"])}
-            className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
-          >
-            Throughput
-          </button>
-          <button
-            onClick={() => setSelectedMetrics(["avgMos", "avgJitter", "avgLatency", "avgPacketLoss"])}
-            className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
-          >
-            QoE Metrics
-          </button>
-          <button
-            onClick={() => setSelectedMetrics(["avgRsrp", "avgRsrq", "avgSinr"])}
-            className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
-          >
-            Signal Quality
-          </button>
-          <button
-            onClick={() => setSelectedMetrics(["avgDuration", "sampleCount"])}
-            className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
-          >
-            Usage Stats
-          </button>
-        </div>
-      </div>
+      
 
       {/* Action Buttons */}
       <div className="flex gap-2">

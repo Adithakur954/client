@@ -64,7 +64,7 @@ export const getColorByValue = (colorBy, value) => {
   return match ? scheme[match] : scheme["Unknown"] || "#6B7280";
 };
 
-// ✅ Helper to get PCI color
+
 export const getPciColor = (pciValue) => {
   const numValue = parseFloat(pciValue);
   if (!Number.isFinite(numValue)) return "#808080";

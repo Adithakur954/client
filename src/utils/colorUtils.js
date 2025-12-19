@@ -41,23 +41,7 @@ export const normalizeProviderName = (rawName) => {
 };
 
 
-// export const fuunction =(rawname)=>{
-//   if(!rawname) return null;
 
-//   invalidArrays=["000 000","//////","404440","/","//","///"];
-
-//   if(invalidArrays.includes(rawname.trim())) return "Unknown";
-
-//   const cleaned = rawname.toUpperCase().replace(/[\s\-_]/g, "");
-//   if (cleaned.includes("JIO") || cleaned.includes("JIOTRUE")) return "Jio";
-//   else if (cleaned.includes("AIRTEL") || cleaned.includes("airtel")) return "Airtel";
-//   else if (cleaned === "VI" || cleaned.includes("VIINDIA") || cleaned.includes("VODAFONE") || cleaned.includes("IDEA")) return "VI India";
-//   else if (cleaned.includes("YAS") || cleaned.includes("BROADBAND")) return "YAS";
-//   else if (cleaned.includes("BSNL")) return "BSNL";
-//   else return rawname;
-// }
-
-// Normalize technology names
 export const normalizeTechName = (tech) => {
   if (!tech) return "Unknown";
   const t = String(tech).trim().toUpperCase();
@@ -69,14 +53,14 @@ export const normalizeTechName = (tech) => {
   return "Unknown";
 };
 
-// Color schemes for different categories
+
 export const COLOR_SCHEMES = {
   provider: {
     Jio: "#3B82F6",
     Airtel: "#EF4444",
     "VI India": "#22C55E",
     BSNL: "#F59E0B",
-    Yas: "#C0C0C0", // Silver
+    Yas: "#7d1b49", 
     Unknown: "#6B7280",
   },
   technology: {
@@ -97,11 +81,12 @@ export const COLOR_SCHEMES = {
     1: "#EF4444",
     2: "#F59E0B",
     7: "#10B781",
+    B7: "#10B781",
     Unknown: "#6B7280",
   },
 };
 
-// Get color for a log based on colorBy type
+
 export const getLogColor = (colorBy, value, defaultColor = "#6B7280") => {
   if (!colorBy || !value) {
     return defaultColor;

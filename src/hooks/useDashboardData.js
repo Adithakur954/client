@@ -5,10 +5,11 @@ import {
   buildQueryString, 
   groupOperatorSamplesByNetwork, 
   buildRanking,
-  canonicalOperatorName,
   toNumber,
   ensureNegative
 } from '../utils/dashboardUtils';
+
+import { normalizeProviderName } from '@/utils/colorUtils';
 
 const SWR_CONFIG = {
   revalidateOnFocus: false,
@@ -197,7 +198,7 @@ const processMetricData = (rawData, metric) => {
   const isNegative = NEGATIVE_METRICS.includes(metric);
   
   for (const item of rawData) {
-    const name = canonicalOperatorName(item?.operatorName || item?.name || item?.operator);
+    const name = normalizeProviderName(item?.operatorName || item?.name || item?.operator);
     if (!name || name === 'Unknown') continue;
     
     const value = extractMetricValue(item, metric);
@@ -233,7 +234,7 @@ const processOperatorMetrics = (rawData, metric) => {
   const grouped = {};
 
   rawData.forEach((item, index) => {
-    const operatorName = canonicalOperatorName(
+    const operatorName = normalizeProviderName(
       item?.operatorName || item?.operator || item?.name
     );
     
@@ -616,37 +617,51 @@ export const useQualityRanking = (rsrqMin = -10, rsrqMax = 0) => {
   return { data: ranking, ...rest };
 };
 
-export const useHoles = () =>{
-  const {data:rawData, ...rest} = useSWR(
-    "holes" , 
-    async() =>{
+export const useHoles = () => {
+  const { data: rawData, ...rest } = useSWR(
+    "holes",
+    async () => {
       try {
         const response = await adminApi.getHoles();
-        console.log(response,"get holees respones")
+        console.log('[useHoles] Raw API response:', response);
         return extractData(response, []);
       } catch (error) {
-        throw error ;
+        console.error('[useHoles] Error:', error);
+        throw error;
       }
-    },{
+    },
+    {
       ...SWR_CONFIG,
+      dedupingInterval: CACHE_TIME.MEDIUM,
       revalidateOnMount: true,
-      fallbackData: [] 
+      fallbackData: []
     }
   );
-  const processedData = useMemo(()=>{
-    if(!rawData || !Array.isArray(rawData)){
+
+  const processedData = useMemo(() => {
+    if (!rawData || !Array.isArray(rawData)) {
+      console.log('[useHoles] No raw data or not an array');
       return [];
     }
-    const processed = rawData.map(item => ({
-    id: item?.id,
-    rsrp: item?.value || null,
-    rsrq: item?.value || null ,
-  }));
-  return processed;
 
-  }, [rawData])
+    const processed = rawData
+      .filter(item => item?.rsrp != null && item?.rsrq != null)
+      .map(item => ({
+        id: item?.id,
+        sessionId: item?.session_id,
+        // lat: item?.lat,
+        // lon: item?.lon,
+        // network: item?.network,
+        operator: item?.m_alpha_long,
+        rsrp: Number(item?.rsrp),
+        rsrq: Number(item?.rsrq),
+      }));
 
-  return {data: processedData, ...rest};
+    console.log('[useHoles] Processed data count:', processed.length);
+    return processed;
+  }, [rawData]);
+
+  return { data: processedData, ...rest };
 };
 
 export const useHandsetPerformance = () => {
@@ -745,11 +760,13 @@ export const useOperatorsAndNetworks = () => {
     const list = processUniqueList(rawOperators, operatorKeys);
     
     const processed = list
-      .map(op => canonicalOperatorName(op))
-      .filter(op => op && op !== 'Unknown' && op !== 'unknown');
+      .map(op => normalizeProviderName(op))
+      .filter(op => op && op.toLowerCase !== 'Unknown' && op !== 'unknown');
+
+      const uniqueOperator = [...new Set(processed)];
     
-    console.log('[useOperatorsAndNetworks] Processed operators:', processed);
-    return processed;
+    console.log('[useOperatorsAndNetworks] Processed operators:', processed, uniqueOperator);
+    return uniqueOperator;
   }, [rawOperators]);
 
   const networks = useMemo(() => {
