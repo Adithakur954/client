@@ -8,8 +8,9 @@ import {
   toNumber,
   ensureNegative
 } from '../utils/dashboardUtils';
-
 import { normalizeProviderName } from '@/utils/colorUtils';
+
+
 
 const SWR_CONFIG = {
   revalidateOnFocus: false,
@@ -461,7 +462,7 @@ export const useOperatorMetrics = (metric, filters) => {
     async () => {
       const response = await adminApi.getOperatorSamplesV2?.(query);
       const extracted = extractData(response, []);
-      console.log('[useOperatorMetrics] Raw API data:', extracted);
+      
       return extracted;
     },
     { 
@@ -473,7 +474,7 @@ export const useOperatorMetrics = (metric, filters) => {
   
   const processedData = useMemo(() => {
     const processed = processOperatorMetrics(rawData || [], metric);
-    console.log('[useOperatorMetrics] Processed data for metric:', metric, processed);
+    
     return processed;
   }, [rawData, metric]);
   
@@ -617,13 +618,51 @@ export const useQualityRanking = (rsrqMin = -10, rsrqMax = 0) => {
   return { data: ranking, ...rest };
 };
 
+export const useIndOut =() =>{
+  const {data:rawData, ...rest} =useSWR(
+    "IndoorOutdoor",
+    async() => {
+      try {
+        const response  = await adminApi.getIndoorOutdoor();
+        return extractData(response, []);
+      } catch (error) {
+        throw error;
+      }
+    },
+    {
+      ...SWR_CONFIG,
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      revalidateOnMount: true,
+      fallbackData: []
+    }
+  );
+
+  const processedData = useMemo(()=>{
+    if(!rawData || !Array.isArray(rawData)){
+      console.error("data is not array")
+      return []
+    }
+    return rawData.map((item) => ({
+      provider: normalizeProviderName(item.OperatorName) || "Unknown",
+      location: item.LocationType || "Unknown",
+      avgRsrp: Number(item.AvgRsrp) || 0,
+      avgRsrq: Number(item.AvgRsrq) || 0,
+      avgSinr: Number(item.AvgSinr) || 0,
+      avgMos: Number(item.AvgMos) || 0,
+      avgDlTpt: Number(item.AvgDlTpt) || 0,
+      avgUlTpt: Number(item.AvgUlTpt) || 0,
+      sampleCount: Number(item.SampleCount) || 0,
+    }));
+  },[rawData])
+  return { data: processedData, ...rest };
+}
+
 export const useHoles = () => {
   const { data: rawData, ...rest } = useSWR(
     "holes",
     async () => {
       try {
         const response = await adminApi.getHoles();
-        console.log('[useHoles] Raw API response:', response);
         return extractData(response, []);
       } catch (error) {
         console.error('[useHoles] Error:', error);
@@ -640,7 +679,6 @@ export const useHoles = () => {
 
   const processedData = useMemo(() => {
     if (!rawData || !Array.isArray(rawData)) {
-      console.log('[useHoles] No raw data or not an array');
       return [];
     }
 
@@ -649,15 +687,11 @@ export const useHoles = () => {
       .map(item => ({
         id: item?.id,
         sessionId: item?.session_id,
-        // lat: item?.lat,
-        // lon: item?.lon,
-        // network: item?.network,
         operator: item?.m_alpha_long,
         rsrp: Number(item?.rsrp),
         rsrq: Number(item?.rsrq),
       }));
 
-    console.log('[useHoles] Processed data count:', processed.length);
     return processed;
   }, [rawData]);
 
@@ -724,7 +758,6 @@ export const useOperatorsAndNetworks = () => {
     async () => {
       const response = await adminApi.getOperatorsV2?.();
       const extracted = extractData(response, []);
-      console.log('[useOperatorsAndNetworks] Raw operators data:', extracted);
       return extracted;
     },
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.LONG, fallbackData: [] }
@@ -739,7 +772,6 @@ export const useOperatorsAndNetworks = () => {
     async () => {
       const response = await adminApi.getNetworksV2?.();
       const extracted = extractData(response, []);
-      console.log('[useOperatorsAndNetworks] Raw networks data:', extracted);
       return extracted;
     },
     { ...SWR_CONFIG, dedupingInterval: CACHE_TIME.LONG, fallbackData: [] }
@@ -765,7 +797,6 @@ export const useOperatorsAndNetworks = () => {
 
       const uniqueOperator = [...new Set(processed)];
     
-    console.log('[useOperatorsAndNetworks] Processed operators:', processed, uniqueOperator);
     return uniqueOperator;
   }, [rawOperators]);
 
@@ -782,7 +813,6 @@ export const useOperatorsAndNetworks = () => {
     ];
     
     const processed = processUniqueList(rawNetworks, networkKeys);
-    console.log('[useOperatorsAndNetworks] Processed networks:', processed);
     return processed;
   }, [rawNetworks]);
 
@@ -1078,5 +1108,161 @@ export const useRefreshDashboard = () => {
     mutate(() => true, undefined, { revalidate: true });
   }, [mutate]);
 };
+
+// hooks/useDashboardData.js
+
+export const useBoxData = (options = {}) => {
+  const metric =
+    typeof options === 'string'
+      ? options
+      : options?.metric || 'rsrp';
+
+  const { data: rawData, ...rest } = useSWR(
+    ['boxData', metric],
+    async () => {
+      try {
+        const response = await adminApi.getBoxData?.(metric);
+        const extractedData = extractData(response, []);
+        return extractedData;
+      } catch (error) {
+        console.error('Error fetching box data:', error);
+        throw error;
+      }
+    },
+    {
+      ...SWR_CONFIG,
+      dedupingInterval: CACHE_TIME.MEDIUM,
+      fallbackData: []
+    }
+  );
+
+  const processedData = useMemo(() => {
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      return [];
+    }
+
+    // Step 1: normalize + validate rows
+    const validRows = [];
+
+    rawData.forEach((item) => {
+      if (!item) return;
+
+      const rawOperator = item.Operator || item.operator || '';
+      const provider = normalizeProviderName(rawOperator);
+
+      // Skip invalid / unknown operators
+      if (!provider) {
+        return;
+      }
+
+      const min = toNumber(item.Min);
+      const max = toNumber(item.Max);
+      const Q1 = toNumber(item.Q1);
+      const Q3 = toNumber(item.Q3);
+      const Median = toNumber(item.Median);
+      const samples = toNumber(item.Samples) || 0;
+
+      // Ensure all required values are finite
+      if (
+        !Number.isFinite(min) ||
+        !Number.isFinite(max) ||
+        !Number.isFinite(Q1) ||
+        !Number.isFinite(Q3) ||
+        !Number.isFinite(Median)
+      ) {
+        return;
+      }
+
+      // Ensure proper ordering
+      const sorted = [min, Q1, Median, Q3, max].sort((a, b) => a - b);
+
+      validRows.push({
+        provider,
+        min: sorted[0],
+        Q1: sorted[1],
+        Median: sorted[2],
+        Q3: sorted[3],
+        max: sorted[4],
+        samples,
+        _rawOperator: rawOperator
+      });
+    });
+
+    // Step 2: group by provider
+    const providerMap = new Map();
+
+    validRows.forEach((row) => {
+      if (!providerMap.has(row.provider)) {
+        providerMap.set(row.provider, []);
+      }
+      providerMap.get(row.provider).push(row);
+    });
+
+    // Step 3: aggregate statistics per provider
+    const aggregated = Array.from(providerMap.entries()).map(
+      ([provider, entries]) => {
+        if (entries.length === 1) {
+          const e = entries[0];
+          return {
+            provider,
+            min: e.min,
+            Q1: e.Q1,
+            Median: e.Median,
+            Q3: e.Q3,
+            max: e.max,
+            samples: e.samples,
+            _sourceCount: 1
+          };
+        }
+
+        const totalSamples = entries.reduce(
+          (sum, e) => sum + (e.samples || 1),
+          0
+        );
+
+        const overallMin = Math.min(...entries.map(e => e.min));
+        const overallMax = Math.max(...entries.map(e => e.max));
+
+        let weightedQ1 = 0;
+        let weightedMedian = 0;
+        let weightedQ3 = 0;
+
+        entries.forEach((e) => {
+          const weight = (e.samples || 1) / totalSamples;
+          weightedQ1 += e.Q1 * weight;
+          weightedMedian += e.Median * weight;
+          weightedQ3 += e.Q3 * weight;
+        });
+
+        const sortedStats = [
+          overallMin,
+          weightedQ1,
+          weightedMedian,
+          weightedQ3,
+          overallMax
+        ].sort((a, b) => a - b);
+
+        return {
+          provider,
+          min: sortedStats[0],
+          Q1: sortedStats[1],
+          Median: sortedStats[2],
+          Q3: sortedStats[3],
+          max: sortedStats[4],
+          samples: totalSamples,
+          _sourceCount: entries.length
+        };
+      }
+    );
+
+    // Sort providers by Median (descending)
+    aggregated.sort((a, b) => b.Median - a.Median);
+
+    return aggregated;
+  }, [rawData, metric]);
+
+  return { data: processedData, rawData, ...rest };
+};
+
 
 export { SWR_CONFIG, CACHE_TIME };

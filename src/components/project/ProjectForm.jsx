@@ -396,7 +396,6 @@ export const ProjectForm = ({
         PolygonIds: [selectedPolygon],
         SessionIds: selectedSessions,
       };
-      console.log("📤 Project Payload:", projectPayload);
 
       const projectRes = await mapViewApi.createProjectWithPolygons(projectPayload);
 
@@ -420,7 +419,6 @@ export const ProjectForm = ({
             Name: selectedPolygonData.label || projectName.trim(),
             project_id: projectId,
           };
-          console.log("📤 Building Payload:", buildingPayload);
 
           const buildingRes = await buildingApi.generateBuildings(buildingPayload);
 
@@ -442,7 +440,6 @@ export const ProjectForm = ({
             grid: parseFloat(gridSize),
             min_samples: parseInt(minSamples, 10),
           };
-          console.log("📤 Area Breakdown Payload:", breakdownPayload);
 
           const breakdownRes = await areaBreakdownApi.getAreaBreakdown(breakdownPayload);
 
@@ -466,12 +463,7 @@ export const ProjectForm = ({
           formData.append("project_name", projectName.trim());
           formData.append("method", "noml");
 
-          console.log("📤 Site Upload Payload:", {
-            file: siteFile.name,
-            project_id: projectId,
-            project_name: projectName.trim(),
-            method: "noml",
-          });
+          
 
           const uploadRes = await cellSiteApi.uploadSite(formData);
           
@@ -495,7 +487,6 @@ export const ProjectForm = ({
             session_ids: selectedSessions,
             method: "noml",
           };
-          console.log("📤 Sessions Payload:", sessionPayload);
 
           const sessionRes = await cellSiteApi.uploadSessions(sessionPayload);
 
@@ -520,7 +511,6 @@ export const ProjectForm = ({
             indoor_mode: indoorMode,
             grid: parseFloat(predictionGrid),
           };
-          console.log("📤 Prediction Payload:", predictionPayload);
 
           const predRes = await predictionApi.runPrediction(predictionPayload);
 

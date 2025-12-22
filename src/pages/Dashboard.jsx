@@ -7,14 +7,14 @@ import {
 
 import MonthlySamplesChart from '@/components/dashboard/charts/MonthlySamplesChart';
 import OperatorNetworkChart from '@/components/dashboard/charts/OperatorNetworkChart';
-import MetricChart from '@/components/dashboard/charts/MetricChart';
+import MetricChart from '@/components/dashboard/charts/BoxPlotChartSimple';
 import BandDistributionChart from '@/components/dashboard/charts/BandDistributionChart';
 import HandsetPerformanceChart from '@/components/dashboard/charts/HandsetPerformanceChart';
 import QualityRankingChart from '@/components/dashboard/charts/QualityRankingChart';
 import StatCardSkeleton from '@/components/dashboard/skeletons/StatCardSkeleton';
 import { StatCard } from '@/components/dashboard';
 import AppChart from '@/components/dashboard/charts/AppChart';
-import HolesScatterChart from '@/components/dashboard/charts/HolesScatterChart';
+import HolesScatterChart from '@/components/dashboard/charts/IndoorOutdoorBarChart';
 
 import { 
   useTotals, 
@@ -99,7 +99,7 @@ const DashboardPage = () => {
       },
       {
         title: "Operators",
-        value: operatorCount-1 || 0,
+        value: operatorCount || 0,
         icon: Wifi,
         color: "bg-gradient-to-br from-sky-500 to-sky-600",
         description: "Unique network operators"

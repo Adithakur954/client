@@ -1,14 +1,14 @@
 
 export const normalizeProviderName = (rawName) => {
-  if (!rawName) return "Unknown";
+  if (!rawName) return ;
 
   const invalidValues = ["000 000", " 000 000 ", "404440", "404011"];
   const s = String(rawName).trim();
 
   // Handle only slashes like /, //, ///
-  if (/^\/+$/.test(s)) return "Unknown";
+  if (/^\/+$/.test(s)) return ;
 
-  if (invalidValues.includes(s)) return "Unknown";
+  if (invalidValues.includes(s)) return ;
 
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
 
@@ -30,7 +30,7 @@ export const normalizeProviderName = (rawName) => {
   }
 
   if (cleaned.includes("YAS") || cleaned.includes("BROADBAND")) {
-    return "YAS";
+    return "Yas";
   }
 
   if (cleaned.includes("BSNL")) {
@@ -50,7 +50,7 @@ export const normalizeTechName = (tech) => {
   if (t.includes("LTE") || t.includes("4G")) return "4G";
   if (t.includes("3G")) return "3G";
   if (t.includes("2G") || t.includes("EDGE")) return "2G";
-  return "Unknown";
+  return tech;
 };
 
 
@@ -60,7 +60,7 @@ export const COLOR_SCHEMES = {
     Airtel: "#EF4444",
     "VI India": "#22C55E",
     BSNL: "#F59E0B",
-    Yas: "#7d1b49", 
+    Yas: "#7d1b49",  
     Unknown: "#6B7280",
   },
   technology: {

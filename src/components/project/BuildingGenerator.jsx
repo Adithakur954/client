@@ -68,7 +68,6 @@ export const generateBuildingsForPolygon = async (polygonData) => {
     throw new Error("Invalid polygon data");
   }
 
-  console.log("🏗️ Generating buildings for:", polygonData.label);
   const payload = { WKT: polygonData.wkt };
   const response = await buildingApi.generateBuildings(payload);
 

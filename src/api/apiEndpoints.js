@@ -379,6 +379,8 @@ export const adminApi = {
     }),
 
     getHoles: ()=> api.get("/Admin/holes"),
+    getBoxData: (metric)=> api.get(`/Admin/box-plot/operators?metric=${metric}`),
+    getIndoorOutdoor: ()=> api.get("/Admin/operator-indoor-outdoor-avg"),
 
   getNetworkDurations: async (startDate, endDate) => {
     const formatDateLocal = (d) => {
@@ -452,7 +454,7 @@ export const adminApi = {
   getNetworksV2: () => api.get("/Admin/NetworksV2"),
   
   saveUserDetails: (data) => api.post("/Admin/SaveUserDetails", data),
-  deleteUser: (id) => api.post(`/Admin/DeleteUser?id=${id}`),
+  deleteUser: (id) => api.post(`/Admin/DeleteUser`, { id }),
   userResetPassword: (data) => api.post("/Admin/UserResetPassword", data),
   changePassword: (data) => api.post("/Admin/ChangePassword", data),
   getSessions: () => api.get("/Admin/GetSessions"),
@@ -621,11 +623,7 @@ export const homeApi = {
   getAuthStatus: () => api.get("/api/auth/status"),
 };
 
-// export const settingApi = {
-//   checkSession: () => api.get("/api/Setting/CheckSession"),
-//   getThresholdSettings: () => api.get("/api/Setting/GetThresholdSettings"),
-//   saveThreshold: (payload) => api.post("/api/Setting/SaveThreshold", payload),
-// };
+
 
 export const settingApi = {
     checkSession: async () => {

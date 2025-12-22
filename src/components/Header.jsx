@@ -1,9 +1,11 @@
+// components/Header.jsx
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
 import { LogOut } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import DrawingControlsPanel from './map/layout/DrawingControlsPanel';
+import AdvancedFilters from './map/HeaderFilters';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -13,19 +15,16 @@ export default function Header() {
 
   return (
     <header className="h-16 bg-slate-950 text-white shadow-lg flex items-center justify-between px-6 flex-shrink-0 relative z-50">
-      {/* Left Section - Logo or Empty */}
-      {/* <div className="flex items-center min-w-[200px]">
-        <h1 className="text-lg font-semibold"></h1>
-      </div> */}
-
-      {/* Center Section - Drawing Controls (only on map pages) */}
-      <div className="flex-1 flex items-center justify-center">
-        {isMapPage && (
-          <DrawingControlsPanel position="relative" />
-        )}
+      
+      <div className="flex items-center space-x-3 min-w-[200px]">
+        {/* ✅ No props needed - HeaderFilters gets data from context */}
+        {isMapPage && <AdvancedFilters />}
       </div>
 
-      {/* Right Section - User Info & Logout */}
+      <div className="flex-1 flex items-center justify-center">
+        {isMapPage && <DrawingControlsPanel position="relative" />}
+      </div>
+
       <div className="flex items-center space-x-4 min-w-[200px] justify-end">
         <p className="text-gray-300 text-sm">
           Welcome, <span className="font-semibold text-white">{user?.name || 'User'}</span>

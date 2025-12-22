@@ -386,7 +386,6 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
       settings={{
         title: 'Band Distribution Settings',
         render: settingsRender,
-        onApply: () => console.log('✅ Settings applied')
       }}
     >
       <ActiveFiltersDisplay />

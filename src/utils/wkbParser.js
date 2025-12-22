@@ -55,7 +55,7 @@ export function parsePolygonList(polygonList) {
     const { wkt, geometry, error } = parseWKB(p.region);
     
     if (error) {
-      console.warn(`⚠️ Failed to parse polygon ${p.name}:`, error);
+      console.warn(` Failed to parse polygon ${p.name}:`, error);
     } else {
       console.log(`✅ Parsed ${p.name}`);
     }

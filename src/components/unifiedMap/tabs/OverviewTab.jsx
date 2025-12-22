@@ -224,14 +224,14 @@ export const OverviewTab = ({
         if (typeof techs !== "object" || techs === null) return;
 
         const normalizedProvider = normalizeProviderName(provider);
-        if (normalizedProvider === "Unknown") return;
+        if (!normalizedProvider || normalizedProvider === "Unknown") return;
 
         Object.entries(techs).forEach(([tech, volumeData]) => {
           const normalizedTech = normalizeTechName(tech);
-          if (normalizedTech === "Unknown") return;
+         if (!normalizedTech || normalizedTech === "Unknown") return;
 
           if (volumeData && typeof volumeData === "object") {
-            const key = `${normalizedProvider.toLowerCase()}_${normalizedTech}`;
+             const key = `${normalizedProvider.toLowerCase()}_${normalizedTech.toLowerCase()}`;
 
             if (!aggregated[key]) {
               aggregated[key] = {

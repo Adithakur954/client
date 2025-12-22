@@ -3,9 +3,7 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_CSHARP_API_URL;
 
-// ============================================
-// STATE MANAGEMENT
-// ============================================
+
 let authErrorHandler = null;
 let isRedirecting = false;
 
@@ -13,9 +11,7 @@ export const setAuthErrorHandler = (handler) => {
   authErrorHandler = handler;
 };
 
-// ============================================
-// REQUEST QUEUE - Prevents overwhelming the server
-// ============================================
+
 class RequestQueue {
   constructor(maxConcurrent = 4) {
     this.maxConcurrent = maxConcurrent;

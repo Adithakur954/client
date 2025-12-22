@@ -77,14 +77,11 @@ export const UploadSiteModal = ({ open, onOpenChange, onUploadSuccess }) => {
         if (trainPath) formData.append('train_path', trainPath);
       }
 
-      console.log('📤 Uploading to Python backend (port 5000)');
-      console.log('📁 File:', file.name);
-      console.log('⚙️ Method:', method);
+      
 
       // Use Python backend cellSiteApi
       const response = await cellSiteApi.uploadSite(formData);
 
-      console.log('✅ Upload response:', response);
 
       if (response.success) {
         toast.success(response.message || 'File processed successfully!');

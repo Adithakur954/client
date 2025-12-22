@@ -100,16 +100,12 @@ export default function PredictionSide({
   }, [reloadData, autoCloseOnApply, setOpen]);
 
   const handleNavigate = useCallback(() => {
-    console.log("🚀 Navigating to Sample Map");
-    console.log("   - Project ID:", projectId);
-    console.log("   - Session ID:", sessionId);
     
     const q = new URLSearchParams();
     if (projectId) q.set("project_id", String(projectId));
     if (sessionId) q.set("session", String(sessionId));
     
     const finalUrl = `/map?${q.toString()}`;
-    console.log("   - Final URL:", finalUrl);
     
     navigate(finalUrl);
   }, [projectId, sessionId, navigate]);

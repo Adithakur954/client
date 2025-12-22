@@ -255,7 +255,6 @@ const OperatorNetworkChart = () => {
   const filteredData = useMemo(() => {
     if (!allData || allData.length === 0) return [];
 
-    console.log('Processing data:', { metric: selectedMetric, dataCount: allData.length, sample: allData[0] });
 
     let filtered = allData.filter(
       (item) => isValidName(item.name) && isAllowedOperator(item.name)
@@ -359,7 +358,6 @@ const OperatorNetworkChart = () => {
         return techs.some((tech) => hasValidValue(item[tech]));
       });
 
-    console.log('Filtered data:', filtered);
 
     return filtered;
   }, [allData, selectedOperators, selectedTechnologies, selectedMetric]);

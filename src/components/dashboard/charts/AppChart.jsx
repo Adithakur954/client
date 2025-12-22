@@ -129,7 +129,6 @@ function AppChart() {
   // DATA VALIDATION
   // ============================================
   const data = useMemo(() => {
-    console.log('📊 [AppChart] chartData:', chartData);
     if (!chartData) {
       console.warn('⚠️ [AppChart] chartData is null/undefined');
       return [];
@@ -138,7 +137,6 @@ function AppChart() {
       console.warn('⚠️ [AppChart] chartData is not an array:', typeof chartData);
       return [];
     }
-    console.log('✅ [AppChart] Valid data:', { count: chartData.length, sample: chartData[0] });
     return chartData;
   }, [chartData]);
 
@@ -160,7 +158,6 @@ function AppChart() {
     });
     
     const result = sorted.slice(0, topN);
-    console.log('📈 [AppChart] Display data:', { count: result.length, sortBy, topN });
     
     return result;
   }, [data, topN, sortBy]);
@@ -334,7 +331,6 @@ function AppChart() {
       settings={{
         title: "App Chart Settings",
         render: settingsRender,
-        onApply: () => console.log("Selected metrics:", selectedMetrics),
       }}
     >
       {isLoading ? (

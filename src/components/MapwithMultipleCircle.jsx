@@ -9,106 +9,106 @@ import { getLogColor } from "../utils/colorUtils";
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
-const OPERATOR_COLORS = {
-  jio: "#3B82F6",
-  airtel: "#EF4444",
-  vi: "#22C55E",
-  vodafone: "#22C55E",
-  bsnl: "#F59E0B",
-  unknown: "#6B7280",
-};
+// const OPERATOR_COLORS = {
+//   jio: "#3B82F6",
+//   airtel: "#EF4444",
+//   vi: "#22C55E",
+//   vodafone: "#22C55E",
+//   bsnl: "#F59E0B",
+//   unknown: "#6B7280",
+// };
 
-const TECHNOLOGY_COLORS = {
-  "5g": "#EC4899",
-  "nr": "#EC4899",
-  "4g": "#8B5CF6",
-  "lte": "#8B5CF6",
-  "3g": "#10B981",
-  "2g": "#6B7280",
-  "unknown": "#F59E0B",
-};
+// const TECHNOLOGY_COLORS = {
+//   "5g": "#EC4899",
+//   "nr": "#EC4899",
+//   "4g": "#8B5CF6",
+//   "lte": "#8B5CF6",
+//   "3g": "#10B981",
+//   "2g": "#6B7280",
+//   "unknown": "#F59E0B",
+// };
 
-const BAND_COLORS = {
-  "1": "#EF4444",
-  "2": "#F59E0B",
-  "3": "#EF4444",
-  "5": "#F59E0B",
-  "7": "#10B981",
-  "8": "#10B981",
-  "20": "#0EA5E9",
-  "38": "#14B8A6",
-  "40": "#3B82F6",
-  "41": "#8B5CF6",
-  "42": "#6366F1",
-  "n28": "#EC4899",
-  "n78": "#F472B6",
-  "n258": "#D946EF",
-  "Unknown": "#6B7280"
-};
+// const BAND_COLORS = {
+//   "1": "#EF4444",
+//   "2": "#F59E0B",
+//   "3": "#EF4444",
+//   "5": "#F59E0B",
+//   "7": "#10B981",
+//   "8": "#10B981",
+//   "20": "#0EA5E9",
+//   "38": "#14B8A6",
+//   "40": "#3B82F6",
+//   "41": "#8B5CF6",
+//   "42": "#6366F1",
+//   "n28": "#EC4899",
+//   "n78": "#F472B6",
+//   "n258": "#D946EF",
+//   "Unknown": "#6B7280"
+// };
 
 // Smart matching functions
-const getOperatorColor = (name) => {
-  if (!name || typeof name !== 'string') return OPERATOR_COLORS.unknown;
-  const cleanName = name.toLowerCase().trim();
+// const getOperatorColor = (name) => {
+//   if (!name || typeof name !== 'string') return OPERATOR_COLORS.unknown;
+//   const cleanName = name.toLowerCase().trim();
   
-  if (cleanName.includes('jio') || cleanName.includes('reliance')) return OPERATOR_COLORS.jio;
-  if (cleanName.includes('airtel') || cleanName.includes('Air')) return OPERATOR_COLORS.airtel;
-  if (cleanName.includes('vodafone') || cleanName.includes('idea') || cleanName === 'vi' || cleanName.includes('vi india')) return OPERATOR_COLORS.vi;
-  if (cleanName.includes('bsnl')) return OPERATOR_COLORS.bsnl;
+//   if (cleanName.includes('jio') || cleanName.includes('reliance')) return OPERATOR_COLORS.jio;
+//   if (cleanName.includes('airtel') || cleanName.includes('Air')) return OPERATOR_COLORS.airtel;
+//   if (cleanName.includes('vodafone') || cleanName.includes('idea') || cleanName === 'vi' || cleanName.includes('vi india')) return OPERATOR_COLORS.vi;
+//   if (cleanName.includes('bsnl')) return OPERATOR_COLORS.bsnl;
   
-  return OPERATOR_COLORS.unknown;
-};
+//   return OPERATOR_COLORS.unknown;
+// };
 
-const getTechnologyColor = (tech) => {
-  if (!tech || typeof tech !== 'string') return TECHNOLOGY_COLORS.unknown;
-  const cleanTech = tech.toLowerCase().trim();
+// const getTechnologyColor = (tech) => {
+//   if (!tech || typeof tech !== 'string') return TECHNOLOGY_COLORS.unknown;
+//   const cleanTech = tech.toLowerCase().trim();
   
-  if (cleanTech.includes('5g') || cleanTech.includes('nr')) return TECHNOLOGY_COLORS['5g'];
-  if (cleanTech.includes('4g') || cleanTech.includes('lte')) return TECHNOLOGY_COLORS['4g'];
-  if (cleanTech.includes('3g') || cleanTech.includes('hspa') || cleanTech.includes('wcdma')) return TECHNOLOGY_COLORS['3g'];
-  if (cleanTech.includes('2g') || cleanTech.includes('gsm') || cleanTech.includes('edge')) return TECHNOLOGY_COLORS['2g'];
+//   if (cleanTech.includes('5g') || cleanTech.includes('nr')) return TECHNOLOGY_COLORS['5g'];
+//   if (cleanTech.includes('4g') || cleanTech.includes('lte')) return TECHNOLOGY_COLORS['4g'];
+//   if (cleanTech.includes('3g') || cleanTech.includes('hspa') || cleanTech.includes('wcdma')) return TECHNOLOGY_COLORS['3g'];
+//   if (cleanTech.includes('2g') || cleanTech.includes('gsm') || cleanTech.includes('edge')) return TECHNOLOGY_COLORS['2g'];
   
-  return TECHNOLOGY_COLORS.unknown;
-};
+//   return TECHNOLOGY_COLORS.unknown;
+// };
 
-const getBandColor = (band) => {
-  if (!band) return BAND_COLORS.unknown;
-  const cleanBand = String(band).toLowerCase().trim();
+// const getBandColor = (band) => {
+//   if (!band) return BAND_COLORS.unknown;
+//   const cleanBand = String(band).toLowerCase().trim();
   
-  if (BAND_COLORS[cleanBand]) return BAND_COLORS[cleanBand];
+//   if (BAND_COLORS[cleanBand]) return BAND_COLORS[cleanBand];
   
-  const bandMatch = cleanBand.match(/(\d+)/);
-  if (bandMatch && BAND_COLORS[bandMatch[1]]) return BAND_COLORS[bandMatch[1]];
+//   const bandMatch = cleanBand.match(/(\d+)/);
+//   if (bandMatch && BAND_COLORS[bandMatch[1]]) return BAND_COLORS[bandMatch[1]];
   
-  return BAND_COLORS.unknown;
-};
+//   return BAND_COLORS.unknown;
+// };
 
-// Updated getColorByScheme with smart matching
-const getColorByScheme = (location, colorBy) => {
-  if (!colorBy) return null;
+// // Updated getColorByScheme with smart matching
+// const getColorByScheme = (location, colorBy) => {
+//   if (!colorBy) return null;
   
-  const value = location[colorBy];
-  if (!value) return "#6B7280";
+//   const value = location[colorBy];
+//   if (!value) return "#6B7280";
   
-  switch (colorBy.toLowerCase()) {
-    case 'provider':
-    case 'operator':
-    case 'network':
-      return getOperatorColor(value);
+//   switch (colorBy.toLowerCase()) {
+//     case 'provider':
+//     case 'operator':
+//     case 'network':
+//       return getLogColor(value);
       
-    case 'technology':
-    case 'tech':
-    case 'rat':
-      return getTechnologyColor(value);
+//     case 'technology':
+//     case 'tech':
+//     case 'rat':
+//       return getTechnologyColor(value);
       
-    case 'band':
-    case 'frequency':
-      return getBandColor(value);
+//     case 'band':
+//     case 'frequency':
+//       return getBandColor(value);
       
-    default:
-      return "#6B7280";
-  }
-};
+//     default:
+//       return "#6B7280";
+//   }
+// };
 
 // Aggregation methods
 const AGGREGATION_METHODS = {
@@ -124,14 +124,7 @@ const AGGREGATION_METHODS = {
   count: (values) => values.length,
 };
 
-// Utility functions
-// const getColorByScheme = (location, colorBy) => {
-//   if (!colorBy) return null;
-//   const scheme = COLOR_SCHEMES[colorBy];
-//   if (!scheme) return null;
-//   const value = location[colorBy];
-//   return scheme[value] || scheme["Unknown"] || "#6B7280";
-// };
+
 
 const parseWKTToPolygons = (wkt) => {
   if (!wkt?.trim()) return [];
@@ -493,8 +486,38 @@ const MapWithMultipleCircles = ({
   }, [enableGrid, gridSizeMeters, polygonData, locationsToRender, selectedMetric, thresholds, gridAggregationMethod]);
 
   // Get color for a location point
+  // Get color for a location point
   const getLocationColor = useCallback((loc) => {
-    if (colorBy) return getColorByScheme(loc, colorBy);
+    // If a specific coloring scheme is selected (Provider, Tech, Band)
+    if (colorBy && colorBy !== 'metric') {
+      let schemeKey = colorBy; 
+      let value = null;
+      const mode = colorBy.toLowerCase();
+
+      // 1. Determine Scheme and Value based on selection
+      if (mode.includes('provider') || mode.includes('operator')) {
+        schemeKey = 'provider';
+        // Check all common field names for operator
+        value = loc.operator || loc.Operator || loc.provider || loc.Provider || loc.operatorName || loc.name; 
+      } 
+      else if (mode.includes('tech') || mode.includes('rat')) {
+        schemeKey = 'technology';
+        value = loc.technology || loc.Technology || loc.tech || loc.Tech || loc.networkType;
+      } 
+      else if (mode.includes('band') || mode.includes('freq')) {
+        schemeKey = 'band';
+        value = loc.band || loc.Band || loc.frequency; 
+      }
+      else {
+        // Fallback: try to find the value directly if it's a different key
+        value = loc[colorBy];
+      }
+
+      // 2. Use the utility from colorUtils to get the color (handles normalization internally)
+      return getLogColor(schemeKey, value);
+    }
+    
+    // Default: Color by Metric (RSRP, RSRQ, etc.)
     return getColorForMetric(selectedMetric, loc?.[selectedMetric], thresholds);
   }, [colorBy, selectedMetric, thresholds]);
 

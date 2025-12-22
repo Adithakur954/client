@@ -1,4 +1,4 @@
-// Default color thresholds (should match your Settings page)
+
 export const defaultThresholds = {
     RSRP: [
         { min: -140, max: -105, color: '#FF0000' },

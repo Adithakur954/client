@@ -1,76 +1,146 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from "react";
+// context/MapContext.jsx
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 const MapContext = createContext(null);
 
-export const useMapContext = () => {
-  const context = useContext(MapContext);
-  if (!context) {
-    throw new Error("useMapContext must be used within MapProvider");
-  }
-  return context;
+// Default filters
+const DEFAULT_FILTERS = {
+  technology: 'ALL',
+  metric: 'RSRP',
+  band: '',
+  provider: 'all',
+  startDate: null,
+  endDate: null,
+  minSignal: '',
+  maxSignal: '',
+  dataSource: 'all'
 };
 
-export const MapProvider = ({ children }) => {
+// Default available filter options
+const DEFAULT_AVAILABLE_FILTERS = {
+  providers: [],
+  bands: [],
+  technologies: []
+};
+
+export function MapProvider({ children }) {
   // UI State
   const [ui, setUi] = useState({
     drawEnabled: false,
-    shapeMode: "polygon",
+    shapeMode: 'polygon',
     drawPixelateRect: false,
     drawCellSizeMeters: 100,
     drawClearSignal: 0,
     colorizeCells: true,
   });
 
-  // Use refs for data that changes frequently
-  const hasLogsRef = useRef(false);
-  const polygonStatsRef = useRef(null);
-  const downloadHandlersRef = useRef({
-    onDownloadStatsCsv: null,
-    onDownloadRawCsv: null,
-    onFetchLogs: null,
-  });
+  // Filters State
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
-  // Stable updateUI
-  const updateUI = useCallback((partial) => {
-    setUi((prev) => {
-      const hasChanges = Object.keys(partial).some(key => prev[key] !== partial[key]);
-      if (!hasChanges) return prev;
-      return { ...prev, ...partial };
-    });
+  // ✅ NEW: Available filter options from data
+  const [availableFilters, setAvailableFilters] = useState(DEFAULT_AVAILABLE_FILTERS);
+
+  // Download handlers
+  const [downloadHandlers, setDownloadHandlers] = useState({});
+  
+  // Polygon stats
+  const [polygonStats, setPolygonStats] = useState(null);
+  const [hasLogs, setHasLogs] = useState(false);
+
+  // Update UI
+  const updateUI = useCallback((updates) => {
+    setUi(prev => ({ ...prev, ...updates }));
   }, []);
 
-  // Ref setters (don't trigger re-renders)
-  const setHasLogs = useCallback((value) => {
-    hasLogsRef.current = value;
+  // Update single filter
+  const updateFilter = useCallback((key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
-  const setPolygonStats = useCallback((value) => {
-    polygonStatsRef.current = value;
+  // Reset single filter
+  const resetFilter = useCallback((key) => {
+    setFilters(prev => ({ ...prev, [key]: DEFAULT_FILTERS[key] }));
   }, []);
 
-  const setDownloadHandlers = useCallback((handlers) => {
-    downloadHandlersRef.current = { ...downloadHandlersRef.current, ...handlers };
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
   }, []);
 
-  // Memoized context value
-  const contextValue = useMemo(() => ({
+  // ✅ NEW: Update available filter options
+  const updateAvailableFilters = useCallback((options) => {
+    setAvailableFilters(prev => ({ ...prev, ...options }));
+  }, []);
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.technology && filters.technology !== 'ALL') count++;
+    if (filters.band && filters.band !== '' && filters.band !== 'all') count++;
+    if (filters.provider && filters.provider !== 'all') count++;
+    if (filters.minSignal !== '') count++;
+    if (filters.maxSignal !== '') count++;
+    if (filters.startDate) count++;
+    if (filters.endDate) count++;
+    if (filters.dataSource && filters.dataSource !== 'all') count++;
+    return count;
+  }, [filters]);
+
+  // Check if any filters are active
+  const hasActiveFilters = activeFilterCount > 0;
+
+  const value = useMemo(() => ({
+    // UI
     ui,
     updateUI,
-    hasLogsRef,
-    polygonStatsRef,
-    downloadHandlersRef,
-    setHasLogs,
-    setPolygonStats,
+    
+    // Filters
+    filters,
+    updateFilter,
+    resetFilter,
+    clearFilters,
+    activeFilterCount,
+    hasActiveFilters,
+    isFiltersOpen,
+    setIsFiltersOpen,
+    
+    // ✅ NEW: Available filter options
+    availableFilters,
+    updateAvailableFilters,
+    
+    // Download handlers
+    downloadHandlers,
     setDownloadHandlers,
-    // Legacy getters
-    get hasLogs() { return hasLogsRef.current; },
-    get polygonStats() { return polygonStatsRef.current; },
-    get downloadHandlers() { return downloadHandlersRef.current; },
-  }), [ui, updateUI, setHasLogs, setPolygonStats, setDownloadHandlers]);
+    
+    // Polygon stats
+    polygonStats,
+    setPolygonStats,
+    hasLogs,
+    setHasLogs,
+  }), [
+    ui, updateUI,
+    filters, updateFilter, resetFilter, clearFilters, activeFilterCount, hasActiveFilters,
+    isFiltersOpen, setIsFiltersOpen,
+    availableFilters, updateAvailableFilters,
+    downloadHandlers, setDownloadHandlers,
+    polygonStats, setPolygonStats,
+    hasLogs, setHasLogs
+  ]);
 
   return (
-    <MapContext.Provider value={contextValue}>
+    <MapContext.Provider value={value}>
       {children}
     </MapContext.Provider>
   );
-};
+}
+
+export function useMapContext() {
+  const context = useContext(MapContext);
+  if (!context) {
+    throw new Error('useMapContext must be used within a MapProvider');
+  }
+  return context;
+}
+
+export default MapContext;
