@@ -60,7 +60,7 @@ const HeaderFilters = () => {
       if (b && b !== 'all') {  // Skip if already 'all'
         options.push({ 
           value: String(b), 
-          label: `${b} MHz` 
+          label: `${b} ` 
         });
       }
     });
@@ -153,7 +153,7 @@ const HeaderFilters = () => {
                 <SelectValue placeholder="Select technology" />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-600">
-                {technologyOptions.map(tech => (
+                {technologyOptions.filter(tech => tech !== 'Unknown').map(tech => (
                   <SelectItem 
                     key={tech} 
                     value={tech}

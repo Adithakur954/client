@@ -34,30 +34,46 @@ import {
 } from "../../api/apiEndpoints";
 import Spinner from "../common/Spinner";
 
-const PolygonDropdown = ({ polygons, selectedPolygon, setSelectedPolygon, disabled }) => {
+const PolygonDropdown = ({
+  polygons,
+  selectedPolygon,
+  setSelectedPolygon,
+  disabled,
+}) => {
   const safePolygons = Array.isArray(polygons) ? polygons : [];
 
   return (
     <select
       className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
       value={selectedPolygon || ""}
-      onChange={(e) => setSelectedPolygon(e.target.value ? Number(e.target.value) : null)}
+      onChange={(e) =>
+        setSelectedPolygon(e.target.value ? Number(e.target.value) : null)
+      }
       disabled={disabled}
     >
       <option value="">
-        {safePolygons.length === 0 ? "No polygons available" : "Select polygon..."}
+        {safePolygons.length === 0
+          ? "No polygons available"
+          : "Select polygon..."}
       </option>
       {safePolygons.map((p) => (
         <option key={p.value} value={p.value}>
-          {p.label} {p.sessionIds?.length > 0 ? `(${p.sessionIds.length} sessions)` : ""}
+          {p.label}{" "}
+          {p.sessionIds?.length > 0 ? `(${p.sessionIds.length} sessions)` : ""}
         </option>
       ))}
     </select>
   );
 };
 
-const SessionSelector = ({ sessions, selectedSessions, setSelectedSessions, disabled }) => {
-  const allSelected = sessions.length > 0 && selectedSessions.length === sessions.length;
+const SessionSelector = ({
+  sessions,
+  selectedSessions,
+  setSelectedSessions,
+  disabled,
+}) => {
+  const allSelected =
+    sessions.length > 0 && selectedSessions.length === sessions.length;
 
   const toggleAll = () => {
     setSelectedSessions(allSelected ? [] : [...sessions]);
@@ -87,7 +103,11 @@ const SessionSelector = ({ sessions, selectedSessions, setSelectedSessions, disa
           disabled={disabled}
           className="h-8 text-xs border-blue-300 hover:bg-blue-100"
         >
-          {allSelected ? <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> : <Square className="h-3.5 w-3.5 mr-1.5" />}
+          {allSelected ? (
+            <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
+          ) : (
+            <Square className="h-3.5 w-3.5 mr-1.5" />
+          )}
           {allSelected ? "Deselect All" : "Select All"}
         </Button>
       </div>
@@ -105,7 +125,9 @@ const SessionSelector = ({ sessions, selectedSessions, setSelectedSessions, disa
               disabled={disabled}
               className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
             />
-            <span className="text-sm text-gray-700 font-medium">Session {sessionId}</span>
+            <span className="text-sm text-gray-700 font-medium">
+              Session {sessionId}
+            </span>
           </label>
         ))}
       </div>
@@ -113,7 +135,13 @@ const SessionSelector = ({ sessions, selectedSessions, setSelectedSessions, disa
   );
 };
 
-const GridSizeInput = ({ gridSize, setGridSize, minSamples, setMinSamples, disabled }) => {
+const GridSizeInput = ({
+  gridSize,
+  setGridSize,
+  minSamples,
+  setMinSamples,
+  disabled,
+}) => {
   const presets = [50, 100, 200, 500];
 
   return (
@@ -148,7 +176,9 @@ const GridSizeInput = ({ gridSize, setGridSize, minSamples, setMinSamples, disab
             ))}
           </div>
         </div>
-        <p className="text-xs text-gray-500">Grid block size for area breakdown</p>
+        <p className="text-xs text-gray-500">
+          Grid block size for area breakdown
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -164,21 +194,23 @@ const GridSizeInput = ({ gridSize, setGridSize, minSamples, setMinSamples, disab
           max="1000"
           className="w-24 h-9"
         />
-        <p className="text-xs text-gray-500">Minimum samples required for building clusters (default: 10)</p>
+        <p className="text-xs text-gray-500">
+          Minimum samples required for building clusters (default: 10)
+        </p>
       </div>
     </div>
   );
 };
 
-const PredictionOptions = ({ 
-  enabled, 
-  setEnabled, 
-  indoorMode, 
+const PredictionOptions = ({
+  enabled,
+  setEnabled,
+  indoorMode,
   setIndoorMode,
   predictionGrid,
   setPredictionGrid,
   disabled,
-  sessionCount 
+  sessionCount,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const gridPresets = [10, 22, 50, 100];
@@ -195,11 +227,14 @@ const PredictionOptions = ({
             disabled={disabled || sessionCount === 0}
             className="h-4 w-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
           />
-          <Label htmlFor="run-prediction" className="text-sm font-semibold text-purple-900 cursor-pointer">
+          <Label
+            htmlFor="run-prediction"
+            className="text-sm font-semibold text-purple-900 cursor-pointer"
+          >
             Run LTE Prediction Pipeline
           </Label>
         </div>
-        
+
         {enabled && (
           <Button
             type="button"
@@ -210,7 +245,11 @@ const PredictionOptions = ({
           >
             <Settings className="h-3.5 w-3.5 mr-1" />
             {showAdvanced ? "Hide" : "Options"}
-            {showAdvanced ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
+            {showAdvanced ? (
+              <ChevronUp className="h-3.5 w-3.5 ml-1" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 ml-1" />
+            )}
           </Button>
         )}
       </div>
@@ -223,7 +262,8 @@ const PredictionOptions = ({
 
       {enabled && sessionCount > 0 && (
         <p className="text-xs text-purple-600 font-medium">
-          ✓ Will run prediction on {sessionCount} session(s) after project creation
+          ✓ Will run prediction on {sessionCount} session(s) after project
+          creation
         </p>
       )}
 
@@ -243,12 +283,15 @@ const PredictionOptions = ({
               <option value="ml">Machine Learning</option>
               <option value="none">None</option>
             </select>
-            <p className="text-xs text-gray-500">Method used to detect indoor/outdoor locations</p>
+            <p className="text-xs text-gray-500">
+              Method used to detect indoor/outdoor locations
+            </p>
           </div>
 
           <div className="space-y-2">
             <Label className="text-sm font-semibold text-purple-800">
-              Prediction Grid Size (meters) <span className="text-red-500">*</span>
+              Prediction Grid Size (meters){" "}
+              <span className="text-red-500">*</span>
             </Label>
             <div className="flex flex-wrap gap-2 items-center">
               <Input
@@ -276,7 +319,9 @@ const PredictionOptions = ({
                 ))}
               </div>
             </div>
-            <p className="text-xs text-gray-500">Grid resolution for prediction output (default: 22m)</p>
+            <p className="text-xs text-gray-500">
+              Grid resolution for prediction output (default: 22m)
+            </p>
           </div>
         </div>
       )}
@@ -344,15 +389,15 @@ export const ProjectForm = ({
 
   const validateForm = () => {
     const errors = [];
-    
+
     if (!projectName.trim()) {
       errors.push("Project name is required");
     }
-    
+
     if (!selectedPolygon) {
       errors.push("Please select a polygon");
     }
-    
+
     const numGridSize = parseFloat(gridSize);
     if (isNaN(numGridSize) || numGridSize < 1 || numGridSize > 10000) {
       errors.push("Grid size must be between 1 and 10000");
@@ -365,11 +410,15 @@ export const ProjectForm = ({
 
     if (runPrediction) {
       const numPredictionGrid = parseFloat(predictionGrid);
-      if (isNaN(numPredictionGrid) || numPredictionGrid < 1 || numPredictionGrid > 1000) {
+      if (
+        isNaN(numPredictionGrid) ||
+        numPredictionGrid < 1 ||
+        numPredictionGrid > 1000
+      ) {
         errors.push("Prediction grid must be between 1 and 1000");
       }
     }
-    
+
     return errors;
   };
 
@@ -397,13 +446,18 @@ export const ProjectForm = ({
         SessionIds: selectedSessions,
       };
 
-      const projectRes = await mapViewApi.createProjectWithPolygons(projectPayload);
+      const projectRes = await mapViewApi.createProjectWithPolygons(
+        projectPayload
+      );
 
       if (!projectRes || projectRes.Status !== 1) {
         throw new Error(projectRes?.Message || "Project creation failed");
       }
 
-      projectId = projectRes?.Data?.projectId || projectRes?.Data?.project_id || projectRes?.Data?.id;
+      projectId =
+        projectRes?.Data?.projectId ||
+        projectRes?.Data?.project_id ||
+        projectRes?.Data?.id;
       if (!projectId) throw new Error("No project ID received");
 
       projectData = projectRes.Data?.project || projectRes.Data;
@@ -420,17 +474,23 @@ export const ProjectForm = ({
             project_id: projectId,
           };
 
-          const buildingRes = await buildingApi.generateBuildings(buildingPayload);
+          const buildingRes = await buildingApi.generateBuildings(
+            buildingPayload
+          );
 
           if (buildingRes.Status === 1 || buildingRes.success) {
-            toast.success(`Generated ${buildingRes.Stats?.extracted || 0} buildings`);
+            toast.success(
+              `Generated ${buildingRes.Stats?.extracted || 0} buildings`
+            );
             completedSteps.push("buildings_generated");
           }
         } catch (err) {
           toast.warn("Building generation skipped");
         }
 
-        setCurrentStep(`Analyzing area (${gridSize}m grid, min ${minSamples} samples)...`);
+        setCurrentStep(
+          `Analyzing area (${gridSize}m grid, min ${minSamples} samples)...`
+        );
 
         try {
           const breakdownPayload = {
@@ -441,15 +501,21 @@ export const ProjectForm = ({
             min_samples: parseInt(minSamples, 10),
           };
 
-          const breakdownRes = await areaBreakdownApi.getAreaBreakdown(breakdownPayload);
+          const breakdownRes = await areaBreakdownApi.getAreaBreakdown(
+            breakdownPayload
+          );
 
           if (breakdownRes?.status === "success") {
             const details = breakdownRes.details || [];
-            toast.success(`Area analysis complete: ${details.length} items processed`);
+            toast.success(
+              `Area analysis complete: ${details.length} items processed`
+            );
             completedSteps.push("breakdown_processed");
           }
         } catch (err) {
-          toast.warn("Area breakdown failed: " + (err.message || "Unknown error"));
+          toast.warn(
+            "Area breakdown failed: " + (err.message || "Unknown error")
+          );
         }
       }
 
@@ -463,10 +529,8 @@ export const ProjectForm = ({
           formData.append("project_name", projectName.trim());
           formData.append("method", "noml");
 
-          
-
           const uploadRes = await cellSiteApi.uploadSite(formData);
-          
+
           if (uploadRes.success || uploadRes.Status === 1) {
             toast.success("Site file processed");
             completedSteps.push("site_uploaded");
@@ -516,7 +580,11 @@ export const ProjectForm = ({
 
           if (predRes.status === "success" || predRes.message) {
             predictionResult = predRes;
-            toast.success(`Prediction complete! ${predRes.predictions_saved || 0} predictions saved`);
+            toast.success(
+              `Prediction complete! ${
+                predRes.predictions_saved || 0
+              } predictions saved`
+            );
             completedSteps.push("prediction_completed");
           }
         } catch (err) {
@@ -549,7 +617,6 @@ export const ProjectForm = ({
           predictionGrid: parseFloat(predictionGrid),
         });
       }
-
     } catch (err) {
       let errorMessage = "Failed to create project";
       if (err.response?.data?.Message) {
@@ -561,25 +628,30 @@ export const ProjectForm = ({
       }
 
       toast.error(errorMessage, { autoClose: 8000 });
-
     } finally {
       setLoading(false);
       setCurrentStep("");
     }
   };
 
-  const canSubmit = projectName.trim() && selectedPolygon && parseFloat(gridSize) > 0 && parseInt(minSamples, 10) > 0;
-  const isLoadingPolygons = parentLoading && (!polygons || polygons.length === 0);
+  const canSubmit =
+    projectName.trim() &&
+    selectedPolygon &&
+    parseFloat(gridSize) > 0 &&
+    parseInt(minSamples, 10) > 0;
+  const isLoadingPolygons =
+    parentLoading && (!polygons || polygons.length === 0);
 
   return (
     <Card className="shadow-lg border-gray-200">
       <CardHeader className="pb-4">
         <CardTitle className="text-xl">Create New Project</CardTitle>
         <CardDescription className="text-gray-500">
-          Set up a project with polygon, buildings, area breakdown, and optional prediction
+          Set up a project with polygon, buildings, area breakdown, and optional
+          prediction
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
@@ -604,7 +676,9 @@ export const ProjectForm = ({
             {isLoadingPolygons ? (
               <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <Spinner className="h-4 w-4" />
-                <span className="text-sm text-gray-600">Loading polygons...</span>
+                <span className="text-sm text-gray-600">
+                  Loading polygons...
+                </span>
               </div>
             ) : (
               <PolygonDropdown
@@ -617,8 +691,13 @@ export const ProjectForm = ({
 
             {selectedPolygonData?.wkt && (
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-xs text-green-800 font-semibold">✓ Polygon WKT loaded</p>
-                <p className="text-xs text-green-600 mt-1 truncate font-mono" title={selectedPolygonData.wkt}>
+                <p className="text-xs text-green-800 font-semibold">
+                  ✓ Polygon WKT loaded
+                </p>
+                <p
+                  className="text-xs text-green-600 mt-1 truncate font-mono"
+                  title={selectedPolygonData.wkt}
+                >
                   {selectedPolygonData.wkt.substring(0, 80)}...
                 </p>
               </div>
@@ -672,7 +751,7 @@ export const ProjectForm = ({
                 <ChevronDown className="h-4 w-4 ml-auto text-gray-400 group-open:rotate-180 transition-transform" />
               </div>
             </summary>
-            
+
             <div className="mt-2 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
               <div className="flex justify-end">
                 <Button
@@ -703,7 +782,9 @@ export const ProjectForm = ({
                       <FileText className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-blue-900">{siteFile.name}</p>
+                      <p className="text-sm font-medium text-blue-900">
+                        {siteFile.name}
+                      </p>
                       <p className="text-xs text-blue-600">
                         {(siteFile.size / 1024).toFixed(1)} KB
                       </p>
@@ -725,7 +806,7 @@ export const ProjectForm = ({
           </details>
 
           {loading && currentStep && (
-            <Alert className="bg-blue-50 border-blue-200">
+            <Alert className="bg-blue-50 border-blue-200 p-2 text-sm max-w-md">
               <div className="flex items-center gap-3">
                 <Spinner className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-900 font-medium">
@@ -755,8 +836,8 @@ export const ProjectForm = ({
             </Button>
           </div>
 
-          {selectedPolygonData && !loading && (
-            <div className="text-xs text-gray-500 border-t border-gray-200 pt-4 mt-4">
+          {/* {selectedPolygonData && !loading && (
+            <div className="text-xs text-gray-500 border-t border-gray-200 h-2 pt-4 mt-4">
               <p className="font-semibold text-gray-700 mb-2">Pipeline Steps:</p>
               <ol className="list-decimal list-inside space-y-1 ml-1 text-gray-600">
                 <li>Create project with polygon</li>
@@ -769,7 +850,7 @@ export const ProjectForm = ({
                 )}
               </ol>
             </div>
-          )}
+          )} */}
         </form>
       </CardContent>
     </Card>

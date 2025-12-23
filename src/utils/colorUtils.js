@@ -44,13 +44,29 @@ export const normalizeProviderName = (rawName) => {
 
 export const normalizeTechName = (tech) => {
   if (!tech) return "Unknown";
-  const t = String(tech).trim().toUpperCase();
+
+  const techStr = String(tech).trim();
+  
+  const InvalidValues = [
+    "000", 
+    "00", 
+    "Unknown/No Service", 
+    "Unknown / No Service",  
+    "Unknown",               
+    "404440", 
+    "404011"
+  ];
+  
+  if (InvalidValues.includes(techStr)) return "Unknown";
+
+  const t = techStr.toUpperCase();
 
   if (t.includes("5G") || t.includes("NR")) return "5G";
   if (t.includes("LTE") || t.includes("4G")) return "4G";
   if (t.includes("3G")) return "3G";
   if (t.includes("2G") || t.includes("EDGE")) return "2G";
-  return tech;
+  
+  return tech;  
 };
 
 
@@ -123,3 +139,5 @@ export const getLogColor = (colorBy, value, defaultColor = "#6B7280") => {
 
   return defaultColor;
 };
+
+export const providerColors = (provider) => COLOR_SCHEMES.provider[normalizeProviderName(provider)];

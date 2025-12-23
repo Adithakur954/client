@@ -515,11 +515,9 @@ export const mapViewApi = {
    */
   createProjectWithPolygons: async (payload) => {
     try {
-      console.log('📤 Creating project with payload:', JSON.stringify(payload, null, 2));
       
       const response = await api.post("/api/MapView/CreateProjectWithPolygons", payload);
       
-      console.log('✅ Project created:', response);
       return response;
     } catch (error) {
       console.error('❌ Project creation error:', error);

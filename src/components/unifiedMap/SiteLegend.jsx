@@ -6,7 +6,7 @@ const SITE_COLORS = [
   { label: 'Jio', color: '#3B82F6' },
   { label: 'Airtel', color: '#EF4444' },
   { label: 'Vi India', color: '#22C55E' },
-  { label: 'BSNL', color: '#F59E0B' },
+  { label: 'Yas', color: "#7d1b49" },
   { label: 'Unknown', color: '#8B5CF6' },
 ];
 

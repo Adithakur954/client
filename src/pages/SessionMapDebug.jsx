@@ -17,6 +17,7 @@ import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 import { toast } from "react-toastify";
 import { useMapContext } from "../context/MapContext";
 import DrawingToolsLayer from "@/components/map/tools/DrawingToolsLayer";
+import AllLogsPanelToggle from "@/components/map/layout/AllLogsPanelToggle"; // NEW IMPORT
 import {
   Dialog,
   DialogContent,
@@ -553,6 +554,7 @@ function SessionMapDebug() {
   const [map, setMap] = useState(null);
   const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0 });
   const [analysis, setAnalysis] = useState(null);
+  const [appSummary, setAppSummary] = useState(null); // NEW: App Summary State
 
   // Save Polygon State
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
@@ -562,9 +564,6 @@ function SessionMapDebug() {
   // Threshold State
   const [allThresholds, setAllThresholds] = useState(null); // Raw API response data
   const [currentThresholds, setCurrentThresholds] = useState(null); // Parsed thresholds for current metric
-  // const [provider, setProvider] = useState([]);
-  // const [band, setBand] = useState([]);
-  // const [networkType, setNetworkType] = useState([]);
 
   // Show/Hide Legend
   const [showLegend, setShowLegend] = useState(true);
@@ -1001,7 +1000,9 @@ function SessionMapDebug() {
     }
   }, [filteredLogs.length, sessionIds, setPolygonStats, setHasLogs, filters]);
 
-  
+  // ============================================
+  // FETCH DATA - UPDATED WITH APP SUMMARY
+  // ============================================
   useEffect(() => {
     const fetchData = async () => {
       if (sessionIds.length === 0) {
@@ -1013,8 +1014,9 @@ function SessionMapDebug() {
       setLoading(true);
       setError(null);
       const allPoints = [];
+      let mergedAppSummary = {}; // NEW: To accumulate app data across sessions
 
-      // ✅ FIX: Accumulate unique values across ALL sessions
+      // Accumulate unique values across ALL sessions
       const allProviders = new Set();
       const allBands = new Set();
       const allNetworkTypes = new Set();
@@ -1026,6 +1028,12 @@ function SessionMapDebug() {
           const response = await mapViewApi.getNetworkLog({
             session_id: sessionIds[i],
           });
+
+          // NEW: Check if the response contains app_summary data
+          if (response?.app_summary) {
+            mergedAppSummary = { ...mergedAppSummary, ...response.app_summary };
+          }
+
           let rawData = Array.isArray(response)
             ? response
             : response?.data
@@ -1036,15 +1044,14 @@ function SessionMapDebug() {
 
           const points = rawData
             .map((log, idx) => {
-              // ✅ Extract and normalize data
+              // Extract and normalize data
               const providerValue = normalizeProviderName(
                 log.m_alpha_long || log.Provider
               );
               const bandValue = log.band || log.Band;
-              const techValue = normalizeTechName(
-                log.network);
+              const techValue = normalizeTechName(log.network);
 
-              // ✅ Add to sets (will automatically handle duplicates)
+              // Add to sets (will automatically handle duplicates)
               if (providerValue) allProviders.add(providerValue);
               if (bandValue) allBands.add(String(bandValue));
               if (techValue) allNetworkTypes.add(techValue);
@@ -1093,7 +1100,7 @@ function SessionMapDebug() {
         }
       }
 
-      // ✅ FIX: Set state AFTER processing all sessions, filter out empty values
+      // Set state AFTER processing all sessions, filter out empty values
       const providerArray = Array.from(allProviders).filter(
         (p) => p && p !== "undefined" && p !== "null"
       );
@@ -1111,10 +1118,10 @@ function SessionMapDebug() {
       });
 
       updateAvailableFilters({
-      providers: providerArray,
-      bands: bandArray,
-      technologies: techArray,
-    });
+        providers: providerArray,
+        bands: bandArray,
+        technologies: techArray,
+      });
 
       if (allPoints.length === 0) {
         setError("No valid data found in the sessions");
@@ -1124,7 +1131,11 @@ function SessionMapDebug() {
         );
       }
 
+      // Update aggregate states
       setLogs(allPoints);
+      setAppSummary(
+        Object.keys(mergedAppSummary).length > 0 ? mergedAppSummary : null
+      ); // NEW: Set app summary
       setLoading(false);
     };
 
@@ -1270,9 +1281,25 @@ function SessionMapDebug() {
         )}
       </GoogleMap>
 
-      
-        
-      
+      {/* NEW: Detailed Logs Summary Panel (Aggregate View) */}
+      <AllLogsPanelToggle
+        logs={filteredLogs}
+        thresholds={
+          allThresholds
+            ? {
+                rsrp: parseThresholds(allThresholds.rsrp_json),
+                rsrq: parseThresholds(allThresholds.rsrq_json),
+                sinr: parseThresholds(allThresholds.sinr_json),
+                dl_thpt: parseThresholds(allThresholds.dl_thpt_json),
+                ul_thpt: parseThresholds(allThresholds.ul_thpt_json),
+                mos: parseThresholds(allThresholds.mos_json),
+              }
+            : {}
+        }
+        selectedMetric={filters.metric?.toLowerCase() || "rsrp"}
+        isLoading={loading}
+        appSummary={appSummary}
+      />
 
       {/* Active Filters Bar */}
       {hasActiveFilters && (
@@ -1285,8 +1312,6 @@ function SessionMapDebug() {
           />
         </>
       )}
-
-      
 
       {/* Legend - Now with dynamic thresholds */}
       {showLegend && (

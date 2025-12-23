@@ -24,7 +24,7 @@ import MapLegend from "@/components/map/MapLegend";
 import { useNeighborCollisions } from "@/hooks/useNeighborCollisions";
 import NeighborHeatmapLayer from "@/components/unifiedMap/NeighborHeatmapLayer";
 import SiteLegend from "@/components/unifiedMap/SiteLegend";
-import { normalizeProviderName } from "@/utils/colorUtils"; 
+import { normalizeProviderName, normalizeTechName } from "@/utils/colorUtils"; 
 
 import {
   useBestNetworkCalculation,
@@ -76,6 +76,8 @@ const PROVIDER_COLORS = {
   "Vi India": "#22C55E",
   VI: "#22C55E",
   "Vodafone IN": "#22C55E",
+  Yas: "#7d1b49",
+  YAS: "#7d1b49",
   BSNL: "#F59E0B",
   bsnl: "#F59E0B",
   Unknown: "#6B7280",
@@ -253,7 +255,7 @@ const getProviderColor = (provider) => {
   if (lower.includes("jio")) return "#3B82F6";
   if (lower.includes("airtel")) return "#EF4444";
   if (lower.includes("vi") || lower.includes("vodafone")) return "#22C55E";
-  if (lower.includes("bsnl")) return "#F59E0B";
+  if (lower.includes("yas") || lower.includes("YAS")) return "#7d1b49";
 
   return "#6B7280";
 };
@@ -1137,11 +1139,7 @@ const UnifiedMapView = () => {
   // Google Maps Loader
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
-  // ============================================
-  // CUSTOM HOOKS FOR DATA FETCHING
-  // ============================================
-
-  // 1. Threshold settings (always loaded)
+ 
   const { thresholds: baseThresholds } = useThresholdSettings();
 
   // 2. Sample data (only when dataToggle is "sample")
@@ -1274,7 +1272,7 @@ const UnifiedMapView = () => {
     locations.forEach((loc) => {
       if (loc.provider) providers.add(loc.provider);
       if (loc.band) bands.add(loc.band);
-      if (loc.technology) technologies.add(loc.technology);
+      if (loc.technology) technologies.add(normalizeTechName(loc.technology));
     });
 
     return {

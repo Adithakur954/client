@@ -191,7 +191,7 @@ const BoxPlotChartSimple = () => {
             onChange={(e) => setSelectedMetric(e.target.value)}
             className="w-full max-w-xs px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
           >
-            {(METRICS || [
+            {( [
               { value: 'rsrp', label: 'RSRP' },
               { value: 'rsrq', label: 'RSRQ' },
               { value: 'sinr', label: 'SINR' },
@@ -263,26 +263,7 @@ const BoxPlotChartSimple = () => {
                       className="absolute inset-0 cursor-pointer group"
                       title={`${item.provider}\nMax: ${item.max?.toFixed(1)}\nQ3: ${item.Q3?.toFixed(1)}\nMedian: ${item.Median?.toFixed(1)}\nQ1: ${item.Q1?.toFixed(1)}\nMin: ${item.min?.toFixed(1)}\nSamples: ${item.samples?.toLocaleString()}`}
                     >
-                      {/* Hover tooltip */}
-                      {/* <div className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block">
-                        <div className="bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg whitespace-nowrap">
-                          <div className="font-bold mb-1">{item.provider}</div>
-                          <div className="space-y-0.5">
-                            <div>Max: {item.max?.toFixed(1)} {metricConfig.unit}</div>
-                            <div>Q3: {item.Q3?.toFixed(1)} {metricConfig.unit}</div>
-                            <div className="text-blue-300 font-medium">
-                              Median: {item.Median?.toFixed(1)} {metricConfig.unit}
-                            </div>
-                            <div>Q1: {item.Q1?.toFixed(1)} {metricConfig.unit}</div>
-                            <div>Min: {item.min?.toFixed(1)} {metricConfig.unit}</div>
-                            {item.samples > 0 && (
-                              <div className="pt-1 border-t border-gray-700">
-                                Samples: {item.samples?.toLocaleString()}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div> */}
+                      
                     </div>
 
                     {/* Whisker Line (Min to Max) */}
