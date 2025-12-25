@@ -17,7 +17,8 @@ import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
 import { toast } from "react-toastify";
 import { useMapContext } from "../context/MapContext";
 import DrawingToolsLayer from "@/components/map/tools/DrawingToolsLayer";
-import AllLogsPanelToggle from "@/components/map/layout/AllLogsPanelToggle"; // NEW IMPORT
+import DrawingControlsPanel from "@/components/map/layout/DrawingControlsPanel";
+import AllLogsPanelToggle from "@/components/map/layout/AllLogsPanelToggle";
 import {
   Dialog,
   DialogContent,
@@ -31,9 +32,6 @@ import { format, set } from "date-fns";
 import { normalizeProviderName, normalizeTechName } from "@/utils/colorUtils";
 import HeaderFilters from "@/components/map/HeaderFilters";
 
-// ============================================
-// CONSTANTS
-// ============================================
 const containerStyle = {
   width: "100%",
   height: "100%",
@@ -55,11 +53,6 @@ const MAP_OPTIONS = {
 const EMPTY_ARRAY = [];
 const EMPTY_OBJECT = {};
 
-// ============================================
-// THRESHOLD HELPER FUNCTIONS
-// ============================================
-
-// Get the API key name for a metric
 const getThresholdKey = (metric) => {
   switch (metric?.toUpperCase()) {
     case "RSRP":
@@ -71,15 +64,16 @@ const getThresholdKey = (metric) => {
     case "MOS":
       return "mos_json";
     case "DL_THPT":
+    case "DL_TPT":
       return "dl_thpt_json";
     case "UL_THPT":
+    case "UL_TPT":
       return "ul_thpt_json";
     default:
       return "rsrp_json";
   }
 };
 
-// Get unit for metric display
 const getMetricUnit = (metric) => {
   switch (metric?.toUpperCase()) {
     case "RSRP":
@@ -92,13 +86,14 @@ const getMetricUnit = (metric) => {
       return "";
     case "DL_THPT":
     case "UL_THPT":
+    case "DL_TPT":
+    case "UL_TPT":
       return "Mbps";
     default:
       return "dBm";
   }
 };
 
-// Parse threshold JSON string from API safely
 const parseThresholds = (jsonString) => {
   if (!jsonString || jsonString === "undefined" || jsonString === "null") {
     return null;
@@ -112,46 +107,39 @@ const parseThresholds = (jsonString) => {
   }
 };
 
-// Get color for a value using dynamic thresholds
 const getColorFromThresholds = (value, thresholds) => {
   if (value === null || value === undefined || isNaN(value)) {
-    return "#808080"; // Gray for invalid values
+    return "#808080";
   }
 
   if (!thresholds || !Array.isArray(thresholds) || thresholds.length === 0) {
     return "#808080";
   }
 
-  // Find matching threshold range
   for (const threshold of thresholds) {
     const min = parseFloat(threshold.min);
     const max = parseFloat(threshold.max);
 
-    // Handle edge case where max might be 0 or less than min (e.g., SINR "21 to 0")
     if (max > min) {
       if (value >= min && value < max) {
         return threshold.color;
       }
     } else {
-      // If max <= min, it might mean "greater than min"
       if (value >= min) {
         return threshold.color;
       }
     }
   }
 
-  // If no range matched, find the closest one
   const sortedThresholds = [...thresholds].sort(
     (a, b) => parseFloat(b.max) - parseFloat(a.max)
   );
 
-  // Check if value is above all ranges
   const highestMax = Math.max(...thresholds.map((t) => parseFloat(t.max)));
   if (value >= highestMax) {
     return sortedThresholds[0].color;
   }
 
-  // Check if value is below all ranges
   const lowestMin = Math.min(...thresholds.map((t) => parseFloat(t.min)));
   if (value < lowestMin) {
     return (
@@ -163,7 +151,6 @@ const getColorFromThresholds = (value, thresholds) => {
   return "#808080";
 };
 
-// Convert thresholds to legend format
 const thresholdsToLegend = (thresholds, metric) => {
   if (!thresholds || !Array.isArray(thresholds) || thresholds.length === 0) {
     return null;
@@ -171,15 +158,13 @@ const thresholdsToLegend = (thresholds, metric) => {
 
   const unit = getMetricUnit(metric);
 
-  // Sort by min value descending (best signal first for display typically)
-  // But for RSRP/RSRQ (negative values), we want to sort differently
   const isNegativeMetric = ["RSRP", "RSRQ"].includes(metric?.toUpperCase());
 
   const sorted = [...thresholds].sort((a, b) => {
     if (isNegativeMetric) {
-      return parseFloat(b.min) - parseFloat(a.min); // Higher (less negative) first
+      return parseFloat(b.min) - parseFloat(a.min);
     }
-    return parseFloat(b.min) - parseFloat(a.min); // Higher first
+    return parseFloat(b.min) - parseFloat(a.min);
   });
 
   return sorted.map((t) => ({
@@ -190,11 +175,6 @@ const thresholdsToLegend = (thresholds, metric) => {
   }));
 };
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-// Convert coordinates to WKT Polygon
 const coordinatesToWktPolygon = (coords) => {
   if (!Array.isArray(coords) || coords.length < 3) return null;
   const pointsString = coords.map((p) => `${p.lng} ${p.lat}`).join(", ");
@@ -202,7 +182,6 @@ const coordinatesToWktPolygon = (coords) => {
   return `POLYGON((${pointsString}, ${firstPointString}))`;
 };
 
-// Fallback RSRP color function
 const getColorForRSRP = (rsrp) => {
   if (rsrp >= -80) return "#00FF00";
   if (rsrp >= -90) return "#FFFF00";
@@ -211,7 +190,6 @@ const getColorForRSRP = (rsrp) => {
   return "#FF0000";
 };
 
-// Fallback RSRQ color function
 const getColorForRSRQ = (rsrq) => {
   if (rsrq >= -10) return "#00FF00";
   if (rsrq >= -15) return "#7FFF00";
@@ -220,7 +198,6 @@ const getColorForRSRQ = (rsrq) => {
   return "#FF0000";
 };
 
-// Fallback SINR color function
 const getColorForSINR = (sinr) => {
   if (sinr >= 20) return "#00FF00";
   if (sinr >= 13) return "#7FFF00";
@@ -229,18 +206,15 @@ const getColorForSINR = (sinr) => {
   return "#FF0000";
 };
 
-// Get color for any metric (with optional dynamic thresholds)
 const getColorForMetric = (value, metric, thresholds = null) => {
   if (value === null || value === undefined || isNaN(value)) {
-    return "#808080"; // Gray for invalid values
+    return "#808080";
   }
 
-  // Use dynamic thresholds if available
   if (thresholds && Array.isArray(thresholds) && thresholds.length > 0) {
     return getColorFromThresholds(value, thresholds);
   }
 
-  // Fallback to static thresholds
   switch (metric?.toUpperCase()) {
     case "RSRP":
       return getColorForRSRP(value);
@@ -258,15 +232,11 @@ const getColorForMetric = (value, metric, thresholds = null) => {
   }
 };
 
-// Get metric value from log
 const getMetricValue = (log, metric) => {
   const metricKey = metric?.toLowerCase() || "rsrp";
   return log[metricKey] ?? log.rsrp ?? -120;
 };
 
-// ============================================
-// CANVAS CIRCLES OVERLAY COMPONENT
-// ============================================
 function CanvasCirclesOverlay({
   map,
   logs,
@@ -329,12 +299,10 @@ function CanvasCirclesOverlay({
               const x = pixel.x - sw.x;
               const y = pixel.y - ne.y;
 
-              // Get metric value based on selected metric
               const metricValue = getMetricValue(pt, metric);
 
               ctx.beginPath();
               ctx.arc(x, y, radius, 0, Math.PI * 2);
-              // Use dynamic thresholds if available
               ctx.fillStyle = getColorForMetric(
                 metricValue,
                 metric,
@@ -382,9 +350,6 @@ function CanvasCirclesOverlay({
   return null;
 }
 
-// ============================================
-// ACTIVE FILTERS BAR COMPONENT
-// ============================================
 function ActiveFiltersBar({
   filters,
   onClearFilter,
@@ -480,28 +445,24 @@ function ActiveFiltersBar({
   );
 }
 
-// ============================================
-// LEGEND COMPONENT
-// ============================================
 function MapLegend({ metric = "RSRP", thresholds = null }) {
-  // Default/fallback legends
   const defaultLegends = {
     RSRP: [
-      { color: "#00FF00", label: "≥ -80 dBm (Excellent)" },
+      { color: "#00FF00", label: ">= -80 dBm (Excellent)" },
       { color: "#FFFF00", label: "-80 to -90 dBm (Good)" },
       { color: "#FFA500", label: "-90 to -100 dBm (Fair)" },
       { color: "#FF6600", label: "-100 to -110 dBm (Poor)" },
       { color: "#FF0000", label: "< -110 dBm (No Signal)" },
     ],
     RSRQ: [
-      { color: "#00FF00", label: "≥ -10 dB (Excellent)" },
+      { color: "#00FF00", label: ">= -10 dB (Excellent)" },
       { color: "#7FFF00", label: "-10 to -15 dB (Good)" },
       { color: "#FFFF00", label: "-15 to -20 dB (Fair)" },
       { color: "#FFA500", label: "-20 to -25 dB (Poor)" },
       { color: "#FF0000", label: "< -25 dB (Bad)" },
     ],
     SINR: [
-      { color: "#00FF00", label: "≥ 20 dB (Excellent)" },
+      { color: "#00FF00", label: ">= 20 dB (Excellent)" },
       { color: "#7FFF00", label: "13 to 20 dB (Good)" },
       { color: "#FFFF00", label: "0 to 13 dB (Fair)" },
       { color: "#FFA500", label: "-5 to 0 dB (Poor)" },
@@ -509,7 +470,6 @@ function MapLegend({ metric = "RSRP", thresholds = null }) {
     ],
   };
 
-  // Convert dynamic thresholds to legend format
   const dynamicLegend = useMemo(() => {
     return thresholdsToLegend(thresholds, metric);
   }, [thresholds, metric]);
@@ -540,41 +500,37 @@ function MapLegend({ metric = "RSRP", thresholds = null }) {
   );
 }
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
 function SessionMapDebug() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Data State
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [map, setMap] = useState(null);
   const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0 });
   const [analysis, setAnalysis] = useState(null);
-  const [appSummary, setAppSummary] = useState(null); // NEW: App Summary State
+  const [appSummary, setAppSummary] = useState(null);
 
-  // Save Polygon State
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [polygonName, setPolygonName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Threshold State
-  const [allThresholds, setAllThresholds] = useState(null); // Raw API response data
-  const [currentThresholds, setCurrentThresholds] = useState(null); // Parsed thresholds for current metric
+  const [allThresholds, setAllThresholds] = useState(null);
+  const [currentThresholds, setCurrentThresholds] = useState(null);
 
-  // Show/Hide Legend
   const [showLegend, setShowLegend] = useState(true);
 
-  // Get context values
+  // FIX #3: Add state for session markers
+  const [sessionMarkers, setSessionMarkers] = useState([]);
+
   const {
     ui,
     updateUI,
     setDownloadHandlers,
     setPolygonStats,
     setHasLogs,
+    hasLogs,
     filters,
     resetFilter,
     clearFilters,
@@ -582,7 +538,6 @@ function SessionMapDebug() {
     updateAvailableFilters,
   } = useMapContext();
 
-  // Parse session IDs from URL
   const sessionIdParam =
     searchParams.get("sessionId") || searchParams.get("sessionIds");
 
@@ -594,16 +549,15 @@ function SessionMapDebug() {
       .filter((id) => id && id !== "undefined" && id !== "null");
   }, [sessionIdParam]);
 
-  // Load Google Maps
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
-  // Safe UI with defaults
+  // FIX #2: Changed default drawCellSizeMeters from 100 to 10
   const safeUi = useMemo(
     () => ({
       drawEnabled: false,
       shapeMode: "polygon",
       drawPixelateRect: false,
-      drawCellSizeMeters: 100,
+      drawCellSizeMeters: 5, 
       drawClearSignal: 0,
       colorizeCells: true,
       ...ui,
@@ -611,22 +565,35 @@ function SessionMapDebug() {
     [ui]
   );
 
-  // ============================================
-  // FETCH THRESHOLDS ON MOUNT
-  // ============================================
+  // FIX #4: Updated formattedThresholds to handle both naming conventions
+  const formattedThresholds = useMemo(() => {
+    if (!allThresholds) return {};
+    return {
+      rsrp: parseThresholds(allThresholds.rsrp_json),
+      rsrq: parseThresholds(allThresholds.rsrq_json),
+      sinr: parseThresholds(allThresholds.sinr_json),
+      // Handle both dl_thpt_json and dl_tpt_json naming
+      dl_thpt: parseThresholds(allThresholds.dl_thpt_json || allThresholds.dl_tpt_json),
+      ul_thpt: parseThresholds(allThresholds.ul_thpt_json || allThresholds.ul_tpt_json),
+      // Also add alternative keys for compatibility
+      dl_tpt: parseThresholds(allThresholds.dl_thpt_json || allThresholds.dl_tpt_json),
+      ul_tpt: parseThresholds(allThresholds.ul_thpt_json || allThresholds.ul_tpt_json),
+      mos: parseThresholds(allThresholds.mos_json),
+      lte_bler: parseThresholds(allThresholds.lte_bler_json),
+    };
+  }, [allThresholds]);
+
   useEffect(() => {
     const fetchThresholds = async () => {
       try {
         const response = await settingApi.getThresholdSettings();
         console.log("Thresholds response:", response);
 
-        // Check for valid response
         if (!response || response.Status !== 1 || !response.Data) {
           console.warn("Failed to fetch thresholds or invalid response");
           return;
         }
 
-        // Store all threshold data
         setAllThresholds(response.Data);
       } catch (error) {
         console.error("Error fetching signal thresholds:", error);
@@ -634,11 +601,8 @@ function SessionMapDebug() {
     };
 
     fetchThresholds();
-  }, []); // Only fetch once on mount
+  }, []);
 
-  // ============================================
-  // UPDATE CURRENT THRESHOLDS WHEN METRIC CHANGES
-  // ============================================
   useEffect(() => {
     if (!allThresholds) {
       setCurrentThresholds(null);
@@ -665,17 +629,12 @@ function SessionMapDebug() {
     setCurrentThresholds(parsed);
   }, [allThresholds, filters.metric]);
 
-  // ============================================
-  // FILTER LOGS
-  // ============================================
   const filteredLogs = useMemo(() => {
     if (!logs.length) return [];
 
     return logs.filter((log) => {
-      // Get metric value based on selected metric
       const metricValue = getMetricValue(log, filters.metric);
 
-      // Signal strength filter
       if (filters.minSignal !== "" && !isNaN(parseFloat(filters.minSignal))) {
         if (metricValue < parseFloat(filters.minSignal)) {
           return false;
@@ -687,7 +646,6 @@ function SessionMapDebug() {
         }
       }
 
-      // Technology filter
       if (filters.technology && filters.technology !== "ALL") {
         if (log.technology) {
           if (
@@ -698,7 +656,6 @@ function SessionMapDebug() {
         }
       }
 
-      // Band filter
       if (filters.band && filters.band !== "") {
         if (log.band) {
           if (log.band.toString() !== filters.band) {
@@ -707,7 +664,6 @@ function SessionMapDebug() {
         }
       }
 
-      // Date filter
       if (filters.startDate || filters.endDate) {
         if (log.timestamp) {
           const logDate = new Date(log.timestamp);
@@ -724,7 +680,6 @@ function SessionMapDebug() {
         }
       }
 
-      // Data source filter
       if (filters.dataSource && filters.dataSource !== "all") {
         if (log.source) {
           if (log.source.toLowerCase() !== filters.dataSource.toLowerCase()) {
@@ -737,7 +692,6 @@ function SessionMapDebug() {
     });
   }, [logs, filters]);
 
-  // Show toast when filters change and affect count
   const prevFilteredCountRef = useRef(0);
   useEffect(() => {
     if (
@@ -757,9 +711,6 @@ function SessionMapDebug() {
     }
   }, [filteredLogs.length, logs.length]);
 
-  // ============================================
-  // HANDLE CLEAR FILTER
-  // ============================================
   const handleClearFilter = useCallback(
     (key) => {
       resetFilter(key);
@@ -767,9 +718,6 @@ function SessionMapDebug() {
     [resetFilter]
   );
 
-  // ============================================
-  // SAVE POLYGON HANDLER
-  // ============================================
   const handleSavePolygon = async () => {
     if (!analysis || !analysis.geometry) {
       toast.warn("No analysis data or geometry found to save.");
@@ -842,9 +790,6 @@ function SessionMapDebug() {
     }
   };
 
-  // ============================================
-  // DOWNLOAD HANDLERS
-  // ============================================
   const handleStatsDownload = useCallback(() => {
     if (filteredLogs.length === 0) {
       toast.error("No data to download");
@@ -919,7 +864,7 @@ function SessionMapDebug() {
       headers.join(","),
       ...filteredLogs.map((l) =>
         [
-          l.sessionId || "",
+          l.session_id || "",
           l.lat || "",
           l.lng || "",
           l.rsrp || "",
@@ -944,7 +889,6 @@ function SessionMapDebug() {
     toast.success(`Downloaded ${filteredLogs.length} points!`);
   }, [filteredLogs]);
 
-  // Register handlers using ref to avoid re-renders
   const handlersRef = useRef({
     stats: handleStatsDownload,
     raw: handleRawDownload,
@@ -959,9 +903,6 @@ function SessionMapDebug() {
     });
   }, [setDownloadHandlers]);
 
-  // ============================================
-  // UPDATE POLYGON STATS WHEN FILTERED LOGS CHANGE
-  // ============================================
   const prevLogsLengthRef = useRef(0);
   useEffect(() => {
     if (filteredLogs.length !== prevLogsLengthRef.current) {
@@ -1000,9 +941,6 @@ function SessionMapDebug() {
     }
   }, [filteredLogs.length, sessionIds, setPolygonStats, setHasLogs, filters]);
 
-  // ============================================
-  // FETCH DATA - UPDATED WITH APP SUMMARY
-  // ============================================
   useEffect(() => {
     const fetchData = async () => {
       if (sessionIds.length === 0) {
@@ -1014,12 +952,14 @@ function SessionMapDebug() {
       setLoading(true);
       setError(null);
       const allPoints = [];
-      let mergedAppSummary = {}; // NEW: To accumulate app data across sessions
+      let mergedAppSummary = {};
 
-      // Accumulate unique values across ALL sessions
       const allProviders = new Set();
       const allBands = new Set();
       const allNetworkTypes = new Set();
+
+      // FIX #3: Create session markers array
+      const markers = [];
 
       for (let i = 0; i < sessionIds.length; i++) {
         setFetchProgress({ current: i + 1, total: sessionIds.length });
@@ -1029,7 +969,6 @@ function SessionMapDebug() {
             session_id: sessionIds[i],
           });
 
-          // NEW: Check if the response contains app_summary data
           if (response?.app_summary) {
             mergedAppSummary = { ...mergedAppSummary, ...response.app_summary };
           }
@@ -1044,18 +983,17 @@ function SessionMapDebug() {
 
           const points = rawData
             .map((log, idx) => {
-              // Extract and normalize data
               const providerValue = normalizeProviderName(
                 log.m_alpha_long || log.Provider
               );
               const bandValue = log.band || log.Band;
               const techValue = normalizeTechName(log.network);
 
-              // Add to sets (will automatically handle duplicates)
               if (providerValue) allProviders.add(providerValue);
               if (bandValue) allBands.add(String(bandValue));
               if (techValue) allNetworkTypes.add(techValue);
 
+              // FIX #1: Changed sessionId to session_id (with underscore)
               return {
                 lat: parseFloat(
                   log.lat || log.Lat || log.latitude || log.Latitude
@@ -1084,7 +1022,7 @@ function SessionMapDebug() {
                 source: log.source || log.Source || log.dataSource || "",
                 pci: log.pci || log.PCI || "",
                 cellId: log.cellId || log.CellId || log.cell_id || "",
-                sessionId: sessionIds[i],
+                session_id: sessionIds[i], // FIX #1: Changed from sessionId to session_id
                 id: `${sessionIds[i]}-${idx}`,
               };
             })
@@ -1094,13 +1032,25 @@ function SessionMapDebug() {
             );
 
           allPoints.push(...points);
+
+          // FIX #3: Create a session marker for each session
+          if (points.length > 0) {
+            const firstPoint = points[0];
+            markers.push({
+              id: sessionIds[i],
+              session_id: sessionIds[i],
+              lat: firstPoint.lat,
+              lng: firstPoint.lng,
+              position: { lat: firstPoint.lat, lng: firstPoint.lng },
+              logsCount: points.length,
+            });
+          }
         } catch (err) {
           console.error(`Error fetching session ${sessionIds[i]}:`, err);
           toast.error(`Failed to fetch session ${sessionIds[i]}`);
         }
       }
 
-      // Set state AFTER processing all sessions, filter out empty values
       const providerArray = Array.from(allProviders).filter(
         (p) => p && p !== "undefined" && p !== "null"
       );
@@ -1131,20 +1081,17 @@ function SessionMapDebug() {
         );
       }
 
-      // Update aggregate states
       setLogs(allPoints);
+      setSessionMarkers(markers); // FIX #3: Set session markers
       setAppSummary(
         Object.keys(mergedAppSummary).length > 0 ? mergedAppSummary : null
-      ); // NEW: Set app summary
+      );
       setLoading(false);
     };
 
     fetchData();
   }, [sessionIds.join(",")]);
 
-  // ============================================
-  // AUTO-FIT MAP TO FILTERED LOGS
-  // ============================================
   useEffect(() => {
     if (map && filteredLogs.length > 0 && window.google) {
       const bounds = new window.google.maps.LatLngBounds();
@@ -1153,9 +1100,6 @@ function SessionMapDebug() {
     }
   }, [map, filteredLogs.length]);
 
-  // ============================================
-  // STABLE CALLBACKS
-  // ============================================
   const onMapLoad = useCallback((m) => setMap(m), []);
   const onMapUnmount = useCallback(() => setMap(null), []);
 
@@ -1175,7 +1119,6 @@ function SessionMapDebug() {
     setPolygonStats(null);
   }, [setPolygonStats]);
 
-  // Map center based on filtered logs
   const mapCenter = useMemo(() => {
     if (filteredLogs.length > 0) {
       return { lat: filteredLogs[0].lat, lng: filteredLogs[0].lng };
@@ -1183,9 +1126,6 @@ function SessionMapDebug() {
     return DEFAULT_CENTER;
   }, [filteredLogs]);
 
-  // ============================================
-  // LOADING STATE
-  // ============================================
   if (!isLoaded || loading) {
     return (
       <div className="flex items-center justify-center h-screen w-screen bg-gray-900">
@@ -1213,9 +1153,6 @@ function SessionMapDebug() {
     );
   }
 
-  // ============================================
-  // ERROR STATE
-  // ============================================
   if (loadError || error) {
     return (
       <div className="flex items-center justify-center h-screen w-screen bg-gray-900 text-white">
@@ -1230,9 +1167,6 @@ function SessionMapDebug() {
     );
   }
 
-  // ============================================
-  // MAIN RENDER
-  // ============================================
   return (
     <div
       style={{
@@ -1242,7 +1176,6 @@ function SessionMapDebug() {
         overflow: "hidden",
       }}
     >
-      {/* Google Map */}
       <GoogleMap
         mapContainerStyle={containerStyle}
         center={mapCenter}
@@ -1251,7 +1184,6 @@ function SessionMapDebug() {
         onUnmount={onMapUnmount}
         options={MAP_OPTIONS}
       >
-        {/* Canvas Overlay for Points - Now with dynamic thresholds */}
         {map && filteredLogs.length > 0 && (
           <CanvasCirclesOverlay
             map={map}
@@ -1261,14 +1193,13 @@ function SessionMapDebug() {
           />
         )}
 
-        {/* Drawing Tools Layer */}
         {map && (
           <DrawingToolsLayer
             map={map}
             enabled={safeUi.drawEnabled}
             logs={filteredLogs}
-            sessions={EMPTY_ARRAY}
-            thresholds={currentThresholds || EMPTY_OBJECT}
+            sessions={sessionMarkers} // FIX #3: Pass actual session markers instead of EMPTY_ARRAY
+            thresholds={formattedThresholds}
             selectedMetric={filters.metric?.toLowerCase() || "rsrp"}
             shapeMode={safeUi.shapeMode}
             pixelateRect={safeUi.drawPixelateRect}
@@ -1281,7 +1212,14 @@ function SessionMapDebug() {
         )}
       </GoogleMap>
 
-      {/* NEW: Detailed Logs Summary Panel (Aggregate View) */}
+      <DrawingControlsPanel
+        position="top-right"
+        ui={ui}
+        onUIChange={updateUI}
+        hasLogs={hasLogs}
+        polygonStats={analysis}
+      />
+
       <AllLogsPanelToggle
         logs={filteredLogs}
         thresholds={
@@ -1290,8 +1228,8 @@ function SessionMapDebug() {
                 rsrp: parseThresholds(allThresholds.rsrp_json),
                 rsrq: parseThresholds(allThresholds.rsrq_json),
                 sinr: parseThresholds(allThresholds.sinr_json),
-                dl_thpt: parseThresholds(allThresholds.dl_thpt_json),
-                ul_thpt: parseThresholds(allThresholds.ul_thpt_json),
+                dl_thpt: parseThresholds(allThresholds.dl_thpt_json || allThresholds.dl_tpt_json),
+                ul_thpt: parseThresholds(allThresholds.ul_thpt_json || allThresholds.ul_tpt_json),
                 mos: parseThresholds(allThresholds.mos_json),
               }
             : {}
@@ -1301,19 +1239,15 @@ function SessionMapDebug() {
         appSummary={appSummary}
       />
 
-      {/* Active Filters Bar */}
       {hasActiveFilters && (
-        <>
-          <ActiveFiltersBar
-            filters={filters}
-            onClearFilter={handleClearFilter}
-            onClearAll={clearFilters}
-            className="absolute top-4 left-4 z-20 max-w-lg"
-          />
-        </>
+        <ActiveFiltersBar
+          filters={filters}
+          onClearFilter={handleClearFilter}
+          onClearAll={clearFilters}
+          className="absolute top-4 left-4 z-20 max-w-lg"
+        />
       )}
 
-      {/* Legend - Now with dynamic thresholds */}
       {showLegend && (
         <div className="absolute top-20 right-4 z-20">
           <MapLegend
@@ -1323,7 +1257,6 @@ function SessionMapDebug() {
         </div>
       )}
 
-      {/* No Data Message */}
       {filteredLogs.length === 0 && logs.length > 0 && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-6 py-4 text-center">
           <Filter className="h-8 w-8 text-gray-400 mx-auto mb-2" />
@@ -1339,10 +1272,8 @@ function SessionMapDebug() {
         </div>
       )}
 
-      {/* Analysis Panel */}
       {analysis && (
         <div className="absolute bottom-4 left-4 z-30 bg-white rounded-lg shadow-lg w-[300px] border border-gray-200">
-          {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 bg-blue-600 rounded-t-lg">
             <h3 className="font-semibold text-white text-sm">
               Selection Analysis
@@ -1355,9 +1286,7 @@ function SessionMapDebug() {
             </button>
           </div>
 
-          {/* Content */}
           <div className="p-3 text-xs space-y-2">
-            {/* Basic Info Grid */}
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-gray-50 rounded px-2 py-1.5">
                 <div className="text-[10px] text-gray-500 uppercase tracking-wide">
@@ -1377,7 +1306,6 @@ function SessionMapDebug() {
               </div>
             </div>
 
-            {/* Stats */}
             {analysis.stats?.mean !== undefined && (
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-blue-50 rounded px-2 py-1.5 border border-blue-100">
@@ -1419,7 +1347,6 @@ function SessionMapDebug() {
               </div>
             )}
 
-            {/* Area info if available */}
             {analysis.area > 0 && (
               <div className="bg-gray-50 rounded px-2 py-1.5">
                 <div className="text-[10px] text-gray-500 uppercase tracking-wide">
@@ -1427,23 +1354,21 @@ function SessionMapDebug() {
                 </div>
                 <div className="font-medium text-gray-800">
                   {analysis.area > 1000000
-                    ? `${(analysis.area / 1000000).toFixed(2)} km²`
-                    : `${analysis.area.toFixed(0)} m²`}
+                    ? `${(analysis.area / 1000000).toFixed(2)} km2`
+                    : `${analysis.area.toFixed(0)} m2`}
                 </div>
               </div>
             )}
 
-            {/* Active filters info */}
             {hasActiveFilters && (
               <div className="bg-yellow-50 rounded px-2 py-1.5 border border-yellow-100">
                 <div className="text-[10px] text-yellow-700">
-                  ⚠️ Analysis based on filtered data
+                  Analysis based on filtered data
                 </div>
               </div>
             )}
           </div>
 
-          {/* Actions */}
           <div className="px-3 py-2 border-t border-gray-200 bg-gray-50 rounded-b-lg flex gap-2">
             <Button
               size="sm"
@@ -1467,7 +1392,6 @@ function SessionMapDebug() {
         </div>
       )}
 
-      {/* Save Polygon Dialog */}
       <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
         <DialogContent className="sm:max-w-[425px] bg-white text-gray-900">
           <DialogHeader>
@@ -1499,7 +1423,7 @@ function SessionMapDebug() {
                   <span className="capitalize font-medium">
                     {analysis.type}
                   </span>{" "}
-                  • Points:{" "}
+                  - Points:{" "}
                   <span className="font-medium">{analysis.count || 0}</span>
                 </div>
                 {analysis.stats?.mean && (

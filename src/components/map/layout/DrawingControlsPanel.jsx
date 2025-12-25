@@ -87,7 +87,7 @@ const DrawingControlsPanel = memo(function DrawingControlsPanel({
   }, [onUIChange]);
 
   const handleCellSizeChange = useCallback((e) => {
-    onUIChange?.({ drawCellSizeMeters: Math.max(10, Number(e.target.value || 100)) });
+    onUIChange?.({ drawCellSizeMeters: Math.max(1, Number(e.target.value || 20)) });
   }, [onUIChange]);
 
   const handleFetchClick = useCallback(() => {
@@ -220,8 +220,8 @@ const DrawingControlsPanel = memo(function DrawingControlsPanel({
               <Label className="text-xs text-gray-700">Cell size:</Label>
               <input
                 type="number"
-                min={10}
-                step={10}
+                min={1}
+                step={5}
                 value={safeUi.drawCellSizeMeters ?? 100}
                 onChange={handleCellSizeChange}
                 className="w-20 border border-gray-300 rounded px-2 py-1 text-sm outline-none disabled:bg-gray-100"

@@ -11,7 +11,9 @@ export const PCI_COLOR_PALETTE = [
 // ✅ Color schemes for "Color By" options (Provider, Technology, Band)
 export const COLOR_SCHEMES = {
   provider: {
-    JIO: "#3B82F6",        // Blue
+    JIO: "#3B82F6", 
+    Jio: "#3B82F6",
+    jio: "#3B82F6",       // Blue
     Airtel: "#EF4444",     // Red
     "IND airtel": "#EF4444",
     "Vi India": "#22C55E", // Green
@@ -31,21 +33,79 @@ export const COLOR_SCHEMES = {
     Unknown: "#F59E0B",    // Amber
   },
   band: {
-    "1": "#EF4444",
-  "2": "#F59E0B",
-  "3": "#EF4444",
-  "5": "#F59E0B",
-  "7": "#10B981",
-  "8": "#10B981",
-  "20": "#0EA5E9",
-  "38": "#14B8A6",
-  "40": "#3B82F6",
-  "41": "#8B5CF6",
-  "42": "#6366F1",
-  "n28": "#EC4899",
-  "n78": "#F472B6",
-  "n258": "#D946EF",
-  "Unknown": "#6B7280"
+    1: "#EF4444",
+  B1: "#EF4444",
+
+  2: "#F59E0B",
+  B2: "#F59E0B",
+
+  3: "#EF4444",
+  B3: "#EF4444",
+
+  4: "#F59E0B",
+  B4: "#F59E0B",
+
+  5: "#F59E0B",
+  B5: "#F59E0B",
+
+  6: "#EF4444",
+  B6: "#EF4444",
+
+  8: "#10B981",
+  B8: "#10B981",
+
+  9: "#F59E0B",
+  B9: "#F59E0B",
+
+  19: "#EF4444",
+  B19: "#EF4444",
+
+  // ---------- 4G (LTE) ----------
+  7: "#10B981",
+  B7: "#10B981",
+
+  12: "#3B82F6",
+  B12: "#3B82F6",
+
+  13: "#3B82F6",
+  B13: "#3B82F6",
+
+  17: "#3B82F6",
+  B17: "#3B82F6",
+
+  18: "#10B981",
+  B18: "#10B981",
+
+  20: "#3B82F6",
+  B20: "#3B82F6",
+
+  25: "#8B5CF6",
+  B25: "#8B5CF6",
+
+  26: "#8B5CF6",
+  B26: "#8B5CF6",
+
+  28: "#EC4899",
+  B28: "#EC4899",
+
+  38: "#6366F1",
+  B38: "#6366F1",
+
+  39: "#6366F1",
+  B39: "#6366F1",
+
+  40: "#3B82F6",
+  B40: "#3B82F6",
+
+  41: "#8B5CF6",
+  B41: "#8B5CF6",
+
+  // ---------- 5G (already present, kept for compatibility) ----------
+  n28: "#EC4899",
+  n78: "#F472B6",
+
+  // ---------- Fallback ----------
+  Unknown: "#6B7280",
   },
 };
 

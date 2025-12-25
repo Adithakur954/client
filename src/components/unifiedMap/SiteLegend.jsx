@@ -16,7 +16,7 @@ export default function SiteLegend({ enabled }) {
   if (!enabled) return null;
 
   return (
-    <div className="absolute top-28 left-4 z-10">
+    <div className="absolute bottom-38 right-4 z-10">
       <div className="bg-gray-900/95 backdrop-blur-lg border border-gray-700/40 rounded-lg shadow-xl min-w-[160px] max-w-[200px]">
         {/* Header */}
         <button

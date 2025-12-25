@@ -67,6 +67,29 @@ export const cellSiteApi = {
   /**
    * Verify project exists
    */
+
+  checkSiteData: async (projectId) => {
+  try {
+    console.log(`🔍 Checking site data for project ${projectId}...`);
+    const response = await pythonApi.get(`/api/cell-site/site-noml/${projectId}`);
+    
+    const count = response?.count || response?.data?.length || 0;
+    console.log(`✅ Site data check: ${count} records found`);
+    
+    return {
+      exists: count > 0,
+      count: count,
+      data: response
+    };
+  } catch (error) {
+    // 404 means no data exists
+    if (error.response?.status === 404) {
+      return { exists: false, count: 0 };
+    }
+    console.error('❌ Check site data error:', error);
+    return { exists: false, count: 0, error: error.message };
+  }
+},
   verifyProject: async (projectId) => {
     try {
       console.log(`🔍 Verifying project ${projectId} exists...`);
@@ -300,14 +323,6 @@ export const areaBreakdownApi = {
 };
 
 export const predictionApi = {
-  /**
-   * Run LTE Prediction Pipeline
-   * @param {Object} params - Prediction parameters
-   * @param {number} params.Project_id - Project ID
-   * @param {number[]} params.Session_ids - Array of session IDs
-   * @param {string} [params.indoor_mode='heuristic'] - Indoor mode (optional)
-   * @returns {Promise<Object>} Prediction result
-   */
   runPrediction: async (params) => {
     try {
       console.log('🚀 Starting LTE Prediction Pipeline...');
@@ -323,7 +338,8 @@ export const predictionApi = {
       const payload = {
         Project_id: params.Project_id,
         Session_ids: params.Session_ids,
-        indoor_mode: params.indoor_mode || 'heuristic'
+        indoor_mode: params.indoor_mode || 'heuristic',
+        grid: params.grid || 22.0, // ✅ ADDED grid parameter
       };
 
       const response = await pythonApi.post('/api/prediction/run', payload, {
@@ -345,6 +361,94 @@ export const predictionApi = {
       
       throw error;
     }
+  },
+
+  /**
+   * ✅ NEW: Debug database - check tables and data for a project
+   */
+  debugDatabase: async (projectId) => {
+    try {
+      console.log(`🔍 Debugging database for project ${projectId}...`);
+      const response = await pythonApi.get(`/api/prediction/debug-db/${projectId}`);
+      console.log('📊 Database debug result:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ Debug database error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ✅ NEW: Verify site data exists for a project
+   */
+  verifySiteData: async (projectId) => {
+    try {
+      console.log(`🔍 Verifying site data for project ${projectId}...`);
+      const response = await pythonApi.get(`/api/prediction/debug-db/${projectId}`);
+      
+      const result = {
+        hasData: (response?.site_noMl_count || 0) > 0,
+        count: response?.site_noMl_count || 0,
+        projectExists: response?.project_exists === "YES",
+        tables: response?.all_tables || [],
+        details: response,
+      };
+      
+      console.log('📊 Site data verification result:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Verify site data error:', error);
+      return {
+        hasData: false,
+        count: 0,
+        projectExists: false,
+        error: error.message,
+      };
+    }
+  },
+
+  /**
+   * ✅ NEW: Wait for site data to be available (with retries)
+   */
+  waitForSiteData: async (projectId, maxRetries = 5, delayMs = 2000) => {
+    console.log(`⏳ Waiting for site data (max ${maxRetries} attempts, ${delayMs}ms delay)...`);
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      console.log(`📊 Checking site data (attempt ${attempt}/${maxRetries})...`);
+      
+      try {
+        const result = await predictionApi.verifySiteData(projectId);
+        
+        if (result.hasData && result.count > 0) {
+          console.log(`✅ Found ${result.count} site records after ${attempt} attempt(s)`);
+          return { 
+            success: true, 
+            count: result.count, 
+            attempts: attempt,
+            details: result 
+          };
+        }
+        
+        if (attempt < maxRetries) {
+          console.log(`⏳ No data yet, waiting ${delayMs}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      } catch (error) {
+        console.error(`❌ Attempt ${attempt} failed:`, error.message);
+        
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    
+    console.error('❌ Site data not available after all retries');
+    return { 
+      success: false, 
+      count: 0, 
+      attempts: maxRetries,
+      error: 'Site data not found after retries' 
+    };
   },
 
   /**
@@ -468,6 +572,7 @@ export const mapViewApi = {
   signup: (user) => api.post("/api/MapView/user_signup", user),
   startSession: (data) => api.post("/api/MapView/start_session", data),
   endSession: (data) => api.post("/api/MapView/end_session", data),
+  getDuration: ({sessionIds}) => api.get(`/api/MapView/session/provider-network-time/combined`,{ params: { sessionIds } }),
 
   // ==================== Polygon Management ====================
   getProjectPolygons: (projectId) =>

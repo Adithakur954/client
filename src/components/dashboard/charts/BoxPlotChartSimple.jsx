@@ -2,7 +2,6 @@
 import React, { useMemo, useState } from 'react';
 import { Settings, Download, Activity, TrendingUp, AlertCircle } from 'lucide-react';
 import { useBoxData } from '@/hooks/useDashboardData';
-import { METRICS } from '@/components/constants/dashboardConstants';
 import Spinner from '@/components/common/Spinner';
 
 // Operator colors
@@ -14,6 +13,45 @@ const OPERATOR_COLORS = {
   'Vodafone': '#E60000',
   'Idea': '#FFD700',
   'default': '#6366f1'
+};
+
+// Metric configurations with correct units and domains
+const METRIC_CONFIG = {
+  rsrp: {
+    value: 'rsrp',
+    label: 'RSRP',
+    unit: 'dBm',
+    domain: [-140, -60],
+    description: 'Reference Signal Received Power'
+  },
+  rsrq: {
+    value: 'rsrq',
+    label: 'RSRQ',
+    unit: 'dB',
+    domain: [-20, -3],
+    description: 'Reference Signal Received Quality'
+  },
+  sinr: {
+    value: 'sinr',
+    label: 'SINR',
+    unit: 'dB',
+    domain: [-10, 30],
+    description: 'Signal to Interference & Noise Ratio'
+  },
+  dl_tpt: {
+    value: 'dl_tpt',
+    label: 'DL Throughput',
+    unit: 'Mbps',
+    domain: [0, 100],
+    description: 'Download Throughput'
+  },
+  ul_tpt: {
+    value: 'ul_tpt',
+    label: 'UL Throughput',
+    unit: 'Mbps',
+    domain: [0, 50],
+    description: 'Upload Throughput'
+  }
 };
 
 const getOperatorColor = (name) => {
@@ -38,16 +76,12 @@ const BoxPlotChartSimple = () => {
   const [selectedMetric, setSelectedMetric] = useState('rsrp');
   const [showSettings, setShowSettings] = useState(false);
 
-  // Fetch data - pass string directly
+  // Fetch data
   const { data: boxData, isLoading, error } = useBoxData(selectedMetric);
 
   // Get metric configuration
   const metricConfig = useMemo(() => {
-    return METRICS?.find(m => m.value === selectedMetric) || {
-      label: 'RSRP',
-      unit: 'dBm',
-      domain: [-120, -60]
-    };
+    return METRIC_CONFIG[selectedMetric] || METRIC_CONFIG.rsrp;
   }, [selectedMetric]);
 
   // Validate and filter data
@@ -62,22 +96,21 @@ const BoxPlotChartSimple = () => {
       Number.isFinite(d.Q1) &&
       Number.isFinite(d.Q3) &&
       Number.isFinite(d.Median) &&
-      d.max > d.min // Ensure valid range
+      d.max > d.min
     );
   }, [boxData]);
 
   // Calculate Y-axis domain from VALID data
   const yDomain = useMemo(() => {
     if (validData.length === 0) {
-      return metricConfig.domain || [-120, -60];
+      return metricConfig.domain;
     }
     
     const allMin = Math.min(...validData.map(d => d.min));
     const allMax = Math.max(...validData.map(d => d.max));
     
-    // Ensure we have a valid range
     if (!Number.isFinite(allMin) || !Number.isFinite(allMax) || allMin >= allMax) {
-      return metricConfig.domain || [-120, -60];
+      return metricConfig.domain;
     }
     
     const padding = Math.abs(allMax - allMin) * 0.15;
@@ -89,22 +122,38 @@ const BoxPlotChartSimple = () => {
     const range = max - min;
     if (range <= 0 || !Number.isFinite(value)) return 0;
     const percent = ((value - min) / range) * 100;
-    return Math.max(0, Math.min(100, percent)); // Clamp between 0-100
+    return Math.max(0, Math.min(100, percent));
+  };
+
+  // Format value with appropriate precision based on metric
+  const formatValue = (value, metric) => {
+    if (!Number.isFinite(value)) return 'N/A';
+    
+    switch (metric) {
+      case 'dl_tpt':
+      case 'ul_tpt':
+        return value.toFixed(2); // More precision for throughput
+      case 'rsrp':
+      case 'rsrq':
+      case 'sinr':
+      default:
+        return value.toFixed(1);
+    }
   };
 
   // Export handler
   const handleExport = () => {
     if (validData.length === 0) return;
 
-    const headers = ['Provider', 'Min', 'Q1', 'Median', 'Q3', 'Max', 'IQR', 'Samples'];
+    const headers = ['Provider', `Min (${metricConfig.unit})`, `Q1 (${metricConfig.unit})`, `Median (${metricConfig.unit})`, `Q3 (${metricConfig.unit})`, `Max (${metricConfig.unit})`, `IQR (${metricConfig.unit})`, 'Samples'];
     const rows = validData.map(item => [
       item.provider,
-      item.min?.toFixed(2),
-      item.Q1?.toFixed(2),
-      item.Median?.toFixed(2),
-      item.Q3?.toFixed(2),
-      item.max?.toFixed(2),
-      (item.Q3 - item.Q1)?.toFixed(2),
+      formatValue(item.min, selectedMetric),
+      formatValue(item.Q1, selectedMetric),
+      formatValue(item.Median, selectedMetric),
+      formatValue(item.Q3, selectedMetric),
+      formatValue(item.max, selectedMetric),
+      formatValue(item.Q3 - item.Q1, selectedMetric),
       item.samples || 'N/A'
     ]);
 
@@ -138,6 +187,9 @@ const BoxPlotChartSimple = () => {
           </h3>
           <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
             Box Plot
+          </span>
+          <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+            {metricConfig.unit}
           </span>
           {validData.length > 0 && (
             <span className="text-xs text-gray-500">
@@ -191,16 +243,15 @@ const BoxPlotChartSimple = () => {
             onChange={(e) => setSelectedMetric(e.target.value)}
             className="w-full max-w-xs px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
           >
-            {( [
-              { value: 'rsrp', label: 'RSRP' },
-              { value: 'rsrq', label: 'RSRQ' },
-              { value: 'sinr', label: 'SINR' },
-              { value: 'dl_thpt', label: 'DL Throughput' },
-              { value: 'ul_thpt', label: 'UL Throughput' },
-            ]).map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
+            {Object.values(METRIC_CONFIG).map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label} ({m.unit})
+              </option>
             ))}
           </select>
+          <p className="mt-2 text-xs text-gray-500">
+            {metricConfig.description}
+          </p>
         </div>
       )}
 
@@ -223,33 +274,28 @@ const BoxPlotChartSimple = () => {
       {/* Chart */}
       {!isLoading && !error && validData.length > 0 && (
         <div className="space-y-6">
-          
-
           {/* Visual Box Plot */}
           <div className="relative bg-gray-50 rounded-lg p-4 pt-6">
-            {/* Y-Axis */}
-            <div className="absolute left-2 top-6 bottom-12 w-12 flex flex-col justify-between text-xs text-gray-500 text-right pr-2">
-              <span>{yDomain[1]} {metricConfig.unit}</span>
+            {/* Y-Axis with unit */}
+            <div className="absolute left-0 top-6 bottom-12 w-16 flex flex-col justify-between text-xs text-gray-500 text-right pr-2">
+              <span>{yDomain[1]} <span className="text-gray-400">{metricConfig.unit}</span></span>
               <span>{Math.round((yDomain[0] + yDomain[1]) / 2)}</span>
               <span>{yDomain[0]}</span>
             </div>
 
             {/* Chart Area */}
             <div 
-              className="ml-14 mr-4 flex items-end justify-around gap-2"
+              className="ml-16 mr-4 flex items-end justify-around gap-2"
               style={{ height: '280px' }}
             >
               {validData.map((item, index) => {
                 const color = getOperatorColor(item.provider);
                 
-                // Calculate percentages safely
                 const minPercent = calcPercent(item.min, yDomain[0], yDomain[1]);
                 const q1Percent = calcPercent(item.Q1, yDomain[0], yDomain[1]);
                 const medianPercent = calcPercent(item.Median, yDomain[0], yDomain[1]);
                 const q3Percent = calcPercent(item.Q3, yDomain[0], yDomain[1]);
                 const maxPercent = calcPercent(item.max, yDomain[0], yDomain[1]);
-
-                // Ensure minimum box height for visibility
                 const boxHeight = Math.max(2, q3Percent - q1Percent);
 
                 return (
@@ -261,12 +307,10 @@ const BoxPlotChartSimple = () => {
                     {/* Tooltip area */}
                     <div 
                       className="absolute inset-0 cursor-pointer group"
-                      title={`${item.provider}\nMax: ${item.max?.toFixed(1)}\nQ3: ${item.Q3?.toFixed(1)}\nMedian: ${item.Median?.toFixed(1)}\nQ1: ${item.Q1?.toFixed(1)}\nMin: ${item.min?.toFixed(1)}\nSamples: ${item.samples?.toLocaleString()}`}
-                    >
-                      
-                    </div>
+                      title={`${item.provider}\nMax: ${formatValue(item.max, selectedMetric)} ${metricConfig.unit}\nQ3: ${formatValue(item.Q3, selectedMetric)} ${metricConfig.unit}\nMedian: ${formatValue(item.Median, selectedMetric)} ${metricConfig.unit}\nQ1: ${formatValue(item.Q1, selectedMetric)} ${metricConfig.unit}\nMin: ${formatValue(item.min, selectedMetric)} ${metricConfig.unit}\nSamples: ${item.samples?.toLocaleString() || 'N/A'}`}
+                    />
 
-                    {/* Whisker Line (Min to Max) */}
+                    {/* Whisker Line */}
                     <div
                       className="absolute left-1/2 w-0.5 -translate-x-1/2 transition-all"
                       style={{
@@ -280,19 +324,13 @@ const BoxPlotChartSimple = () => {
                     {/* Min Cap */}
                     <div
                       className="absolute left-1/2 h-0.5 w-4 -translate-x-1/2 transition-all"
-                      style={{
-                        backgroundColor: color,
-                        bottom: `${minPercent}%`
-                      }}
+                      style={{ backgroundColor: color, bottom: `${minPercent}%` }}
                     />
 
                     {/* Max Cap */}
                     <div
                       className="absolute left-1/2 h-0.5 w-4 -translate-x-1/2 transition-all"
-                      style={{
-                        backgroundColor: color,
-                        bottom: `${maxPercent}%`
-                      }}
+                      style={{ backgroundColor: color, bottom: `${maxPercent}%` }}
                     />
 
                     {/* Box (Q1 to Q3) */}
@@ -320,12 +358,9 @@ const BoxPlotChartSimple = () => {
                     {/* Median Value Label */}
                     <div
                       className="absolute left-1/2 -translate-x-1/2 text-xs font-bold whitespace-nowrap transition-all"
-                      style={{
-                        color: color,
-                        bottom: `${medianPercent + 3}%`
-                      }}
+                      style={{ color: color, bottom: `${medianPercent + 3}%` }}
                     >
-                      {item.Median?.toFixed(1)}
+                      {formatValue(item.Median, selectedMetric)}
                     </div>
 
                     {/* Provider Label */}
@@ -341,7 +376,7 @@ const BoxPlotChartSimple = () => {
             </div>
 
             {/* X-Axis Line */}
-            <div className="ml-14 mr-4 h-px bg-gray-300 mt-8" />
+            <div className="ml-16 mr-4 h-px bg-gray-300 mt-8" />
           </div>
         </div>
       )}
@@ -360,25 +395,6 @@ const BoxPlotChartSimple = () => {
       )}
 
       
-      {validData.length > 0 && (
-        <div className="mt-6 p-3 bg-gray-50 rounded-lg border">
-          <h4 className="text-xs font-semibold text-gray-600 mb-2">How to read this chart:</h4>
-          <div className="flex flex-wrap gap-6 text-xs text-gray-500">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-px bg-gray-500" style={{ borderTop: '2px dashed #666' }} />
-              <span>Whiskers (Min – Max range)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-4 bg-blue-200 border-2 border-blue-500 rounded" />
-              <span>IQR Box (Q1 – Q3, middle 50%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-1 bg-blue-600 rounded" />
-              <span>Median (50th percentile)</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

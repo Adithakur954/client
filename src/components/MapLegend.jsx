@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
-import { COLOR_SCHEMES } from '../utils/colorUtils'; // ✅ Import shared colors
+import { COLOR_SCHEMES } from '@/utils/colorUtils';
 
-// Static legend for RSRP (Signal Quality)
-const SIGNAL_LEGEND = [
+const SIGNAL_QUALITY_LEGEND = [
   { label: 'Excellent', color: '#22c55e', range: '-75 to -80 dBm' },
   { label: 'Good', color: '#86efac', range: '-82 to -85 dBm' },
   { label: 'Fair', color: '#fbbf24', range: '-90 to -95 dBm' },
@@ -10,45 +9,36 @@ const SIGNAL_LEGEND = [
   { label: 'Very Poor', color: '#ef4444', range: '-105+ dBm' },
 ];
 
+const LEGEND_CONFIG = {
+  provider: { title: 'Operators', scheme: 'provider' },
+  operator: { title: 'Operators', scheme: 'provider' },
+  technology: { title: 'Technology', scheme: 'technology' },
+  tech: { title: 'Technology', scheme: 'technology' },
+  band: { title: 'Frequency Bands', scheme: 'band' },
+};
+
+const getLegendItems = (scheme) => {
+  const colorScheme = COLOR_SCHEMES[scheme];
+  if (!colorScheme) return [];
+  
+  return Object.entries(colorScheme)
+    .filter(([key]) => key !== 'Unknown')
+    .map(([label, color]) => ({ label, color }));
+};
+
 const MapLegend = ({ 
-  colorBy = 'metric',   // 'metric', 'provider', 'technology', 'band'
-  showSignalQuality = false // boolean override if needed
+  colorBy = 'metric',   
+  showSignalQuality = false 
 }) => {
   
-  // 1. Determine which Legend to show based on colorBy
   const activeLegend = useMemo(() => {
-    // Case 1: Provider / Operator
-    if (colorBy === 'provider' || colorBy === 'operator') {
-      return {
-        title: "Operators",
-        items: Object.entries(COLOR_SCHEMES.provider)
-          .filter(([key]) => key !== 'Unknown') // Optional: Hide Unknown
-          .map(([label, color]) => ({ label, color }))
-      };
-    }
-
-    // Case 2: Technology
-    if (colorBy === 'technology' || colorBy === 'tech') {
-      return {
-        title: "Technology",
-        items: Object.entries(COLOR_SCHEMES.technology)
-          .filter(([key]) => key !== 'Unknown')
-          .map(([label, color]) => ({ label, color }))
-      };
-    }
-
-    // Case 3: Band
-    if (colorBy === 'band') {
-      return {
-        title: "Frequency Bands",
-        items: Object.entries(COLOR_SCHEMES.band)
-          .filter(([key]) => key !== 'Unknown')
-          .map(([label, color]) => ({ label, color }))
-      };
-    }
-
-    // Default: Return null if coloring by metric (Signal quality handled separately)
-    return null;
+    const config = LEGEND_CONFIG[colorBy];
+    if (!config) return null;
+    
+    return {
+      title: config.title,
+      items: getLegendItems(config.scheme)
+    };
   }, [colorBy]);
 
   const shouldShowSignal = showSignalQuality || colorBy === 'metric' || !colorBy;
@@ -61,7 +51,6 @@ const MapLegend = ({
         Map Legend
       </h3>
       
-      {/* Dynamic Category Legend (Provider/Tech/Band) */}
       {activeLegend && (
         <div className="mb-3">
           <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -71,12 +60,10 @@ const MapLegend = ({
           <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
             {activeLegend.items.map(({ label, color }) => (
               <div key={label} className="flex items-center gap-2">
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <div
-                    className="w-3 h-3 rounded-full border border-gray-300 shadow-sm"
-                    style={{ backgroundColor: color }}
-                  />
-                </div>
+                <div
+                  className="w-3 h-3 rounded-full border border-gray-300 shadow-sm flex-shrink-0"
+                  style={{ backgroundColor: color }}
+                />
                 <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   {label}
                 </div>
@@ -86,14 +73,13 @@ const MapLegend = ({
         </div>
       )}
 
-      {/* Signal Quality Legend (RSRP) */}
       {shouldShowSignal && (
         <div className={activeLegend ? "pt-2 border-t border-gray-200 dark:border-gray-700" : ""}>
           <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
             Signal Quality (RSRP)
           </div>
           <div className="space-y-1.5">
-            {SIGNAL_LEGEND.map(({ label, color, range }) => (
+            {SIGNAL_QUALITY_LEGEND.map(({ label, color, range }) => (
               <div key={label} className="flex items-center gap-2">
                 <div
                   className="w-3 h-3 rounded-sm flex-shrink-0"

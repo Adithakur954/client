@@ -2,7 +2,7 @@
 function toLatLng(pair) {
   const [x, y] = pair.trim().split(/\s+/).map(Number);
   return Number.isFinite(x) && Number.isFinite(y)
-    ? { lat: y, lng: x } // WKT order: lon lat
+    ? { lat: y, lng: x } 
     : null;
 }
 

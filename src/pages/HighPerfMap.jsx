@@ -37,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { loadSavedViewport, saveViewport } from "@/utils/viewport";
 import { parseWKTToCoordinates } from "@/utils/wkt";
 import { GOOGLE_MAPS_LOADER_OPTIONS } from "@/lib/googleMapsLoader";
-import { normalizeProviderName } from "@/utils/colorUtils";
+import { normalizeBandName, normalizeProviderName } from "@/utils/colorUtils";
 
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
@@ -159,7 +159,7 @@ export default function HighPerfMap() {
     drawEnabled: false,
     shapeMode: "polygon",
     drawPixelateRect: false,
-    drawCellSizeMeters: 10,
+    drawCellSizeMeters: 1,
     drawClearSignal: 0,
     showNeighbours: false,
     colorizeCells: true,
@@ -187,7 +187,7 @@ export default function HighPerfMap() {
       if (provider && provider !== "Unknown") providerSet.add(provider);
       const tech = normalizeTechName(log.network || log.Network || log.technology);
       if (tech && tech !== "Unknown") techSet.add(tech);
-      const band = String(log.band || log.Band || "").trim();
+      const band = String(normalizeBandName(log.band || log.Band || "")).trim();
       if (band && band !== "-1" && band !== "" && band !== "undefined") bandSet.add(band);
     });
     return {

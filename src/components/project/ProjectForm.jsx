@@ -805,16 +805,7 @@ export const ProjectForm = ({
             </div>
           </details>
 
-          {loading && currentStep && (
-            <Alert className="bg-blue-50 border-blue-200 p-2 text-sm max-w-md">
-              <div className="flex items-center gap-3">
-                <Spinner className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-900 font-medium">
-                  {currentStep}
-                </AlertDescription>
-              </div>
-            </Alert>
-          )}
+          
 
           <div className="flex justify-end pt-3">
             <Button

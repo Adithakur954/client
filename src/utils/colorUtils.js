@@ -1,3 +1,4 @@
+import { string } from "prop-types";
 
 export const normalizeProviderName = (rawName) => {
   if (!rawName) return ;
@@ -8,7 +9,7 @@ export const normalizeProviderName = (rawName) => {
   // Handle only slashes like /, //, ///
   if (/^\/+$/.test(s)) return ;
 
-  if (invalidValues.includes(s)) return ;
+  if (invalidValues.includes(s)) return null ;
 
   const cleaned = s.toUpperCase().replace(/[\s\-_]/g, "");
 
@@ -40,8 +41,6 @@ export const normalizeProviderName = (rawName) => {
   return s;
 };
 
-
-
 export const normalizeTechName = (tech) => {
   if (!tech) return "Unknown";
 
@@ -69,6 +68,17 @@ export const normalizeTechName = (tech) => {
   return tech;  
 };
 
+export const normalizeBandName = (band) => {
+  if (band === null || band === undefined || band === "" || band === "Unknown") return "Unknown";
+
+  if (band.charAt(0) === "B" || band.charAt(0) === "n") {
+    return band;
+  }else {
+    return "B"+band;
+  }
+
+  return band;
+};
 
 export const COLOR_SCHEMES = {
   provider: {
@@ -77,33 +87,93 @@ export const COLOR_SCHEMES = {
     "VI India": "#22C55E",
     BSNL: "#F59E0B",
     Yas: "#7d1b49",  
-    Unknown: "#6B7280",
+    Unknown: "#a8a6a2",
   },
   technology: {
     "5G": "#EC4899",
     "4G": "#8B5CF6",
     "3G": "#10B981",
     "2G": "#6B7280",
-    Unknown: "#F59E0B",
+    Unknown: "#a8a6a2",
   },
   band: {
-    3: "#EF4444",
-    5: "#F59E0B",
-    8: "#10B981",
-    40: "#3B82F6",
-    41: "#8B5CF6",
-    n28: "#EC4899",
-    n78: "#F472B6",
     1: "#EF4444",
-    2: "#F59E0B",
-    7: "#10B781",
-    B7: "#10B781",
-    Unknown: "#6B7280",
+  B1: "#EF4444",
+
+  2: "#F59E0B",
+  B2: "#F59E0B",
+
+  3: "#EF4444",
+  B3: "#EF4444",
+
+  4: "#F59E0B",
+  B4: "#F59E0B",
+
+  5: "#F59E0B",
+  B5: "#F59E0B",
+
+  6: "#EF4444",
+  B6: "#EF4444",
+
+  8: "#10B981",
+  B8: "#10B981",
+
+  9: "#F59E0B",
+  B9: "#F59E0B",
+
+  19: "#EF4444",
+  B19: "#EF4444",
+
+  // ---------- 4G (LTE) ----------
+  7: "#10B981",
+  B7: "#10B981",
+
+  12: "#3B82F6",
+  B12: "#3B82F6",
+
+  13: "#3B82F6",
+  B13: "#3B82F6",
+
+  17: "#3B82F6",
+  B17: "#3B82F6",
+
+  18: "#10B981",
+  B18: "#10B981",
+
+  20: "#3B82F6",
+  B20: "#3B82F6",
+
+  25: "#8B5CF6",
+  B25: "#8B5CF6",
+
+  26: "#8B5CF6",
+  B26: "#8B5CF6",
+
+  28: "#EC4899",
+  B28: "#EC4899",
+
+  38: "#6366F1",
+  B38: "#6366F1",
+
+  39: "#6366F1",
+  B39: "#6366F1",
+
+  40: "#3B82F6",
+  B40: "#3B82F6",
+
+  41: "#8B5CF6",
+  B41: "#8B5CF6",
+
+  n5: "#F59E0B",
+  n28: "#EC4899",
+  n78: "#F472B6",
+
+ 
+  Unknown: "#a8a6a2",
   },
 };
 
-
-export const getLogColor = (colorBy, value, defaultColor = "#6B7280") => {
+export const getLogColor = (colorBy, value, defaultColor = "#a8a6a2") => {
   if (!colorBy || !value) {
     return defaultColor;
   }
@@ -140,4 +210,8 @@ export const getLogColor = (colorBy, value, defaultColor = "#6B7280") => {
   return defaultColor;
 };
 
-export const providerColors = (provider) => COLOR_SCHEMES.provider[normalizeProviderName(provider)];
+export const getProviderColor = (provider) => COLOR_SCHEMES.provider[normalizeProviderName(provider)];
+
+export const getTechnologyColor = (technology) => COLOR_SCHEMES.technology[normalizeTechName(technology)];
+
+export const getBandColor = (band) => COLOR_SCHEMES.band[normalizeBandName(band)];

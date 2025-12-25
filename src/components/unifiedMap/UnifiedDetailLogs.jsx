@@ -45,8 +45,9 @@ export default function UnifiedDetailLogs({
   onClose,
   tptVolume,
   InpSummary,
+  durationTime,
   
-  // Filter props
+  
   dataFilters = DEFAULT_DATA_FILTERS,
   onFilteredDataChange,
 }) {
@@ -55,8 +56,13 @@ export default function UnifiedDetailLogs({
   const [activeTab, setActiveTab] = useState("overview");
   const [filteredLocations, setFilteredLocations] = useState(locations);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [durationData, setDurationData] = useState(durationTime);
 
-  // All Chart refs
+
+  useEffect(() => {
+  setDurationData(durationTime);
+}, [durationTime]);
+  
   const chartRefs = {
     distribution: useRef(null),
     tech: useRef(null),
@@ -74,7 +80,7 @@ export default function UnifiedDetailLogs({
     qoeChart: useRef(null),
   };
 
-  // Check if filters are active
+ 
   const hasActiveFilters = useMemo(() => {
     return (
       dataFilters.providers?.length > 0 ||
@@ -83,7 +89,16 @@ export default function UnifiedDetailLogs({
     );
   }, [dataFilters]);
 
-  // Fetch filtered data from API
+  // const computeTime = useMemo((durationTime) => {
+  //   if (!durationTime) return null;
+  //   return durationData.map((itme)=>({
+  //     provider
+  //   }))
+    
+      
+    
+  // })
+  
   const fetchFilteredData = useCallback(async (filters) => {
     if (!projectId && !sessionIds?.length) {
       console.warn("No projectId or sessionIds provided for filtering");
@@ -384,6 +399,7 @@ export default function UnifiedDetailLogs({
             stats={stats}
             selectedMetric={selectedMetric}
             ioSummary={ioSummary}
+            durationData={durationData}
             duration={duration}
             locations={filteredLocations}
             expanded={expanded}

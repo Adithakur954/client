@@ -17,7 +17,7 @@ import { CHART_COLORS } from '@/components/constants/dashboardConstants';
 import { useBandDistributionRaw } from '@/hooks/useDashboardData.js';
 import { canonicalOperatorName } from '@/utils/dashboardUtils';
 import { formatNumber } from '@/utils/chartUtils';
-import { normalizeProviderName } from '@/utils/colorUtils';
+import { normalizeBandName, normalizeProviderName } from '@/utils/colorUtils';
 
 const MultiSelectDropdown = ({ 
   label, 
@@ -182,7 +182,7 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
     return rawData.map(item => ({
       operatorName: normalizeProviderName(item?.operatorName || item?.operator),
       network: item?.network || 'Unknown',
-      band: String(item?.band || ''),
+      band: String(normalizeBandName(item?.band || '')),
       count: Number(item?.count || 0)
     }));
   }, [rawData]);
@@ -204,7 +204,8 @@ const BandDistributionChart = ({ filters: globalFilters }) => {
                            selectedOperators.includes(item.operatorName);
       const networkMatch = selectedNetworks.length === 0 || 
                           selectedNetworks.includes(item.network);
-      return operatorMatch && networkMatch;
+      const validBand = item.band && item.band !== 'Unknown';
+      return operatorMatch && networkMatch && validBand;
     });
     
     const aggregated = filtered.reduce((acc, item) => {

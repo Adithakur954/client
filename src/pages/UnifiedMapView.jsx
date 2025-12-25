@@ -24,16 +24,20 @@ import MapLegend from "@/components/map/MapLegend";
 import { useNeighborCollisions } from "@/hooks/useNeighborCollisions";
 import NeighborHeatmapLayer from "@/components/unifiedMap/NeighborHeatmapLayer";
 import SiteLegend from "@/components/unifiedMap/SiteLegend";
-import { normalizeProviderName, normalizeTechName } from "@/utils/colorUtils"; 
+import {
+  normalizeProviderName,
+  normalizeTechName,
+  getBandColor,
+  getTechnologyColor,
+  getProviderColor,
+  COLOR_SCHEMES,
+} from "@/utils/colorUtils";
 
 import {
   useBestNetworkCalculation,
   DEFAULT_WEIGHTS,
 } from "@/hooks/useBestNetworkCalculation";
 
-// ============================================
-// CONSTANTS
-// ============================================
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
 const DEFAULT_THRESHOLDS = {
@@ -58,58 +62,6 @@ const DEFAULT_DATA_FILTERS = {
   technologies: [],
 };
 
-const PROVIDER_COLORS = {
-  JIO: "#3B82F6",
-  jio: "#3B82F6",
-  Jio: "#3B82F6",
-  "Jio True5G": "#3B82F6",
-  "JIO 4G": "#3B82F6",
-  JIO4G: "#3B82F6",
-  "IND-JIO": "#3B82F6",
-  "IND JIO": "#3B82F6",
-  "IND airtel": "#EF4444",
-  "IND Airtel": "#EF4444",
-  airtel: "#EF4444",
-  Airtel: "#EF4444",
-  "Airtel 5G": "#EF4444",
-  "VI India": "#22C55E",
-  "Vi India": "#22C55E",
-  VI: "#22C55E",
-  "Vodafone IN": "#22C55E",
-  Yas: "#7d1b49",
-  YAS: "#7d1b49",
-  BSNL: "#F59E0B",
-  bsnl: "#F59E0B",
-  Unknown: "#6B7280",
-};
-
-const BAND_COLORS = {
-  3: "#EF4444",
-  5: "#F59E0B",
-  8: "#10B981",
-  40: "#3B82F6",
-  41: "#8B5CF6",
-  n28: "#EC4899",
-  n78: "#F472B6",
-  1: "#EF4444",
-  2: "#F59E0B",
-  7: "#10B981",
-  Unknown: "#6B7280",
-};
-
-const TECHNOLOGY_COLORS = {
-  "5G": "#EC4899",
-  "NR (5G)": "#EC4899",
-  "NR (5G SA)": "#EC4899",
-  "NR (5G NSA)": "#EC4899",
-  "4G": "#8B5CF6",
-  "LTE (4G)": "#8B5CF6",
-  "3G": "#10B981",
-  "2G": "#6B7280",
-  "EDGE (2G)": "#6B7280",
-  Unknown: "#F59E0B",
-};
-
 const METRIC_CONFIG = {
   rsrp: { higherIsBetter: true, unit: "dBm", label: "RSRP", min: -140, max: -44 },
   rsrq: { higherIsBetter: true, unit: "dB", label: "RSRQ", min: -20, max: -3 },
@@ -128,9 +80,6 @@ const COLOR_GRADIENT = [
   { min: 0.0, color: "#EF4444" },
 ];
 
-// ============================================
-// UTILITY FUNCTIONS
-// ============================================
 const debounce = (fn, wait) => {
   let timeout;
   return (...args) => {
@@ -164,39 +113,6 @@ const getColorFromNormalizedValue = (normalizedValue) => {
   return "#EF4444";
 };
 
-const getBandColor = (band) => {
-  if (!band) return "#6B7280";
-  if (BAND_COLORS[band]) return BAND_COLORS[band];
-
-  const bandStr = String(band).trim();
-  if (BAND_COLORS[bandStr]) return BAND_COLORS[bandStr];
-  if (BAND_COLORS[`n${bandStr}`]) return BAND_COLORS[`n${bandStr}`];
-
-  const bandNum = parseInt(bandStr.replace(/[^0-9]/g, ""));
-  if (!isNaN(bandNum) && BAND_COLORS[bandNum]) return BAND_COLORS[bandNum];
-
-  const hash = bandStr.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hue = hash % 360;
-  return `hsl(${hue}, 70%, 50%)`;
-};
-
-const getTechnologyColor = (technology) => {
-  if (!technology) return "#6B7280";
-  if (TECHNOLOGY_COLORS[technology]) return TECHNOLOGY_COLORS[technology];
-
-  const techStr = String(technology).trim().toUpperCase();
-
-  if (techStr.includes("5G") || techStr.includes("NR")) {
-    if (techStr.includes("SA") && !techStr.includes("NSA")) return "#D946EF";
-    return "#EC4899";
-  }
-  if (techStr.includes("LTE") || techStr.includes("4G")) return "#8B5CF6";
-  if (techStr.includes("HSPA") || techStr.includes("WCDMA") || techStr.includes("3G") || techStr.includes("UMTS")) return "#22C55E";
-  if (techStr.includes("GSM") || techStr.includes("EDGE") || techStr.includes("2G") || techStr.includes("GPRS")) return "#6B7280";
-
-  return "#F59E0B";
-};
-
 const getColorForMetricValue = (value, metric) => {
   const normalized = normalizeMetricValue(value, metric);
   return getColorFromNormalizedValue(normalized);
@@ -224,8 +140,10 @@ const getColorFromValueOrMetric = (value, thresholds, metric) => {
 
     if (matchedThreshold?.color) return matchedThreshold.color;
 
-    if (value < sorted[0].min) return sorted[0].color;
-    if (value > sorted[sorted.length - 1].max) return sorted[sorted.length - 1].color;
+    if (sorted.length > 0) {
+      if (value < sorted[0].min) return sorted[0].color;
+      if (value > sorted[sorted.length - 1].max) return sorted[sorted.length - 1].color;
+    }
 
     return "#999999";
   }
@@ -245,19 +163,6 @@ const getThresholdKey = (metric) => {
     pci: "pci",
   };
   return mapping[metric?.toLowerCase()] || metric;
-};
-
-const getProviderColor = (provider) => {
-  if (!provider) return "#6B7280";
-  if (PROVIDER_COLORS[provider]) return PROVIDER_COLORS[provider];
-
-  const lower = provider.toLowerCase();
-  if (lower.includes("jio")) return "#3B82F6";
-  if (lower.includes("airtel")) return "#EF4444";
-  if (lower.includes("vi") || lower.includes("vodafone")) return "#22C55E";
-  if (lower.includes("yas") || lower.includes("YAS")) return "#7d1b49";
-
-  return "#6B7280";
 };
 
 const parseWKTToPolygons = (wkt) => {
@@ -408,7 +313,7 @@ const parseLogEntry = (log, sessionId) => {
     nodeb_id: log.nodeb_id,
     latency: parseFloat(log.latency ?? log.Latency ?? log.Lat) || null,
     jitter: parseFloat(log.jitter ?? log.Jitter ?? log.Jit) || null,
-    packet_loss:parseFloat(log.packet_loss),
+    packet_loss: parseFloat(log.packet_loss),
     speed: parseFloat(log.speed ?? log.Speed ?? log.Sp) || null,
     cell_id: parseFloat(log.cell_id ?? log.CellId ?? log.Cell_ID ?? log.Cell_Id) || null,
   };
@@ -424,13 +329,6 @@ const extractLogsFromResponse = (data) => {
   return [];
 };
 
-// ============================================
-// CUSTOM HOOKS FOR API CALLS
-// ============================================
-
-/**
- * Hook to fetch and manage threshold settings
- */
 const useThresholdSettings = () => {
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
   const [loading, setLoading] = useState(true);
@@ -466,7 +364,6 @@ const useThresholdSettings = () => {
       } catch (err) {
         if (err.name === "AbortError") return;
         if (isMounted) {
-          console.error("Failed to load thresholds:", err);
           setError(err.message);
         }
       } finally {
@@ -475,8 +372,6 @@ const useThresholdSettings = () => {
     };
 
     fetchThresholds();
-
-    console.log(thresholds,"thresholds for setting")
 
     return () => {
       isMounted = false;
@@ -487,12 +382,6 @@ const useThresholdSettings = () => {
   return { thresholds, loading, error };
 };
 
-
-
-
-/**
- * Hook to fetch sample network log data
- */
 const useSampleData = (sessionIds, enabled) => {
   const [locations, setLocations] = useState([]);
   const [appSummary, setAppSummary] = useState({});
@@ -503,7 +392,7 @@ const useSampleData = (sessionIds, enabled) => {
   const abortControllerRef = useRef(null);
 
   const fetchData = useCallback(async () => {
-    if (!sessionIds.length || !enabled) {
+    if (!sessionIds?.length || !enabled) {
       setLocations([]);
       setAppSummary({});
       setInpSummary({});
@@ -511,7 +400,6 @@ const useSampleData = (sessionIds, enabled) => {
       return;
     }
 
-    // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -551,14 +439,13 @@ const useSampleData = (sessionIds, enabled) => {
             accumulatedTptVolume[sessionId] = tptData;
           }
 
-          const sessionLogs = extractLogsFromResponse(response.data || response);
+          const sessionLogs = extractLogsFromResponse(response?.data || response);
           sessionLogs.forEach((log) => {
             const parsed = parseLogEntry(log, sessionId);
             if (parsed) accumulatedLogs.push(parsed);
           });
         } catch (err) {
           if (err.name === "AbortError") throw err;
-          console.error(`Session ${sessionId} failed:`, err.message);
         }
 
         if (i < sessionIds.length - 1) await delay(100);
@@ -572,18 +459,16 @@ const useSampleData = (sessionIds, enabled) => {
       const fetchTime = ((performance.now() - startTime) / 1000).toFixed(2);
 
       if (accumulatedLogs.length > 0) {
-        toast.success(` ${accumulatedLogs.length} points loaded in ${fetchTime}s`);
+        toast.success(`${accumulatedLogs.length} points loaded in ${fetchTime}s`);
       } else {
         toast.warn("No valid log data found");
       }
     } catch (err) {
       if (err.name === "AbortError") return;
-      console.error("Critical error:", err);
       toast.error(err.message);
       setError(err.message);
     } finally {
       setLoading(false);
-      console.log(locations," gcgjhjhvhv")
     }
   }, [sessionIds, enabled]);
 
@@ -608,9 +493,6 @@ const useSampleData = (sessionIds, enabled) => {
   };
 };
 
-/**
- * Hook to fetch prediction data
- */
 const usePredictionData = (projectId, selectedMetric, enabled) => {
   const [locations, setLocations] = useState([]);
   const [colorSettings, setColorSettings] = useState([]);
@@ -668,7 +550,6 @@ const usePredictionData = (projectId, selectedMetric, enabled) => {
       }
     } catch (err) {
       if (err.name === "AbortError") return;
-      console.error("Prediction error:", err);
       toast.error(err.message);
       setError(err.message);
     } finally {
@@ -695,9 +576,6 @@ const usePredictionData = (projectId, selectedMetric, enabled) => {
   };
 };
 
-/**
- * Hook to fetch project polygons
- */
 const useProjectPolygons = (projectId, showPolygons, polygonSource) => {
   const [polygons, setPolygons] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -742,7 +620,6 @@ const useProjectPolygons = (projectId, showPolygons, polygonSource) => {
       if (parsed.length) toast.success(`${parsed.length} polygon(s) loaded`);
     } catch (err) {
       if (err.name === "AbortError") return;
-      console.error("Polygon error:", err);
       setError(err.message);
       setPolygons([]);
     } finally {
@@ -763,9 +640,6 @@ const useProjectPolygons = (projectId, showPolygons, polygonSource) => {
   return { polygons, loading, error, refetch: fetchData };
 };
 
-/**
- * Hook to fetch area breakdown polygons
- */
 const useAreaPolygons = (projectId, areaEnabled) => {
   const [areaData, setAreaData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -826,7 +700,6 @@ const useAreaPolygons = (projectId, areaEnabled) => {
       if (parsed.length > 0) toast.success(`${parsed.length} area zone(s) loaded`);
     } catch (err) {
       if (err.name === "AbortError") return;
-      console.error("Area polygon error:", err);
       toast.error(`Failed to load area zones: ${err.message}`);
       setError(err.message);
       setAreaData([]);
@@ -847,10 +720,6 @@ const useAreaPolygons = (projectId, areaEnabled) => {
 
   return { areaData, loading, error, refetch: fetchData };
 };
-
-// ============================================
-// COMPONENTS
-// ============================================
 
 const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCategory }) => {
   if (!selectedCategory) return null;
@@ -901,16 +770,13 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
         maxWidth: "420px",
       }}
     >
-      {/* Header */}
       <div className="px-4 py-3" style={{ backgroundColor: fillColor || "#3B82F6" }}>
         <span className="text-white font-semibold text-sm">
           {name} - {pointCount} samples
         </span>
       </div>
 
-      {/* Content */}
       <div className="p-4 space-y-3">
-        {/* Median Value */}
         {medianValue !== null && medianValue !== undefined && (
           <div className="flex items-center justify-between pb-2 border-b">
             <span className="text-sm font-medium text-gray-600">
@@ -922,7 +788,6 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
           </div>
         )}
 
-        {/* Best Provider */}
         {selectedCategory === "provider" && bestProvider && (
           <div className="space-y-1">
             <div className="text-xs font-semibold text-gray-500 uppercase">Best Provider</div>
@@ -943,7 +808,6 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
           </div>
         )}
 
-        {/* Best Band */}
         {selectedCategory === "band" && bestBand && (
           <div className="space-y-1">
             <div className="text-xs font-semibold text-gray-500 uppercase">Best Band</div>
@@ -964,7 +828,6 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
           </div>
         )}
 
-        {/* Best Technology */}
         {selectedCategory === "technology" && bestTechnology && (
           <div className="space-y-1">
             <div className="text-xs font-semibold text-gray-500 uppercase">Best Technology</div>
@@ -985,7 +848,6 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
           </div>
         )}
 
-        {/* Category Stats */}
         {categoryStats && selectedCategory && categoryStats[selectedCategory]?.stats && (
           <div className="pt-2 border-t">
             <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
@@ -1014,7 +876,6 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
 });
 
 ZoneTooltip.displayName = "ZoneTooltip";
-ZoneTooltip.displayName = "ZoneTooltip";
 
 const BestNetworkLegend = React.memo(({ stats, providerColors, enabled }) => {
   if (!enabled || !stats || Object.keys(stats).length === 0) return null;
@@ -1023,21 +884,17 @@ const BestNetworkLegend = React.memo(({ stats, providerColors, enabled }) => {
     (a, b) => b[1].locationsWon - a[1].locationsWon
   );
 
-  const totalZones = sortedProviders.reduce((sum, [_, d]) => sum + d.locationsWon, 0);
+  const totalZones = sortedProviders.reduce((sum, [, d]) => sum + d.locationsWon, 0);
 
   return (
     <div className="absolute bottom-4 left-4 z-[500] bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 min-w-[220px] max-w-[280px]">
       <div className="font-bold text-sm mb-2 text-gray-800 border-b pb-2 flex items-center gap-2">
-        <span>🏆</span>
         <span>Best Network by Zone</span>
       </div>
       <div className="space-y-1.5">
-        {sortedProviders.map(([provider, data], index) => (
+        {sortedProviders.map(([provider, data]) => (
           <div key={provider} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xs w-4">
-                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : ""}
-              </span>
               <div
                 className="w-3 h-3 rounded"
                 style={{ backgroundColor: data.color || providerColors?.[provider] || getProviderColor(provider) }}
@@ -1062,21 +919,16 @@ const BestNetworkLegend = React.memo(({ stats, providerColors, enabled }) => {
 
 BestNetworkLegend.displayName = "BestNetworkLegend";
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
 const UnifiedMapView = () => {
   const [searchParams] = useSearchParams();
 
-  // UI State
   const [isSideOpen, setIsSideOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState("rsrp");
-  const [ui, setUi] = useState({ basemapStyle: "roadmap" });
+  const [basemapStyle, setBasemapStyle] = useState("roadmap");
   const [viewport, setViewport] = useState(null);
   const [colorBy, setColorBy] = useState(null);
 
-  // Toggle States
   const [enableDataToggle, setEnableDataToggle] = useState(true);
   const [dataToggle, setDataToggle] = useState("sample");
   const [enableSiteToggle, setEnableSiteToggle] = useState(false);
@@ -1085,22 +937,18 @@ const UnifiedMapView = () => {
   const [showSiteSectors, setShowSiteSectors] = useState(true);
   const [showNeighbors, setShowNeighbors] = useState(false);
 
-  // Polygon States
   const [showPolygons, setShowPolygons] = useState(false);
   const [polygonSource, setPolygonSource] = useState("map");
   const [onlyInsidePolygons, setOnlyInsidePolygons] = useState(false);
   const [areaEnabled, setAreaEnabled] = useState(false);
 
-  // Hover States
   const [hoveredPolygon, setHoveredPolygon] = useState(null);
   const [hoverPosition, setHoverPosition] = useState(null);
   const [mapVisibleLocations, setMapVisibleLocations] = useState([]);
 
-  // UI Controls
   const [isOpacityCollapsed, setIsOpacityCollapsed] = useState(true);
   const [opacity, setOpacity] = useState(0.8);
 
-  // Best Network States
   const [bestNetworkEnabled, setBestNetworkEnabled] = useState(false);
   const [bestNetworkWeights, setBestNetworkWeights] = useState(DEFAULT_WEIGHTS);
   const [bestNetworkOptions, setBestNetworkOptions] = useState({
@@ -1113,18 +961,17 @@ const UnifiedMapView = () => {
     outlierMultiplier: 1.5,
   });
 
-  // Filter States
   const [coverageHoleFilters, setCoverageHoleFilters] = useState(DEFAULT_COVERAGE_FILTERS);
   const [dataFilters, setDataFilters] = useState(DEFAULT_DATA_FILTERS);
   const [enableGrid, setEnableGrid] = useState(false);
   const [gridSizeMeters, setGridSizeMeters] = useState(20);
+  const [durationTime, setDurationTime] = useState([]);
 
-  // Other States
   const [logArea, setLogArea] = useState(null);
 
   const mapRef = useRef(null);
+  const viewportRef = useRef(null);
 
-  // Parse URL params
   const projectId = useMemo(() => {
     const param = searchParams.get("project_id") ?? searchParams.get("project");
     return param ? Number(param) : null;
@@ -1136,13 +983,10 @@ const UnifiedMapView = () => {
     return param.split(",").map((s) => s.trim()).filter(Boolean);
   }, [searchParams]);
 
-  // Google Maps Loader
   const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
- 
   const { thresholds: baseThresholds } = useThresholdSettings();
 
-  // 2. Sample data (only when dataToggle is "sample")
   const {
     locations: sampleLocations,
     appSummary,
@@ -1156,7 +1000,6 @@ const UnifiedMapView = () => {
     enableDataToggle && dataToggle === "sample"
   );
 
- 
   const {
     locations: predictionLocations,
     colorSettings: predictionColorSettings,
@@ -1166,27 +1009,24 @@ const UnifiedMapView = () => {
   } = usePredictionData(
     projectId,
     selectedMetric,
-    (enableDataToggle && dataToggle === "prediction") || 
+    (enableDataToggle && dataToggle === "prediction") ||
     (enableSiteToggle && siteToggle === "sites-prediction")
   );
 
-  // 4. Project polygons
   const {
     polygons,
     loading: polygonLoading,
     refetch: refetchPolygons,
   } = useProjectPolygons(projectId, showPolygons, polygonSource);
 
-  // 5. Area polygons
   const {
     areaData,
     loading: areaLoading,
     refetch: refetchAreaPolygons,
   } = useAreaPolygons(projectId, areaEnabled);
 
-  // 6. Site data
   const {
-    siteData,
+    siteData: rawSiteData,
     loading: siteLoading,
     error: siteError,
     refetch: refetchSites,
@@ -1198,9 +1038,10 @@ const UnifiedMapView = () => {
     autoFetch: true,
   });
 
-  // 7. Neighbor collisions
+  const siteData = rawSiteData || [];
+
   const {
-    allNeighbors,
+    allNeighbors: rawAllNeighbors,
     stats: neighborStats,
     loading: neighborLoading,
     refetch: refetchNeighbors,
@@ -1209,35 +1050,51 @@ const UnifiedMapView = () => {
     enabled: showNeighbors,
   });
 
-  // ============================================
-  // DERIVED STATE
-  // ============================================
+  const allNeighbors = rawAllNeighbors || [];
 
-  // Determine which locations to use based on toggle state
+  useEffect(() => {
+    const timeData = async () => {
+      if (!sessionIds?.length) return;
+      try {
+        const res = await mapViewApi.getDuration({ sessionIds: sessionIds.join(",") });
+        const dataArray = res?.data?.data || res?.data || [];
+        if (Array.isArray(dataArray)) {
+          setDurationTime(
+            dataArray.map((item) => ({
+              provider: normalizeProviderName(item.provider || ""),
+              networkType: normalizeTechName(item.network || ""),
+              totaltime: String(item.timeReadable || 0),
+            }))
+          );
+        }
+      } catch (err) {
+        // Silent fail
+      }
+    };
+    timeData();
+  }, [sessionIds]);
+
   const locations = useMemo(() => {
     if (!enableDataToggle && !enableSiteToggle) return [];
-    
+
     if (enableDataToggle) {
-      return dataToggle === "sample" ? sampleLocations : predictionLocations;
+      return dataToggle === "sample" ? (sampleLocations || []) : (predictionLocations || []);
     }
-    
+
     if (enableSiteToggle && siteToggle === "sites-prediction") {
-      return predictionLocations;
+      return predictionLocations || [];
     }
-    
+
     return [];
   }, [enableDataToggle, enableSiteToggle, dataToggle, siteToggle, sampleLocations, predictionLocations]);
 
-  // Combined loading state
-  const isLoading = sampleLoading || predictionLoading || siteLoading || 
-                    neighborLoading || polygonLoading || areaLoading;
+  const isLoading = sampleLoading || predictionLoading || siteLoading ||
+    neighborLoading || polygonLoading || areaLoading;
 
-  // Combined error
   const error = sampleError || predictionError;
 
-  // Effective thresholds (with prediction color settings)
   const effectiveThresholds = useMemo(() => {
-    if (predictionColorSettings.length && dataToggle === "prediction") {
+    if (predictionColorSettings?.length && dataToggle === "prediction") {
       return {
         ...baseThresholds,
         [selectedMetric]: predictionColorSettings.map((s) => ({
@@ -1250,7 +1107,6 @@ const UnifiedMapView = () => {
     return baseThresholds;
   }, [baseThresholds, predictionColorSettings, selectedMetric, dataToggle]);
 
-  // Best network calculation
   const {
     processedPolygons: bestNetworkPolygons,
     stats: bestNetworkStats,
@@ -1263,13 +1119,12 @@ const UnifiedMapView = () => {
     areaData
   );
 
-  // Available filter options
   const availableFilterOptions = useMemo(() => {
     const providers = new Set();
     const bands = new Set();
     const technologies = new Set();
 
-    locations.forEach((loc) => {
+    (locations || []).forEach((loc) => {
       if (loc.provider) providers.add(loc.provider);
       if (loc.band) bands.add(loc.band);
       if (loc.technology) technologies.add(normalizeTechName(loc.technology));
@@ -1282,9 +1137,8 @@ const UnifiedMapView = () => {
     };
   }, [locations]);
 
-  // Filtered locations
   const filteredLocations = useMemo(() => {
-    let result = [...locations];
+    let result = [...(locations || [])];
 
     const activeCoverageFilters = Object.entries(coverageHoleFilters).filter(
       ([, config]) => config.enabled
@@ -1300,18 +1154,17 @@ const UnifiedMapView = () => {
     }
 
     const { providers, bands, technologies } = dataFilters;
-    if (providers.length) result = result.filter((l) => providers.includes(l.provider));
-    if (bands.length) result = result.filter((l) => bands.includes(l.band));
-    if (technologies.length) result = result.filter((l) => technologies.includes(l.technology));
+    if (providers?.length) result = result.filter((l) => providers.includes(l.provider));
+    if (bands?.length) result = result.filter((l) => bands.includes(l.band));
+    if (technologies?.length) result = result.filter((l) => technologies.includes(l.technology));
 
     return result;
   }, [locations, coverageHoleFilters, dataFilters]);
 
-  // Polygons with colors
   const polygonsWithColors = useMemo(() => {
-    if (!showPolygons || !polygons.length) return [];
+    if (!showPolygons || !polygons?.length) return [];
 
-    if (!onlyInsidePolygons || !locations.length) {
+    if (!onlyInsidePolygons || !locations?.length) {
       return polygons.map((p) => ({
         ...p,
         fillColor: "#4285F4",
@@ -1340,11 +1193,10 @@ const UnifiedMapView = () => {
     });
   }, [showPolygons, polygons, onlyInsidePolygons, locations, selectedMetric, effectiveThresholds]);
 
-  // Area polygons with colors
   const areaPolygonsWithColors = useMemo(() => {
-    if (!areaEnabled || !areaData.length) return [];
+    if (!areaEnabled || !areaData?.length) return [];
 
-    if (!filteredLocations.length) {
+    if (!filteredLocations?.length) {
       return areaData.map((p) => ({
         ...p,
         fillColor: "#9333ea",
@@ -1452,46 +1304,6 @@ const UnifiedMapView = () => {
     });
   }, [areaEnabled, areaData, filteredLocations, selectedMetric, baseThresholds, colorBy]);
 
-  useEffect(() => {
-    if (locations.length > 0) {
-      console.group('🗺️ FINAL LOCATIONS IN MAP VIEW');
-      console.log('Total locations:', locations.length);
-      console.log('Source:', dataToggle);
-      console.log('colorBy setting:', colorBy);
-      
-      // Sample first 3
-      console.log('Sample data (first 3):', locations.slice(0, 3));
-      
-      // Provider distribution
-      const providerCounts = {};
-      locations.forEach(loc => {
-        const p = loc.provider || '(empty)';
-        providerCounts[p] = (providerCounts[p] || 0) + 1;
-      });
-      console.log('Provider distribution:', providerCounts);
-      
-      console.groupEnd();
-    }
-  }, [locations, dataToggle, colorBy]);
-
-  // ✅ DEBUG: Monitor colorBy changes
-  useEffect(() => {
-    if (colorBy) {
-      console.log(`🎨 COLOR MODE CHANGED: "${colorBy}"`);
-      if (locations.length > 0) {
-        const sampleLoc = locations[0];
-        console.log(`Sample location for colorBy="${colorBy}":`, {
-          provider: sampleLoc.provider,
-          technology: sampleLoc.technology,
-          band: sampleLoc.band,
-          allKeys: Object.keys(sampleLoc),
-        });
-      }
-    }
-  }, [colorBy, locations]);
-
-
-  // All best network polygons
   const allBestNetworkPolygons = useMemo(() => {
     if (bestNetworkEnabled && bestNetworkPolygons?.length > 0) {
       return bestNetworkPolygons;
@@ -1499,9 +1311,8 @@ const UnifiedMapView = () => {
     return [];
   }, [bestNetworkEnabled, bestNetworkPolygons]);
 
-  // Visible polygons (viewport filtered)
   const visiblePolygons = useMemo(() => {
-    if (!showPolygons || !polygonsWithColors.length) return [];
+    if (!showPolygons || !polygonsWithColors?.length) return [];
     if (!viewport) return polygonsWithColors;
 
     return polygonsWithColors.filter((poly) => {
@@ -1515,9 +1326,8 @@ const UnifiedMapView = () => {
     });
   }, [showPolygons, polygonsWithColors, viewport]);
 
-  // Map center
   const mapCenter = useMemo(() => {
-    if (!locations.length) return DEFAULT_CENTER;
+    if (!locations?.length) return DEFAULT_CENTER;
     const sum = locations.reduce(
       (acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }),
       { lat: 0, lng: 0 }
@@ -1525,54 +1335,84 @@ const UnifiedMapView = () => {
     return { lat: sum.lat / locations.length, lng: sum.lng / locations.length };
   }, [locations]);
 
-  // Display toggles
   const showDataCircles = enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction");
   const shouldShowLegend = enableDataToggle || (enableSiteToggle && siteToggle === "sites-prediction");
 
-  // Locations to display on map
   const locationsToDisplay = useMemo(() => {
     if (onlyInsidePolygons) return [];
     if (!showDataCircles) return [];
 
     const hasCoverageFilters = Object.values(coverageHoleFilters).some((f) => f.enabled);
-    const hasDataFilters = dataFilters.providers.length > 0 || 
-                          dataFilters.bands.length > 0 || 
-                          dataFilters.technologies.length > 0;
+    const hasDataFilters = (dataFilters.providers?.length || 0) > 0 ||
+      (dataFilters.bands?.length || 0) > 0 ||
+      (dataFilters.technologies?.length || 0) > 0;
 
     if (hasCoverageFilters || hasDataFilters) {
       return filteredLocations;
     }
 
-    return locations;
+    return locations || [];
   }, [showDataCircles, coverageHoleFilters, dataFilters, filteredLocations, locations, onlyInsidePolygons]);
 
-  // ============================================
-  // CALLBACKS
-  // ============================================
+  // FIX: Memoize map options to prevent recreation on every render
+  const mapOptions = useMemo(() => ({
+    mapTypeId: basemapStyle,
+  }), [basemapStyle]);
 
-  const debouncedSetViewport = useMemo(() => debounce(setViewport, 150), []);
+  // FIX: Update viewport using ref to avoid triggering re-renders
+  const updateViewportRef = useCallback((newViewport) => {
+    viewportRef.current = newViewport;
+    setViewport(newViewport);
+  }, []);
+
+  const debouncedSetViewport = useMemo(
+    () => debounce(updateViewportRef, 300),
+    [updateViewportRef]
+  );
 
   const handleMapLoad = useCallback((map) => {
     mapRef.current = map;
+
     const updateViewport = () => {
       const bounds = map.getBounds();
       if (!bounds) return;
-      debouncedSetViewport({
+
+      const newViewport = {
         north: bounds.getNorthEast().lat(),
         south: bounds.getSouthWest().lat(),
         east: bounds.getNorthEast().lng(),
         west: bounds.getSouthWest().lng(),
-      });
+      };
+
+      debouncedSetViewport(newViewport);
     };
+
     map.addListener("idle", updateViewport);
     updateViewport();
   }, [debouncedSetViewport]);
 
+  // FIX: Handler for basemap style change
+  const handleBasemapChange = useCallback((newStyle) => {
+    setBasemapStyle(newStyle);
+    
+    // Also update the map directly if ref exists
+    if (mapRef.current) {
+      mapRef.current.setMapTypeId(newStyle);
+    }
+  }, []);
+
+  // FIX: Create a stable UI state handler
+  const handleUIChange = useCallback((newUI) => {
+    if (newUI.basemapStyle && newUI.basemapStyle !== basemapStyle) {
+      handleBasemapChange(newUI.basemapStyle);
+    }
+  }, [basemapStyle, handleBasemapChange]);
+
   const reloadData = useCallback(() => {
     if (enableSiteToggle) refetchSites();
     if (enableDataToggle && dataToggle === "sample") refetchSample();
-    if ((enableDataToggle && dataToggle === "prediction") || 
-        (enableSiteToggle && siteToggle === "sites-prediction")) {
+    if ((enableDataToggle && dataToggle === "prediction") ||
+      (enableSiteToggle && siteToggle === "sites-prediction")) {
       refetchPrediction();
     }
     if (showPolygons) refetchPolygons();
@@ -1581,7 +1421,7 @@ const UnifiedMapView = () => {
   }, [
     enableDataToggle, enableSiteToggle, dataToggle, siteToggle,
     showPolygons, areaEnabled, showNeighbors,
-    refetchSample, refetchPrediction, refetchPolygons, 
+    refetchSample, refetchPrediction, refetchPolygons,
     refetchAreaPolygons, refetchSites, refetchNeighbors
   ]);
 
@@ -1598,10 +1438,6 @@ const UnifiedMapView = () => {
     setHoveredPolygon(null);
     setHoverPosition(null);
   }, []);
-
-  // ============================================
-  // RENDER
-  // ============================================
 
   if (!isLoaded) {
     return (
@@ -1637,12 +1473,13 @@ const UnifiedMapView = () => {
       {showAnalytics && (
         <UnifiedDetailLogs
           locations={filteredLocations}
-          totalLocations={locations.length}
-          filteredCount={filteredLocations.length}
+          totalLocations={locations?.length || 0}
+          filteredCount={filteredLocations?.length || 0}
           dataToggle={dataToggle}
           enableDataToggle={enableDataToggle}
           selectedMetric={selectedMetric}
           siteData={siteData}
+          durationTime={durationTime}
           siteToggle={siteToggle}
           enableSiteToggle={enableSiteToggle}
           showSiteMarkers={showSiteMarkers}
@@ -1692,15 +1529,15 @@ const UnifiedMapView = () => {
         availableFilterOptions={availableFilterOptions}
         colorBy={colorBy}
         setColorBy={setColorBy}
-        ui={ui}
-        onUIChange={setUi}
+        ui={{ basemapStyle }}
+        onUIChange={handleUIChange}
         showPolygons={showPolygons}
         setShowPolygons={setShowPolygons}
         polygonSource={polygonSource}
         setPolygonSource={setPolygonSource}
         onlyInsidePolygons={onlyInsidePolygons}
         setOnlyInsidePolygons={setOnlyInsidePolygons}
-        polygonCount={polygons.length}
+        polygonCount={polygons?.length || 0}
         showSiteMarkers={showSiteMarkers}
         setShowSiteMarkers={setShowSiteMarkers}
         showSiteSectors={showSiteSectors}
@@ -1749,7 +1586,7 @@ const UnifiedMapView = () => {
         />
 
         <div className="relative h-full w-full">
-          {isLoading && locations.length === 0 && siteData.length === 0 ? (
+          {isLoading && (locations?.length || 0) === 0 && (siteData?.length || 0) === 0 ? (
             <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700">
               <Spinner />
             </div>
@@ -1770,10 +1607,10 @@ const UnifiedMapView = () => {
               colorBy={colorBy}
               activeMarkerIndex={null}
               onMarkerClick={() => {}}
-              options={{ mapTypeId: ui.basemapStyle }}
+              options={mapOptions}
               center={mapCenter}
               defaultZoom={13}
-              fitToLocations={locationsToDisplay.length > 0}
+              fitToLocations={(locationsToDisplay?.length || 0) > 0}
               onLoad={handleMapLoad}
               pointRadius={5}
               projectId={projectId}
@@ -1786,7 +1623,7 @@ const UnifiedMapView = () => {
               onFilteredLocationsChange={setMapVisibleLocations}
               opacity={opacity}
             >
-              {showPolygons && visiblePolygons.map((poly) => (
+              {showPolygons && (visiblePolygons || []).map((poly) => (
                 <Polygon
                   key={poly.uid}
                   paths={poly.paths[0]}
@@ -1802,7 +1639,7 @@ const UnifiedMapView = () => {
                 />
               ))}
 
-              {areaEnabled && !bestNetworkEnabled && areaPolygonsWithColors.map((poly) => (
+              {areaEnabled && !bestNetworkEnabled && (areaPolygonsWithColors || []).map((poly) => (
                 <Polygon
                   key={poly.uid}
                   paths={poly.paths[0]}
@@ -1821,7 +1658,7 @@ const UnifiedMapView = () => {
                 />
               ))}
 
-              {bestNetworkEnabled && allBestNetworkPolygons.map((poly) => (
+              {bestNetworkEnabled && (allBestNetworkPolygons || []).map((poly) => (
                 <Polygon
                   key={poly.uid}
                   paths={poly.paths[0]}
@@ -1849,7 +1686,7 @@ const UnifiedMapView = () => {
                 />
               )}
 
-              {showNeighbors && allNeighbors.length > 0 && (
+              {showNeighbors && (allNeighbors?.length || 0) > 0 && (
                 <NeighborHeatmapLayer
                   allNeighbors={allNeighbors}
                   showNeighbors={showNeighbors}

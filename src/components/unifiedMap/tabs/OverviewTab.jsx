@@ -70,6 +70,7 @@ export const OverviewTab = ({
   locations,
   expanded,
   tptVolume,
+  durationData,
 }) => {
   const [searchParams] = useSearchParams();
   const [providerVolume, setProviderVolume] = useState({});
@@ -485,6 +486,10 @@ export const OverviewTab = ({
         <DataVolumeCard volume={volume} sessionWiseVolume={sessionWiseVolume} />
       )}
 
+      {durationData && durationData.length > 0 && (
+        <DurationData durationData={durationData} />
+      )}
+
       {duration && <SessionDurationCard duration={duration} />}
     </div>
   );
@@ -882,6 +887,35 @@ const ProviderVolumeCard = ({
     </div>
   );
 };
+
+const DurationData =({durationData}) =>(
+  <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+      <Clock className="h-4 w-4" />
+      Duration Data
+    </h4>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-700">
+            <th className="text-left px-3 py-2 text-white font-medium">Provider</th>
+            <th className="text-left px-3 py-2 text-white font-medium">Network Type</th>
+            <th className="text-right px-3 py-2 text-white font-medium">Total Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {durationData?.filter(item => (item.provider || "").trim() !== "UNKNOWN" && (item.provider || "").trim() !== "Unknown" && (item.provider || "").trim() !== "").map((item, idx) => (
+            <tr key={idx} className="border-b border-slate-800 hover:bg-slate-700/30 transition-colors">
+              <td className="px-3 py-2 text-white">{item.provider}</td>
+              <td className="px-3 py-2 text-white">{item.networkType}</td>
+              <td className="px-3 py-2 text-right text-white">{item.totaltime}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
 
 const DataVolumeCard = ({ volume, sessionWiseVolume }) => (
   <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
