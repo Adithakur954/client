@@ -14,7 +14,6 @@ export default function UnifiedHeader({
   showAnalytics,
   projectId,
   sessionIds,
-  // ✅ Renamed for clarity
   isOpacityCollapsed,
   setIsOpacityCollapsed,
   opacity,
@@ -46,7 +45,6 @@ export default function UnifiedHeader({
         const allProjects = response?.Data || [];
 
         if (!Array.isArray(allProjects)) {
-          console.error("Unexpected API format:", allProjects);
           return;
         }
 
@@ -56,11 +54,9 @@ export default function UnifiedHeader({
 
         if (matchedProject) {
           setProject(matchedProject);
-        } else {
-          console.warn("⚠️ No project found with ID:", effectiveProjectId);
         }
       } catch (error) {
-        console.error("❌ Error fetching project:", error);
+        // Handle error silently
       } finally {
         setLoading(false);
       }
@@ -107,13 +103,11 @@ export default function UnifiedHeader({
               {showAnalytics ? "Hide" : "Show"} Analytics
             </Button>
 
-            {/* ✅ FIX: Opacity Control - Now INSIDE isMapPage block */}
             <div className="flex items-center gap-2 bg-gray-700/80 rounded-lg px-3 py-1.5 border border-gray-600">
               <span className="text-xs text-gray-300 font-medium">Opacity</span>
 
               {!isOpacityCollapsed ? (
                 <>
-                  {/* ✅ FIX: Better color visibility on dark background */}
                   <span className="text-xs font-bold text-blue-400 min-w-[40px] text-center">
                     {Math.round((opacity ?? 0.8) * 100)}%
                   </span>
@@ -160,8 +154,9 @@ export default function UnifiedHeader({
           <Link to="/mapview">Map View</Link>
         </Button>
         <ProjectsDropdown currentProjectId={effectiveProjectId} />
-        <p className="text-gray-300 text-sm">
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg">
+        
+        {/* Fixed: Changed <p> to <div> to allow nested <div> elements */}
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg">
           <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">
             {user?.name?.charAt(0)?.toUpperCase() || "U"}
           </div>
@@ -169,7 +164,7 @@ export default function UnifiedHeader({
             <span className="font-medium text-white">{user?.name || "User"}</span>
           </span>
         </div>
-        </p>
+        
         <Button
           onClick={logout}
           variant="default"

@@ -8,7 +8,8 @@ import { OverviewTab } from "./tabs/OverviewTab";
 import { SignalTab } from "./tabs/SignalTab";
 import { NetworkTab } from "./tabs/NetworkTab";
 import { PerformanceTab } from "./tabs/PerformanceTab";
-import { ApplicationTab } from "./tabs/ApplicationTab";
+import { ApplicationTab } from "./tabs/ApplicationTab"
+import { IOAnalysis } from "./tabs/IOAnalysis";
 
 // Common
 import { TabButton } from "./common/TabButton";
@@ -45,6 +46,8 @@ export default function UnifiedDetailLogs({
   onClose,
   tptVolume,
   InpSummary,
+  indoor,
+  outdoor,
   durationTime,
   
   
@@ -89,15 +92,7 @@ export default function UnifiedDetailLogs({
     );
   }, [dataFilters]);
 
-  // const computeTime = useMemo((durationTime) => {
-  //   if (!durationTime) return null;
-  //   return durationData.map((itme)=>({
-  //     provider
-  //   }))
-    
-      
-    
-  // })
+  
   
   const fetchFilteredData = useCallback(async (filters) => {
     if (!projectId && !sessionIds?.length) {
@@ -138,9 +133,9 @@ export default function UnifiedDetailLogs({
       
       return filteredData;
     } catch (error) {
-      console.error("❌ Failed to fetch filtered analytics data:", error);
+      console.error(" Failed to fetch filtered analytics data:", error);
       toast.error("Failed to apply filters to analytics");
-      return locations; // Fallback to original locations
+      return locations; 
     } finally {
       setIsFilterLoading(false);
     }
@@ -438,6 +433,16 @@ export default function UnifiedDetailLogs({
             appSummary={appSummary}
             expanded={expanded}
             chartRefs={chartRefs}
+          />
+          
+        )}
+
+        {activeTab === "io" && (
+          <IOAnalysis 
+          indoor={indoor}
+          outdoor={outdoor}
+          expanded={expanded}
+          chartRefs={chartRefs}
           />
         )}
       </div>

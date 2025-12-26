@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { COLOR_SCHEMES } from "@/utils/colorUtils";
+import { TimePicker } from "@/components/ui/TimePicker";
 
 const getYesterday = () => {
   const d = new Date();
@@ -21,6 +22,8 @@ const getYesterday = () => {
 const defaultFilters = {
   startDate: getYesterday(),
   endDate: new Date(),
+  startTime: "00:00:00",
+  endTime: "23:59:59",
   provider: "ALL",
   technology: "ALL",
   band: "ALL",
@@ -42,7 +45,9 @@ const PanelSection = ({ title, children, badge }) => (
         </span>
       )}
     </div>
-    <div className="rounded-lg border border-slate-700 p-3 bg-slate-900">{children}</div>
+    <div className="rounded-lg border border-slate-700 p-3 bg-slate-900">
+      {children}
+    </div>
   </div>
 );
 
@@ -138,7 +143,9 @@ export default function MapSidebarFloating({
 
   const fabPosition = useMemo(() => {
     const base = "fixed z-40";
-    return position === "right" ? `${base} top-4 right-4` : `${base} top-4 left-4`;
+    return position === "right"
+      ? `${base} top-4 right-4`
+      : `${base} top-4 left-4`;
   }, [position]);
 
   const applyAndClose = () => {
@@ -175,10 +182,7 @@ export default function MapSidebarFloating({
       )}
 
       {isOpen && (
-        <div 
-          className="fixed inset-0 z-40  " 
-          onClick={() => setOpen(false)} 
-        />
+        <div className="fixed inset-0 z-40  " onClick={() => setOpen(false)} />
       )}
 
       <div className={sideClasses}>
@@ -222,7 +226,9 @@ export default function MapSidebarFloating({
           <PanelSection title="Date Filter">
             <div className="space-y-3">
               <div>
-                <Label className="text-xs text-slate-300 mb-1 block">Start Date</Label>
+                <Label className="text-xs text-slate-300 mb-1 block">
+                  Start Date
+                </Label>
                 <DatePicker
                   date={filters.startDate}
                   setDate={(d) => handleFilterChange("startDate", d)}
@@ -230,19 +236,43 @@ export default function MapSidebarFloating({
                 />
               </div>
               <div>
-                <Label className="text-xs text-slate-300 mb-1 block">End Date</Label>
+                <Label className="text-xs text-slate-300 mb-1 block">
+                  Start Time
+                </Label>
+                <TimePicker
+                  time={filters.startTime}
+                  setTime={(t) => handleFilterChange("startTime", t)}
+                  showSeconds={true}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-300 mb-1 block">
+                  End Date
+                </Label>
                 <DatePicker
                   date={filters.endDate}
                   setDate={(d) => handleFilterChange("endDate", d)}
                   className="w-full"
                 />
               </div>
+              <div>
+                <Label className="text-xs text-slate-300 mb-1 block">
+                  End Time
+                </Label>
+                <TimePicker
+                  time={filters.endTime}
+                  setTime={(t) => handleFilterChange("endTime", t)}
+                  showSeconds={true}
+                />
+              </div>
             </div>
-            
           </PanelSection>
 
           {/* Filter Options */}
-          <PanelSection title="Filter by" badge={hasLoadedLogs ? "From Data" : undefined}>
+          <PanelSection
+            title="Filter by"
+            badge={hasLoadedLogs ? "From Data" : undefined}
+          >
             <div className="space-y-3">
               {/* Provider */}
               <div>
@@ -261,7 +291,11 @@ export default function MapSidebarFloating({
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue
-                      placeholder={hasLoadedLogs ? "Select Provider..." : "Load data first..."}
+                      placeholder={
+                        hasLoadedLogs
+                          ? "Select Provider..."
+                          : "Load data first..."
+                      }
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -292,7 +326,11 @@ export default function MapSidebarFloating({
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue
-                      placeholder={hasLoadedLogs ? "Select Technology..." : "Load data first..."}
+                      placeholder={
+                        hasLoadedLogs
+                          ? "Select Technology..."
+                          : "Load data first..."
+                      }
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -323,7 +361,9 @@ export default function MapSidebarFloating({
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue
-                      placeholder={hasLoadedLogs ? "Select Band..." : "Load data first..."}
+                      placeholder={
+                        hasLoadedLogs ? "Select Band..." : "Load data first..."
+                      }
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -339,7 +379,9 @@ export default function MapSidebarFloating({
 
               {/* Metric */}
               <div>
-                <Label className="text-xs text-slate-300 mb-1 block">Visualize Metric</Label>
+                <Label className="text-xs text-slate-300 mb-1 block">
+                  Visualize Metric
+                </Label>
                 <Select
                   value={filters.measureIn}
                   onValueChange={(v) => handleFilterChange("measureIn", v)}
@@ -368,11 +410,15 @@ export default function MapSidebarFloating({
                 <input
                   type="checkbox"
                   checked={filters.coverageHoleOnly || false}
-                  onChange={(e) => handleFilterChange("coverageHoleOnly", e.target.checked)}
+                  onChange={(e) =>
+                    handleFilterChange("coverageHoleOnly", e.target.checked)
+                  }
                   className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-slate-100">Coverage Holes</div>
+                  <div className="text-sm font-medium text-slate-100">
+                    Coverage Holes
+                  </div>
                   <div className="text-xs text-slate-400">
                     RSRP &lt; {thresholds?.coveragehole || -110} dBm
                   </div>
@@ -386,7 +432,9 @@ export default function MapSidebarFloating({
                   onChange={() => handleColorByChange("provider")}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <div className="text-sm font-medium text-slate-100">Color by Provider</div>
+                <div className="text-sm font-medium text-slate-100">
+                  Color by Provider
+                </div>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
@@ -396,7 +444,9 @@ export default function MapSidebarFloating({
                   onChange={() => handleColorByChange("technology")}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <div className="text-sm font-medium text-slate-100">Color by Technology</div>
+                <div className="text-sm font-medium text-slate-100">
+                  Color by Technology
+                </div>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
@@ -406,14 +456,18 @@ export default function MapSidebarFloating({
                   onChange={() => handleColorByChange("band")}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <div className="text-sm font-medium text-slate-100">Color by Band</div>
+                <div className="text-sm font-medium text-slate-100">
+                  Color by Band
+                </div>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 p-2 rounded transition-colors">
                 <input
                   type="checkbox"
                   checked={ui?.clusterSessions || false}
-                  onChange={(e) => onUIChange?.({ clusterSessions: e.target.checked })}
+                  onChange={(e) =>
+                    onUIChange?.({ clusterSessions: e.target.checked })
+                  }
                   disabled={!ui?.showSessions || hasActiveFilters}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                 />
@@ -434,7 +488,9 @@ export default function MapSidebarFloating({
                 <input
                   type="checkbox"
                   checked={ui?.showHeatmap || false}
-                  onChange={(e) => onUIChange?.({ showHeatmap: e.target.checked })}
+                  onChange={(e) =>
+                    onUIChange?.({ showHeatmap: e.target.checked })
+                  }
                   disabled={!hasActiveFilters}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                 />
@@ -444,7 +500,6 @@ export default function MapSidebarFloating({
           </PanelSection>
 
           {/* Color Legend */}
-         
         </div>
 
         {/* Footer - Fixed */}

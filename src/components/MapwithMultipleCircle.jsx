@@ -1,116 +1,16 @@
-// src/components/MapwithMultipleCircle.jsx
+
 import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { GoogleMap, PolygonF, RectangleF } from "@react-google-maps/api";
 import { getColorForMetric } from "../utils/metrics";
 import { mapViewApi } from "../api/apiEndpoints";
 import CanvasOverlay from "./maps/CanvasOverlay";
-import { ArrowDown, X } from "lucide-react";
+import { ArrowDown, X, Zap } from "lucide-react";
 import { getLogColor } from "../utils/colorUtils";
+import TechHandoverMarkers from "./maps/TechHandoverMarkers";
+
 
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
-// const OPERATOR_COLORS = {
-//   jio: "#3B82F6",
-//   airtel: "#EF4444",
-//   vi: "#22C55E",
-//   vodafone: "#22C55E",
-//   bsnl: "#F59E0B",
-//   unknown: "#6B7280",
-// };
-
-// const TECHNOLOGY_COLORS = {
-//   "5g": "#EC4899",
-//   "nr": "#EC4899",
-//   "4g": "#8B5CF6",
-//   "lte": "#8B5CF6",
-//   "3g": "#10B981",
-//   "2g": "#6B7280",
-//   "unknown": "#F59E0B",
-// };
-
-// const BAND_COLORS = {
-//   "1": "#EF4444",
-//   "2": "#F59E0B",
-//   "3": "#EF4444",
-//   "5": "#F59E0B",
-//   "7": "#10B981",
-//   "8": "#10B981",
-//   "20": "#0EA5E9",
-//   "38": "#14B8A6",
-//   "40": "#3B82F6",
-//   "41": "#8B5CF6",
-//   "42": "#6366F1",
-//   "n28": "#EC4899",
-//   "n78": "#F472B6",
-//   "n258": "#D946EF",
-//   "Unknown": "#6B7280"
-// };
-
-// Smart matching functions
-// const getOperatorColor = (name) => {
-//   if (!name || typeof name !== 'string') return OPERATOR_COLORS.unknown;
-//   const cleanName = name.toLowerCase().trim();
-  
-//   if (cleanName.includes('jio') || cleanName.includes('reliance')) return OPERATOR_COLORS.jio;
-//   if (cleanName.includes('airtel') || cleanName.includes('Air')) return OPERATOR_COLORS.airtel;
-//   if (cleanName.includes('vodafone') || cleanName.includes('idea') || cleanName === 'vi' || cleanName.includes('vi india')) return OPERATOR_COLORS.vi;
-//   if (cleanName.includes('bsnl')) return OPERATOR_COLORS.bsnl;
-  
-//   return OPERATOR_COLORS.unknown;
-// };
-
-// const getTechnologyColor = (tech) => {
-//   if (!tech || typeof tech !== 'string') return TECHNOLOGY_COLORS.unknown;
-//   const cleanTech = tech.toLowerCase().trim();
-  
-//   if (cleanTech.includes('5g') || cleanTech.includes('nr')) return TECHNOLOGY_COLORS['5g'];
-//   if (cleanTech.includes('4g') || cleanTech.includes('lte')) return TECHNOLOGY_COLORS['4g'];
-//   if (cleanTech.includes('3g') || cleanTech.includes('hspa') || cleanTech.includes('wcdma')) return TECHNOLOGY_COLORS['3g'];
-//   if (cleanTech.includes('2g') || cleanTech.includes('gsm') || cleanTech.includes('edge')) return TECHNOLOGY_COLORS['2g'];
-  
-//   return TECHNOLOGY_COLORS.unknown;
-// };
-
-// const getBandColor = (band) => {
-//   if (!band) return BAND_COLORS.unknown;
-//   const cleanBand = String(band).toLowerCase().trim();
-  
-//   if (BAND_COLORS[cleanBand]) return BAND_COLORS[cleanBand];
-  
-//   const bandMatch = cleanBand.match(/(\d+)/);
-//   if (bandMatch && BAND_COLORS[bandMatch[1]]) return BAND_COLORS[bandMatch[1]];
-  
-//   return BAND_COLORS.unknown;
-// };
-
-// // Updated getColorByScheme with smart matching
-// const getColorByScheme = (location, colorBy) => {
-//   if (!colorBy) return null;
-  
-//   const value = location[colorBy];
-//   if (!value) return "#6B7280";
-  
-//   switch (colorBy.toLowerCase()) {
-//     case 'provider':
-//     case 'operator':
-//     case 'network':
-//       return getLogColor(value);
-      
-//     case 'technology':
-//     case 'tech':
-//     case 'rat':
-//       return getTechnologyColor(value);
-      
-//     case 'band':
-//     case 'frequency':
-//       return getBandColor(value);
-      
-//     default:
-//       return "#6B7280";
-//   }
-// };
-
-// Aggregation methods
 const AGGREGATION_METHODS = {
   median: (values) => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -154,9 +54,9 @@ const getPolygonBounds = (path) => {
   return { north: maxLat, south: minLat, east: maxLng, west: minLng };
 };
 
-// Optimized point-in-polygon check with bbox pre-filter
+
 const isPointInPolygon = (point, path, bbox) => {
-  // Quick bbox check first
+  
   if (bbox) {
     if (point.lat < bbox.south || point.lat > bbox.north || 
         point.lng < bbox.west || point.lng > bbox.east) {
@@ -338,6 +238,8 @@ const MapWithMultipleCircles = ({
   showControls = true,
   showStats = true,
   enableOpacityControl = true,
+  technologyTransitions = [],
+  techHandOver = false,
   onFilteredLocationsChange,
   opacity = 1,
   showPoints: showPointsProp = true,
@@ -346,38 +248,35 @@ const MapWithMultipleCircles = ({
   
   const [hoveredCell, setHoveredCell] = useState(null);
 
-  // Polygon state
+  
   const [polygonData, setPolygonData] = useState([]);
   const [polygonsFetched, setPolygonsFetched] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   
 
-  // ✅ FIX: Use ref to store callback to avoid dependency issues
+  
   const onFilteredLocationsChangeRef = useRef(onFilteredLocationsChange);
   
   useEffect(() => {
     onFilteredLocationsChangeRef.current = onFilteredLocationsChange;
   }, [onFilteredLocationsChange]);
 
-  // Fetch polygons (existing code)
+  
   useEffect(() => {
     const fetchPolygons = async () => {
       if (!projectId) {
-        console.log("📍 No projectId, skipping polygon fetch");
         setPolygonData([]);
         setPolygonsFetched(true);
         return;
       }
 
       if (!enablePolygonFilter) {
-        console.log("📍 Polygon filter disabled, skipping fetch");
         setPolygonData([]);
         setPolygonsFetched(true);
         return;
       }
 
       try {
-        console.log(`📍 Fetching polygons for project ${projectId}, source: ${polygonSource}`);
         const res = await mapViewApi.getProjectPolygonsV2(projectId, polygonSource);
         const items = res?.Data || res?.data?.Data || (Array.isArray(res) ? res : []);
         
@@ -397,7 +296,6 @@ const MapWithMultipleCircles = ({
           }
         });
         
-        console.log(`✅ Fetched ${allPaths.length} polygons`);
         setPolygonData(allPaths);
         setPolygonsFetched(true);
         setFetchError(null);
@@ -418,28 +316,24 @@ const MapWithMultipleCircles = ({
     
     // No locations
     if (!locations?.length) {
-      console.log("⚠️ No locations to filter");
       console.groupEnd();
       return [];
     }
 
     // Polygon filter disabled - return all
     if (!enablePolygonFilter) {
-      console.log(`✅ Filter disabled, returning all ${locations.length} locations`);
       console.groupEnd();
       return locations;
     }
 
     // Polygons not yet fetched - wait
     if (!polygonsFetched) {
-      console.log("⏳ Waiting for polygons to load...");
       console.groupEnd();
       return [];
     }
 
     // No polygons defined - return all locations
     if (polygonData.length === 0) {
-      console.log(`⚠️ No polygons found, returning all ${locations.length} locations`);
       console.groupEnd();
       return locations;   //yaha pe 1 change 
         }
@@ -447,8 +341,6 @@ const MapWithMultipleCircles = ({
     // Filter locations inside polygons
     const filtered = filterLocationsInsidePolygons(locations, polygonData);
     
-    console.log(`✅ Filtered: ${filtered.length} inside / ${locations.length} total`);
-    console.log(`📊 ${((filtered.length / locations.length) * 100).toFixed(1)}% of points inside polygon`);
     
     if (filtered.length === 0 && locations.length > 0) {
       console.warn("⚠️ All points filtered out! Check if polygon covers the data area.");
@@ -462,7 +354,6 @@ const MapWithMultipleCircles = ({
   useEffect(() => {
     const callback = onFilteredLocationsChangeRef.current;
     if (callback) {
-      console.log(`📤 Sending ${locationsToRender.length} filtered locations to parent (for MapLegend)`);
       callback(locationsToRender);
     }
   }, [locationsToRender]);
@@ -626,6 +517,17 @@ const MapWithMultipleCircles = ({
           />
         )}
 
+        <TechHandoverMarkers
+          transitions={technologyTransitions}
+          show={techHandOver}
+          compactMode={technologyTransitions.length > 30}
+          showConnections={technologyTransitions.length < 50}
+          onTransitionClick={(transition) => {
+            console.log("Handover clicked:", transition);
+            // Optionally navigate to that point or show details
+          }}
+        />
+
         {children}
       </GoogleMap>
 
@@ -677,33 +579,6 @@ const MapWithMultipleCircles = ({
         </div>
       )}
 
-      {/* Controls Panel
-      {showControls && !enableGrid && (
-        <div className="absolute top-2 left-49 bg-white rounded-lg shadow-lg p-3 z-10 space-y-3">
-          {!dropButton ? (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-600 font-medium">Opacity </span>
-                <span className="text-xs font-semibold text-blue-600">{Math.round(opacity * 100)}%</span>
-                <button onClick={() => setDropButton(!dropButton)}> <X /> </button>
-              </div>
-              <input
-                type="range"
-                min="10"
-                max="100"
-                value={opacity * 100}
-                onChange={(e) => setOpacity(Number(e.target.value) / 100)}
-                className="w-24 h-2 bg-gray-200 rounded-lg cursor-pointer accent-blue-600"
-              />
-            </div>
-          ) : (
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-600 font-medium">Opacity</span>
-              <button onClick={() => setDropButton(!dropButton)}> <ArrowDown /> </button>
-            </div>
-          )}
-        </div>
-      )} */}
 
       {/* Grid Controls */}
       {showControls && enableGrid && (
@@ -722,6 +597,23 @@ const MapWithMultipleCircles = ({
               <span className="text-gray-500">Cells:</span>
               <span className="font-medium">{gridCells.length}</span>
             </div>
+          </div>
+        </div>
+      )}
+      {techHandOver && technologyTransitions.length > 0 && (
+        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 z-20 min-w-[180px]">
+          <div className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+            <Zap className="h-4 w-4 text-orange-500" />
+            Tech Handovers
+          </div>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Total:</span>
+              <span className="font-bold text-orange-600">
+                {technologyTransitions.length}
+              </span>
+            </div>
+            {/* <HandoverSummary transitions={technologyTransitions} /> */}
           </div>
         </div>
       )}

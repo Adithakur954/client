@@ -159,6 +159,7 @@ const UnifiedMapSidebar = ({
   setDataToggle,
   enableSiteToggle,
   setEnableSiteToggle,
+  setTechHandOver,
   siteToggle,
   setSiteToggle,
   projectId,
@@ -174,6 +175,8 @@ const UnifiedMapSidebar = ({
   setColorBy,
   ui,
   onUIChange,
+  techHandOver,
+  technologyTransitions,
   showPolygons,
   setShowPolygons,
   polygonSource,
@@ -786,7 +789,38 @@ const UnifiedMapSidebar = ({
               </div>
             </PanelSection>
           )}
-          {/* Coverage Hole Filters */}
+          {/* Coverage Handover Panel */}
+          <PanelSection title="Tech Handover" icon={RefreshCw}>
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800">
+                <input
+                  type="checkbox"
+                  checked={techHandOver || false}
+                  onChange={(e) => setTechHandOver?.(e.target.checked)} 
+                  className="w-4 h-4"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium">
+                    Show Technology Handovers
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Display markers where technology changes
+                  </div>
+                </div>
+              </label>
+
+              {techHandOver && technologyTransitions?.length > 0 && (
+                <div className="p-2 bg-slate-800 rounded text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Total Handovers:</span>
+                    <span className="font-semibold text-orange-400">
+                      {technologyTransitions.length}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </PanelSection>
           {shouldShowMetricSelector && coverageHoleFilters && (
             <PanelSection title="Coverage Hole Filters" icon={Filter}>
               <div className="space-y-3">

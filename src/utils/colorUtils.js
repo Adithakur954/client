@@ -50,7 +50,8 @@ export const normalizeTechName = (tech) => {
     "000", 
     "00", 
     "Unknown/No Service", 
-    "Unknown / No Service",  
+    "Unknown / No Service", 
+    "UNKNOWN / NO SERVICE", 
     "Unknown",               
     "404440", 
     "404011"

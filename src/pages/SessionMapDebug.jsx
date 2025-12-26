@@ -1198,7 +1198,7 @@ function SessionMapDebug() {
             map={map}
             enabled={safeUi.drawEnabled}
             logs={filteredLogs}
-            sessions={sessionMarkers} // FIX #3: Pass actual session markers instead of EMPTY_ARRAY
+            sessions={sessionMarkers} 
             thresholds={formattedThresholds}
             selectedMetric={filters.metric?.toLowerCase() || "rsrp"}
             shapeMode={safeUi.shapeMode}
@@ -1212,13 +1212,7 @@ function SessionMapDebug() {
         )}
       </GoogleMap>
 
-      <DrawingControlsPanel
-        position="top-right"
-        ui={ui}
-        onUIChange={updateUI}
-        hasLogs={hasLogs}
-        polygonStats={analysis}
-      />
+      
 
       <AllLogsPanelToggle
         logs={filteredLogs}

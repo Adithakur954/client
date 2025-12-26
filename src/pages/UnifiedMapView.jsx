@@ -38,6 +38,7 @@ import {
   DEFAULT_WEIGHTS,
 } from "@/hooks/useBestNetworkCalculation";
 
+
 const DEFAULT_CENTER = { lat: 28.64453086, lng: 77.37324242 };
 
 const DEFAULT_THRESHOLDS = {
@@ -306,7 +307,7 @@ const parseLogEntry = (log, sessionId) => {
     mos: parseFloat(log.mos ?? log.MOS ?? log.Mos) || null,
     lte_bler: parseFloat(log.lte_bler_json ?? log.LTE_BLER ?? log.LteBler) || null,
     provider: normalizeProviderName(rawProvider),
-    technology: String(log.network ?? log.technology ?? log.Network ?? log.Technology ?? "").trim(),
+    technology: String(normalizeTechName(log.technology ?? log.Technology ?? log.network ?? log.Network ?? "")).trim(),
     band: String(log.band ?? log.Band ?? "").trim(),
     pci: parseInt(log.pci ?? log.PCI ?? log.Pci) || null,
     session_id: sessionId,
@@ -390,6 +391,8 @@ const useSampleData = (sessionIds, enabled) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const abortControllerRef = useRef(null);
+  const [technologyTransitions, setTechnologyTransitions] = useState(false);
+
 
   const fetchData = useCallback(async () => {
     if (!sessionIds?.length || !enabled) {
@@ -473,6 +476,38 @@ const useSampleData = (sessionIds, enabled) => {
   }, [sessionIds, enabled]);
 
   useEffect(() => {
+  if (!locations || locations.length < 2) {
+    setTechnologyTransitions([]);
+    return;
+  }
+
+  const transitions = [];
+  let prevTech = normalizeTechName(locations[0].technology);
+
+  for (let i = 1; i < locations.length; i++) {
+    const currTech = normalizeTechName(locations[i].technology);
+
+    if (currTech && prevTech && currTech !== prevTech) {
+      transitions.push({
+        from: prevTech,
+        to: currTech,
+        atIndex: i,
+        lat: locations[i].lat,
+        lng: locations[i].lng,
+        timestamp: locations[i].timestamp,
+        session_id: locations[i].session_id,
+      });
+      
+    }
+
+    prevTech = currTech;
+  }
+
+  setTechnologyTransitions(transitions);
+}, [locations]);
+
+
+  useEffect(() => {
     fetchData();
 
     return () => {
@@ -490,8 +525,10 @@ const useSampleData = (sessionIds, enabled) => {
     loading,
     error,
     refetch: fetchData,
+    technologyTransitions,
   };
 };
+
 
 const usePredictionData = (projectId, selectedMetric, enabled) => {
   const [locations, setLocations] = useState([]);
@@ -573,6 +610,7 @@ const usePredictionData = (projectId, selectedMetric, enabled) => {
     loading,
     error,
     refetch: fetchData,
+    
   };
 };
 
@@ -777,16 +815,7 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
       </div>
 
       <div className="p-4 space-y-3">
-        {medianValue !== null && medianValue !== undefined && (
-          <div className="flex items-center justify-between pb-2 border-b">
-            <span className="text-sm font-medium text-gray-600">
-              Median {config.label}:
-            </span>
-            <span className="text-base font-bold text-gray-900">
-              {medianValue.toFixed(2)} {unit}
-            </span>
-          </div>
-        )}
+        
 
         {selectedCategory === "provider" && bestProvider && (
           <div className="space-y-1">
@@ -805,6 +834,17 @@ const ZoneTooltip = React.memo(({ polygon, position, selectedMetric, selectedCat
                 </span>
               )}
             </div>
+          </div>
+        )}
+
+        {medianValue !== null && medianValue !== undefined && (
+          <div className="flex items-center justify-between pb-2 border-b">
+            <span className="text-sm font-medium text-gray-600">
+              Median {config.label}:
+            </span>
+            <span className="text-base font-bold text-gray-900">
+              {medianValue.toFixed(2)} {unit}
+            </span>
           </div>
         )}
 
@@ -966,6 +1006,9 @@ const UnifiedMapView = () => {
   const [enableGrid, setEnableGrid] = useState(false);
   const [gridSizeMeters, setGridSizeMeters] = useState(20);
   const [durationTime, setDurationTime] = useState([]);
+  const [techHandOver, setTechHandOver] = useState(false); 
+  const [indoor, setIndoor] = useState([]);
+  const [outdoor, setOutdoor] = useState([]);
 
   const [logArea, setLogArea] = useState(null);
 
@@ -995,6 +1038,7 @@ const UnifiedMapView = () => {
     loading: sampleLoading,
     error: sampleError,
     refetch: refetchSample,
+    technologyTransitions: technologyTransitions,
   } = useSampleData(
     sessionIds,
     enableDataToggle && dataToggle === "sample"
@@ -1072,6 +1116,20 @@ const UnifiedMapView = () => {
       }
     };
     timeData();
+  }, [sessionIds]);
+
+  useEffect(() =>{
+    const ioAnalysis =async () =>{
+      try {
+          const res = await mapViewApi.getIOAnalysis({ sessionIds: sessionIds.join(",") });
+          setIndoor(res?.Indoor)
+          setOutdoor(res?.Outdoor);
+      } catch (error) {
+        console.error("Failed to fetch IO analysis:", error);
+      }
+    }
+
+    ioAnalysis();
   }, [sessionIds]);
 
   const locations = useMemo(() => {
@@ -1500,6 +1558,8 @@ const UnifiedMapView = () => {
           InpSummary={inpSummary}
           tptVolume={tptVolume}
           logArea={logArea}
+          indoor={indoor}
+          outdoor={outdoor}
           dataFilters={dataFilters}
           bestNetworkEnabled={bestNetworkEnabled}
           bestNetworkStats={bestNetworkStats}
@@ -1513,6 +1573,9 @@ const UnifiedMapView = () => {
         enableDataToggle={enableDataToggle}
         setEnableDataToggle={setEnableDataToggle}
         dataToggle={dataToggle}
+        setTechHandOver={setTechHandOver}
+        techHandOver={techHandOver}
+        technologyTransitions={technologyTransitions}
         setDataToggle={setDataToggle}
         enableSiteToggle={enableSiteToggle}
         setEnableSiteToggle={setEnableSiteToggle}
@@ -1604,6 +1667,8 @@ const UnifiedMapView = () => {
               locations={locationsToDisplay}
               thresholds={effectiveThresholds}
               selectedMetric={selectedMetric}
+              technologyTransitions={technologyTransitions}
+              techHandOver={techHandOver}
               colorBy={colorBy}
               activeMarkerIndex={null}
               onMarkerClick={() => {}}

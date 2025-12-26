@@ -573,6 +573,7 @@ export const mapViewApi = {
   startSession: (data) => api.post("/api/MapView/start_session", data),
   endSession: (data) => api.post("/api/MapView/end_session", data),
   getDuration: ({sessionIds}) => api.get(`/api/MapView/session/provider-network-time/combined`,{ params: { sessionIds } }),
+  getIOAnalysis: (params) => api.get(`/api/MapView/GetIndoorOutdoorSessionAnalytics`,{ params }),
 
   // ==================== Polygon Management ====================
   getProjectPolygons: (projectId) =>

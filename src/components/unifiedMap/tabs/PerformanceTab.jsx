@@ -5,7 +5,7 @@ import { SpeedAnalysisChart } from "../charts/performance/SpeedAnalysisChart";
 import { Activity } from "lucide-react";
 
 export const PerformanceTab = ({ locations, expanded, chartRefs }) => {
-  // Check if there's any valid speed data
+ 
   const hasSpeedData = useMemo(() => {
     if (!locations || locations.length === 0) return false;
     return locations.some(loc => 

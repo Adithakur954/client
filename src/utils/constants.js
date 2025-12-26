@@ -226,6 +226,7 @@ export const TABS = [
   { id: "network", label: "Comparison", icon: "Wifi" },
   { id: "performance", label: "Performance", icon: "Zap" },
   { id: "Application", label: "Apps", icon: "PieChartIcon" },
+  { id: "io", label: "I/O Analysis", icon: "Database" },
 ];
 
 export const CHART_CONFIG = {

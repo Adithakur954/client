@@ -247,6 +247,8 @@ export default function HighPerfMap() {
       const apiParams = {
         StartDate: toYmdLocal(dateFilters.startDate),
         EndDate: toYmdLocal(dateFilters.endDate),
+        StartTime: dateFilters.startTime || "00:00:00",  
+      EndTime: dateFilters.endTime || "23:59:59",
       };
       if (dateFilters.provider && dateFilters.provider !== "ALL") apiParams.Provider = dateFilters.provider;
       if (dateFilters.technology && dateFilters.technology !== "ALL") apiParams.Technology = dateFilters.technology;
@@ -336,24 +338,38 @@ export default function HighPerfMap() {
   }, [analysis, activeFilters, fetchLogsFromApi, navigate]);
 
   const handleApplyFilters = useCallback(async (filters) => {
-    const dateChanged = !activeFilters || toYmdLocal(filters.startDate) !== toYmdLocal(activeFilters.startDate) || toYmdLocal(filters.endDate) !== toYmdLocal(activeFilters.endDate);
-    const apiFiltersChanged = dateChanged || filters.provider !== activeFilters?.provider || filters.technology !== activeFilters?.technology || filters.band !== activeFilters?.band;
+  // Check if date changed
+  const dateChanged = !activeFilters || 
+    toYmdLocal(filters.startDate) !== toYmdLocal(activeFilters.startDate) || 
+    toYmdLocal(filters.endDate) !== toYmdLocal(activeFilters.endDate);
+  
+  // Check if time changed
+  const timeChanged = !activeFilters ||
+    filters.startTime !== activeFilters.startTime ||
+    filters.endTime !== activeFilters.endTime;
 
-    setActiveFilters(filters);
-    setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
-    setSelectedSessionData(null);
-    setAnalysis(null);
-    setUi(u => ({ ...u, showLogsCircles: true, showSessions: false }));
-    setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
-    setColorBy(filters.colorBy || null);
+  // Check if any API-related filter changed (date, time, provider, technology, band)
+  const apiFiltersChanged = dateChanged || 
+    timeChanged ||
+    filters.provider !== activeFilters?.provider || 
+    filters.technology !== activeFilters?.technology || 
+    filters.band !== activeFilters?.band;
 
-    let logsToFilter = rawLogs;
-    if (apiFiltersChanged) {
-      logsToFilter = await fetchLogsFromApi(filters);
-    }
-    const filtered = applyLocalFilters(logsToFilter, filters);
-    setDisplayedLogs(filtered);
-  }, [activeFilters, rawLogs, fetchLogsFromApi, applyLocalFilters]);
+  setActiveFilters(filters);
+  setSelectedMetric(String(filters.measureIn || "rsrp").toLowerCase());
+  setSelectedSessionData(null);
+  setAnalysis(null);
+  setUi(u => ({ ...u, showLogsCircles: true, showSessions: false }));
+  setShowCoverageHoleOnly(filters.coverageHoleOnly || false);
+  setColorBy(filters.colorBy || null);
+
+  let logsToFilter = rawLogs;
+  if (apiFiltersChanged) {
+    logsToFilter = await fetchLogsFromApi(filters);
+  }
+  const filtered = applyLocalFilters(logsToFilter, filters);
+  setDisplayedLogs(filtered);
+}, [activeFilters, rawLogs, fetchLogsFromApi, applyLocalFilters]);
 
   const handleClearFilters = useCallback(() => {
     setActiveFilters(null);
