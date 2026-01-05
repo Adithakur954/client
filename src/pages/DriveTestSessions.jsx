@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 const DriveTestSessionsPage = () => {
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [selectedSessions, setSelectedSessions] = useState([]); // ✅ Track selected sessions
+    const [selectedSessions, setSelectedSessions] = useState([]); 
     const navigate = useNavigate();
 
     const [currentPage, setCurrentPage] = useState(1);
@@ -169,6 +169,7 @@ const DriveTestSessionsPage = () => {
                                     aria-label="Select all on this page"
                                 />
                             </TableHead>
+                            <TableHead>SessionId</TableHead>
                             <TableHead>User Details</TableHead>
                             <TableHead>Start Time - End Time</TableHead>
                             <TableHead>Start Location</TableHead>
@@ -194,6 +195,9 @@ const DriveTestSessionsPage = () => {
                                     />
                                 </TableCell>
                                 <TableCell className="whitespace-normal break-words max-w-[200px]">
+                                    <div className="font-medium">{session.id || 'Unknown User'} </div>
+                                </TableCell>
+                                <TableCell className="whitespace-normal break-words max-w-[200px]">
                                     <div className="font-medium">{session.CreatedBy || 'Unknown User'} ({session.mobile || 'N/A'})</div>
                                     <div className="text-sm text-muted-foreground">
                                         {session.make}, {session.model}, {session.os}, {session.operator_name}
@@ -213,7 +217,7 @@ const DriveTestSessionsPage = () => {
                                 <TableCell className="text-right">
                                     <Button variant="outline" size="sm" onClick={() => handleViewOnMap(session.id)}>
                                         <Map className="h-4 w-4 mr-2" />
-                                        View on Map
+                                        
                                     </Button>
                                     <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 ml-2" onClick={() => handleDelete(session.id)}>
                                         <Trash2 className="h-4 w-4" />

@@ -1009,6 +1009,7 @@ const UnifiedMapView = () => {
   const [techHandOver, setTechHandOver] = useState(false); 
   const [indoor, setIndoor] = useState([]);
   const [outdoor, setOutdoor] = useState([]);
+  const [distance, setDistance] = useState(null);
 
   const [logArea, setLogArea] = useState(null);
 
@@ -1117,6 +1118,21 @@ const UnifiedMapView = () => {
     };
     timeData();
   }, [sessionIds]);
+
+  useEffect(() =>{
+    const neighbordata = async () =>{
+      if (!sessionIds?.length) return;
+      try {
+        const res = await mapViewApi.getDistanceSession({ sessionIds: sessionIds.join(",") });
+        setDistance(res?.TotalDistanceKm || null);
+        console.log("Distance data:", res); 
+        console.log("Distance value:", res?.TotalDistanceKm);
+      } catch (error) {
+        console.error("Failed to fetch distance data:", error);
+      }
+    }
+    neighbordata();
+  },[sessionIds])
 
   useEffect(() =>{
     const ioAnalysis =async () =>{
@@ -1415,6 +1431,7 @@ const UnifiedMapView = () => {
   // FIX: Memoize map options to prevent recreation on every render
   const mapOptions = useMemo(() => ({
     mapTypeId: basemapStyle,
+    maxZoom: 15,
   }), [basemapStyle]);
 
   // FIX: Update viewport using ref to avoid triggering re-renders
@@ -1549,6 +1566,7 @@ const UnifiedMapView = () => {
           onlyInsidePolygons={onlyInsidePolygons}
           coverageHoleFilters={coverageHoleFilters}
           viewport={viewport}
+          distance={distance}
           mapCenter={mapCenter}
           projectId={projectId}
           sessionIds={sessionIds}

@@ -4,7 +4,6 @@ import { Settings, Download, Activity, TrendingUp, AlertCircle } from 'lucide-re
 import { useBoxData } from '@/hooks/useDashboardData';
 import Spinner from '@/components/common/Spinner';
 
-// Operator colors
 const OPERATOR_COLORS = {
   'Airtel': '#E40000',
   'Jio': '#0A2885',
@@ -15,7 +14,6 @@ const OPERATOR_COLORS = {
   'default': '#6366f1'
 };
 
-// Metric configurations with correct units and domains
 const METRIC_CONFIG = {
   rsrp: {
     value: 'rsrp',
@@ -63,7 +61,6 @@ const getOperatorColor = (name) => {
   if (cleanName.includes('vi') || cleanName.includes('vodafone') || cleanName.includes('idea')) return OPERATOR_COLORS['Vi'];
   if (cleanName.includes('bsnl')) return OPERATOR_COLORS['BSNL'];
   
-  // Generate consistent color for unknown operators
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -75,16 +72,15 @@ const getOperatorColor = (name) => {
 const BoxPlotChartSimple = () => {
   const [selectedMetric, setSelectedMetric] = useState('rsrp');
   const [showSettings, setShowSettings] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-  // Fetch data
   const { data: boxData, isLoading, error } = useBoxData(selectedMetric);
 
-  // Get metric configuration
   const metricConfig = useMemo(() => {
     return METRIC_CONFIG[selectedMetric] || METRIC_CONFIG.rsrp;
   }, [selectedMetric]);
 
-  // Validate and filter data
   const validData = useMemo(() => {
     if (!boxData || !Array.isArray(boxData)) return [];
     
@@ -100,7 +96,6 @@ const BoxPlotChartSimple = () => {
     );
   }, [boxData]);
 
-  // Calculate Y-axis domain from VALID data
   const yDomain = useMemo(() => {
     if (validData.length === 0) {
       return metricConfig.domain;
@@ -113,11 +108,10 @@ const BoxPlotChartSimple = () => {
       return metricConfig.domain;
     }
     
-    const padding = Math.abs(allMax - allMin) * 0.15;
+    const padding = Math.abs(allMax - allMin) * 0.2;
     return [Math.floor(allMin - padding), Math.ceil(allMax + padding)];
   }, [validData, metricConfig]);
 
-  // Safe percentage calculation
   const calcPercent = (value, min, max) => {
     const range = max - min;
     if (range <= 0 || !Number.isFinite(value)) return 0;
@@ -125,14 +119,13 @@ const BoxPlotChartSimple = () => {
     return Math.max(0, Math.min(100, percent));
   };
 
-  // Format value with appropriate precision based on metric
   const formatValue = (value, metric) => {
     if (!Number.isFinite(value)) return 'N/A';
     
     switch (metric) {
       case 'dl_tpt':
       case 'ul_tpt':
-        return value.toFixed(2); // More precision for throughput
+        return value.toFixed(2);
       case 'rsrp':
       case 'rsrq':
       case 'sinr':
@@ -141,7 +134,6 @@ const BoxPlotChartSimple = () => {
     }
   };
 
-  // Export handler
   const handleExport = () => {
     if (validData.length === 0) return;
 
@@ -165,7 +157,18 @@ const BoxPlotChartSimple = () => {
     link.click();
   };
 
-  // Check for data quality issues
+  const handleMouseMove = (item, event) => {
+    setMousePosition({
+      x: event.clientX,
+      y: event.clientY
+    });
+    setHoveredItem(item);
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredItem(null);
+  };
+
   const dataWarnings = useMemo(() => {
     const warnings = [];
     if (boxData && boxData.length > validData.length) {
@@ -176,6 +179,104 @@ const BoxPlotChartSimple = () => {
     }
     return warnings;
   }, [boxData, validData]);
+
+  const CustomTooltip = ({ item }) => {
+    if (!item) return null;
+    
+    const color = getOperatorColor(item.provider);
+    
+    return (
+      <div 
+        className="fixed z-[9999] bg-white rounded-lg shadow-xl border-2 p-3 pointer-events-none"
+        style={{ 
+          left: mousePosition.x + 15,
+          top: mousePosition.y - 10,
+          borderColor: color,
+          minWidth: '200px'
+        }}
+      >
+        <div 
+          className="text-base font-bold mb-2 pb-2 border-b"
+          style={{ color: color, borderColor: `${color}30` }}
+        >
+          {item.provider}
+        </div>
+        
+        <div className="space-y-1.5 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Max:</span>
+            <span className="font-semibold text-gray-900">
+              {formatValue(item.max, selectedMetric)} {metricConfig.unit}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Q3:</span>
+            <span className="font-semibold text-gray-900">
+              {formatValue(item.Q3, selectedMetric)} {metricConfig.unit}
+            </span>
+          </div>
+          <div className="flex justify-between" style={{ color: color }}>
+            <span className="font-medium">Median:</span>
+            <span className="font-bold">
+              {formatValue(item.Median, selectedMetric)} {metricConfig.unit}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Q1:</span>
+            <span className="font-semibold text-gray-900">
+              {formatValue(item.Q1, selectedMetric)} {metricConfig.unit}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Min:</span>
+            <span className="font-semibold text-gray-900">
+              {formatValue(item.min, selectedMetric)} {metricConfig.unit}
+            </span>
+          </div>
+          <div className="flex justify-between pt-1 border-t border-gray-200">
+            <span className="text-gray-600">IQR:</span>
+            <span className="font-semibold text-gray-900">
+              {formatValue(item.Q3 - item.Q1, selectedMetric)} {metricConfig.unit}
+            </span>
+          </div>
+          {item.samples && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Samples:</span>
+              <span className="font-semibold text-gray-900">
+                {item.samples.toLocaleString()}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const Legend = () => {
+    if (validData.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap justify-center gap-4 mt-6 pt-4 border-t border-gray-200">
+        {validData.map((item, index) => {
+          const color = getOperatorColor(item.provider);
+          return (
+            <div 
+              key={`legend-${item.provider}-${index}`}
+              className="flex items-center gap-2"
+            >
+              <div 
+                className="w-4 h-4 rounded"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-sm font-medium text-gray-700">
+                {item.provider}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -271,13 +372,16 @@ const BoxPlotChartSimple = () => {
         </div>
       )}
 
+      {/* Tooltip */}
+      {hoveredItem && <CustomTooltip item={hoveredItem} />}
+
       {/* Chart */}
       {!isLoading && !error && validData.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Visual Box Plot */}
-          <div className="relative bg-gray-50 rounded-lg p-4 pt-6">
+          <div className="relative bg-gray-50 rounded-lg p-4 pt-8">
             {/* Y-Axis with unit */}
-            <div className="absolute left-0 top-6 bottom-12 w-16 flex flex-col justify-between text-xs text-gray-500 text-right pr-2">
+            <div className="absolute left-0 top-8 bottom-16 w-16 flex flex-col justify-between text-xs text-gray-500 text-right pr-2">
               <span>{yDomain[1]} <span className="text-gray-400">{metricConfig.unit}</span></span>
               <span>{Math.round((yDomain[0] + yDomain[1]) / 2)}</span>
               <span>{yDomain[0]}</span>
@@ -285,8 +389,8 @@ const BoxPlotChartSimple = () => {
 
             {/* Chart Area */}
             <div 
-              className="ml-16 mr-4 flex items-end justify-around gap-2"
-              style={{ height: '280px' }}
+              className="ml-16 mr-4 flex items-end justify-around gap-4"
+              style={{ height: '320px' }}
             >
               {validData.map((item, index) => {
                 const color = getOperatorColor(item.provider);
@@ -301,21 +405,17 @@ const BoxPlotChartSimple = () => {
                 return (
                   <div
                     key={`box-${item.provider}-${index}`}
-                    className="flex-1 relative max-w-[100px] min-w-[40px]"
+                    className="flex-1 relative max-w-[120px] min-w-[50px] cursor-pointer"
                     style={{ height: '100%' }}
+                    onMouseMove={(e) => handleMouseMove(item, e)}
+                    onMouseLeave={handleMouseLeave}
                   >
-                    {/* Tooltip area */}
-                    <div 
-                      className="absolute inset-0 cursor-pointer group"
-                      title={`${item.provider}\nMax: ${formatValue(item.max, selectedMetric)} ${metricConfig.unit}\nQ3: ${formatValue(item.Q3, selectedMetric)} ${metricConfig.unit}\nMedian: ${formatValue(item.Median, selectedMetric)} ${metricConfig.unit}\nQ1: ${formatValue(item.Q1, selectedMetric)} ${metricConfig.unit}\nMin: ${formatValue(item.min, selectedMetric)} ${metricConfig.unit}\nSamples: ${item.samples?.toLocaleString() || 'N/A'}`}
-                    />
-
                     {/* Whisker Line */}
                     <div
                       className="absolute left-1/2 w-0.5 -translate-x-1/2 transition-all"
                       style={{
                         backgroundColor: color,
-                        opacity: 0.6,
+                        opacity: 0.7,
                         bottom: `${minPercent}%`,
                         height: `${Math.max(1, maxPercent - minPercent)}%`
                       }}
@@ -323,31 +423,31 @@ const BoxPlotChartSimple = () => {
 
                     {/* Min Cap */}
                     <div
-                      className="absolute left-1/2 h-0.5 w-4 -translate-x-1/2 transition-all"
+                      className="absolute left-1/2 h-0.5 w-5 -translate-x-1/2 transition-all"
                       style={{ backgroundColor: color, bottom: `${minPercent}%` }}
                     />
 
                     {/* Max Cap */}
                     <div
-                      className="absolute left-1/2 h-0.5 w-4 -translate-x-1/2 transition-all"
+                      className="absolute left-1/2 h-0.5 w-5 -translate-x-1/2 transition-all"
                       style={{ backgroundColor: color, bottom: `${maxPercent}%` }}
                     />
 
                     {/* Box (Q1 to Q3) */}
                     <div
-                      className="absolute left-1/2 -translate-x-1/2 w-10 rounded border-2 transition-all hover:shadow-lg"
+                      className="absolute left-1/2 -translate-x-1/2 w-12 rounded border-2 transition-all hover:shadow-lg"
                       style={{
                         borderColor: color,
-                        backgroundColor: `${color}40`,
+                        backgroundColor: `${color}30`,
                         bottom: `${q1Percent}%`,
                         height: `${boxHeight}%`,
-                        minHeight: '4px'
+                        minHeight: '6px'
                       }}
                     />
 
                     {/* Median Line */}
                     <div
-                      className="absolute left-1/2 h-1 w-10 -translate-x-1/2 rounded transition-all"
+                      className="absolute left-1/2 h-1 w-12 -translate-x-1/2 rounded transition-all"
                       style={{
                         backgroundColor: color,
                         bottom: `${medianPercent}%`,
@@ -355,18 +455,25 @@ const BoxPlotChartSimple = () => {
                       }}
                     />
 
-                    {/* Median Value Label */}
+                    {/* Median Value Label - Positioned to the right of the box */}
                     <div
-                      className="absolute left-1/2 -translate-x-1/2 text-xs font-bold whitespace-nowrap transition-all"
-                      style={{ color: color, bottom: `${medianPercent + 3}%` }}
+                      className="absolute text-xs font-bold whitespace-nowrap px-1.5 py-0.5 rounded shadow-sm border"
+                      style={{ 
+                        color: color, 
+                        backgroundColor: 'white',
+                        borderColor: `${color}50`,
+                        left: 'calc(50% + 30px)',
+                        bottom: `${medianPercent}%`,
+                        transform: 'translateY(50%)',
+                        zIndex: 10
+                      }}
                     >
                       {formatValue(item.Median, selectedMetric)}
                     </div>
 
                     {/* Provider Label */}
                     <div 
-                      className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-700 whitespace-nowrap max-w-[80px] truncate text-center"
-                      title={item.provider}
+                      className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-700 whitespace-nowrap max-w-[100px] truncate text-center"
                     >
                       {item.provider}
                     </div>
@@ -376,8 +483,11 @@ const BoxPlotChartSimple = () => {
             </div>
 
             {/* X-Axis Line */}
-            <div className="ml-16 mr-4 h-px bg-gray-300 mt-8" />
+            <div className="ml-16 mr-4 h-px bg-gray-300 mt-10" />
           </div>
+
+          {/* Legend */}
+          <Legend />
         </div>
       )}
 
@@ -393,8 +503,6 @@ const BoxPlotChartSimple = () => {
           </p>
         </div>
       )}
-
-      
     </div>
   );
 };

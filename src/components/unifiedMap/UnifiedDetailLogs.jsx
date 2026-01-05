@@ -29,6 +29,7 @@ const DEFAULT_DATA_FILTERS = {
 
 export default function UnifiedDetailLogs({
   locations = [],
+  distance,
   totalLocations = 0,
   filteredCount = 0,
   selectedMetric,
@@ -387,6 +388,7 @@ export default function UnifiedDetailLogs({
             totalLocations={totalLocations}
             filteredCount={filteredLocations.length}
             siteData={siteData}
+            distance={distance}
             siteToggle={siteToggle}
             enableSiteToggle={enableSiteToggle}
             showPolygons={showPolygons}

@@ -47,22 +47,6 @@ const FALLBACK_COLORS = [
 
 const NEGATIVE_VALUE_METRICS = ["rsrp", "rsrq"];
 
-const isAllowedOperator = (name) => {
-  if (!name || typeof name !== "string") return false;
-  const cleanName = name.toLowerCase().trim();
-  return (
-    cleanName.includes("air") ||
-    cleanName.includes("airtel") ||
-    cleanName.includes("bharti") ||
-    cleanName.includes("jio") ||
-    cleanName.includes("reliance") ||
-    cleanName.includes("vi") ||
-    cleanName.includes("vodafone") ||
-    cleanName.includes("idea") ||
-    cleanName.includes("yas")
-  );
-};
-
 const isValidName = (name) => {
   if (!name || typeof name !== "string") return false;
   const cleanName = name.toLowerCase().trim();
@@ -186,8 +170,9 @@ const OperatorNetworkChart = () => {
   const availableOperators = useMemo(() => {
     if (!apiOperators || !Array.isArray(apiOperators)) return [];
 
-    const validOperators = apiOperators.filter(
-      (operator) => isValidName(operator) && isAllowedOperator(operator)
+    // Only filter by valid name, no operator restriction
+    const validOperators = apiOperators.filter((operator) =>
+      isValidName(operator)
     );
 
     const uniqueBrands = new Map();
@@ -208,9 +193,8 @@ const OperatorNetworkChart = () => {
   const filteredData = useMemo(() => {
     if (!allData || allData.length === 0) return [];
 
-    let filtered = allData.filter(
-      (item) => isValidName(item.name) && isAllowedOperator(item.name)
-    );
+    // Only filter by valid name, no operator restriction
+    let filtered = allData.filter((item) => isValidName(item.name));
 
     const groupedByBrand = new Map();
 

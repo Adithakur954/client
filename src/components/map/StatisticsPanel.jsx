@@ -6,7 +6,7 @@ const StatisticsPanel = ({ chartData, onClose }) => {
     const { coveragePerfGraph, handsetWiseAvgGraph } = chartData || {};
 
     return (
-        <div className="absolute top-4 right-4 w-96 max-w-md h-auto bg-white/95 dark:bg-gray-800/95 p-4 rounded-lg shadow-2xl z-20 border">
+        <div className="absolute top-4 right-4 w-96 max-w-md h-auto bg-gray-800/95 text-slate-800 p-4 rounded-lg shadow-2xl z-20 border">
              <Card>
                 <CardHeader>
                     <div className="flex justify-between items-center">

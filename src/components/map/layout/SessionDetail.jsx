@@ -102,7 +102,7 @@ const SessionDetailPanel = ({ sessionData, isLoading, onClose, thresholds, selec
           <h3 className="text-lg font-bold">Session Details</h3>
           <button 
             onClick={onClose} 
-            className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+            className="p-1 rounded-full  hover:bg-slate-700 transition-colors"
             aria-label="Close panel"
           >
             <X className="h-5 w-5" />
@@ -118,7 +118,7 @@ const SessionDetailPanel = ({ sessionData, isLoading, onClose, thresholds, selec
             <>
               <div>
                 <h4 className="font-semibold mb-2">Session Summary</h4>
-                <div className="text-sm space-y-1 bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
+                <div className="text-sm space-y-1 bg-slate-800 p-3 rounded-lg">
                   <p><strong>Session ID:</strong> {session?.id || 'N/A'}</p>
                   <p><strong>User:</strong> {session?.CreatedBy || 'N/A'}</p>
                   <p><strong>Device:</strong> {`${session?.make || ''} ${session?.model || ''}`.trim() || 'N/A'}</p>
@@ -129,7 +129,7 @@ const SessionDetailPanel = ({ sessionData, isLoading, onClose, thresholds, selec
 
               <div>
                 <h4 className="font-semibold mb-2">Aggregated Statistics ({logsArray.length} logs)</h4>
-                <div className="text-sm grid grid-cols-2 gap-2 bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
+                <div className="text-sm grid grid-cols-2 gap-2 bg-slate-800 p-3 rounded-lg">
                   <p><strong>Avg RSRP:</strong> {stats.avgRsrp} dBm</p>
                   <p><strong>Avg RSRQ:</strong> {stats.avgRsrq} dB</p>
                   <p><strong>Avg SINR:</strong> {stats.avgSinr} dB</p>
@@ -148,7 +148,7 @@ const SessionDetailPanel = ({ sessionData, isLoading, onClose, thresholds, selec
                   <div className="space-y-1">
                     {metricSummary.length > 0 ? (
                       metricSummary.map((range, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800 rounded">
+                        <div key={idx} className="flex items-center justify-between p-2 bg-slate-800 rounded">
                           <div className="flex items-center gap-2">
                             <div 
                               className="w-4 h-4 rounded flex-shrink-0" 
@@ -162,7 +162,7 @@ const SessionDetailPanel = ({ sessionData, isLoading, onClose, thresholds, selec
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-gray-400 bg-gray-50 dark:bg-slate-800 p-3 rounded-lg text-center">
+                      <p className="text-sm text-gray-400 bg-slate-800 p-3 rounded-lg text-center">
                         No threshold data available for this metric
                       </p>
                     )}

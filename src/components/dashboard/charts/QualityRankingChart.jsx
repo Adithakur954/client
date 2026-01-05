@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
-import { Gauge, gaugeClasses } from '@mui/x-charts/Gauge';
 import {
   Box,
   TextField,
@@ -27,17 +26,51 @@ const OPERATOR_COLORS = {
   vi: { primary: '#FFB800', light: '#fff8e1', dark: '#f57f17' },
   vodafone: { primary: '#e60000', light: '#ffebee', dark: '#c62828' },
   yas: { primary: '#7b1fa2', light: '#f3e5f5', dark: '#4a148c' },
+  bsnl: { primary: '#00A651', light: '#e8f5e9', dark: '#1b5e20' },
 };
 
-const ALLOWED_OPERATORS = ['jio', 'airtel', 'vi', 'vodafone', 'yas'];
-
 const getOperatorConfig = (name) => {
+  if (!name) return { primary: '#607D8B', light: '#ECEFF1', dark: '#455A64' };
+  
   const nameLower = name.toLowerCase();
+  
   if (nameLower.includes('jio')) return OPERATOR_COLORS.jio;
-  if (nameLower.includes('airtel')) return OPERATOR_COLORS.airtel;
+  if (nameLower.includes('airtel') || nameLower.includes('bharti')) return OPERATOR_COLORS.airtel;
   if (nameLower.includes('yas')) return OPERATOR_COLORS.yas;
-  if (nameLower.includes('vi') || nameLower.includes('vodafone')) return OPERATOR_COLORS.vi;
-  return { primary: '#607D8B', light: '#ECEFF1', dark: '#455A64' };
+  if (nameLower.includes('vi') || nameLower.includes('vodafone') || nameLower.includes('idea')) return OPERATOR_COLORS.vi;
+  if (nameLower.includes('bsnl')) return OPERATOR_COLORS.bsnl;
+  
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  
+  return { 
+    primary: `hsl(${hue}, 70%, 45%)`, 
+    light: `hsl(${hue}, 70%, 95%)`, 
+    dark: `hsl(${hue}, 70%, 30%)` 
+  };
+};
+
+const isValidOperatorName = (name) => {
+  if (!name || typeof name !== 'string') return false;
+  const cleanName = name.toLowerCase().trim();
+  return (
+    cleanName !== '' &&
+    cleanName !== 'unknown' &&
+    cleanName !== 'null' &&
+    cleanName !== 'undefined' &&
+    cleanName !== 'n/a' &&
+    cleanName !== 'na' &&
+    cleanName !== '-' &&
+    cleanName !== '000 000' &&
+    cleanName !== '000000' &&
+    !/^0+[\s]*0*$/.test(cleanName) &&
+    !/^[\s0\-]+$/.test(cleanName) &&
+    !cleanName.includes('unknown') &&
+    cleanName.length > 1
+  );
 };
 
 const OperatorRankingChart = () => {
@@ -66,10 +99,7 @@ const OperatorRankingChart = () => {
   const chartData = useMemo(() => {
     if (!currentData || currentData.length === 0) return [];
 
-    const filteredData = currentData.filter((item) => {
-      const nameLower = item.name.toLowerCase();
-      return ALLOWED_OPERATORS.some((operator) => nameLower.includes(operator));
-    });
+    const filteredData = currentData.filter((item) => isValidOperatorName(item.name));
 
     const total = filteredData.reduce((sum, item) => sum + (item.value || 0), 0);
 
@@ -259,13 +289,12 @@ const OperatorRankingChart = () => {
     </ToggleButtonGroup>
   );
 
-  // Multi-Ring Gauge Component
   const MultiRingGauge = () => {
-    const size = 280;
+    const size = 200;
     const centerX = size / 2;
     const centerY = size / 2;
-    const ringWidth = 16;
-    const gap = 4;
+    const ringWidth = 12;
+    const gap = 3;
     const startAngle = -135;
     const endAngle = 135;
     const totalAngle = endAngle - startAngle;
@@ -301,8 +330,10 @@ const OperatorRankingChart = () => {
       <Box sx={{ position: 'relative', width: size, height: size }}>
         <svg width={size} height={size}>
           {chartData.map((item, index) => {
-            const radius = (size / 2) - 20 - index * (ringWidth + gap);
+            const radius = (size / 2) - 15 - index * (ringWidth + gap);
             const isHovered = hoveredOperator === item.id;
+
+            if (radius < 25) return null;
 
             return (
               <g
@@ -311,7 +342,6 @@ const OperatorRankingChart = () => {
                 onMouseLeave={() => setHoveredOperator(null)}
                 style={{ cursor: 'pointer' }}
               >
-                {/* Background Arc */}
                 <path
                   d={getBackgroundArcPath(radius)}
                   fill="none"
@@ -319,15 +349,14 @@ const OperatorRankingChart = () => {
                   strokeWidth={ringWidth}
                   strokeLinecap="round"
                 />
-                {/* Value Arc */}
                 <path
                   d={getArcPath(radius, item.percentage)}
                   fill="none"
                   stroke={item.color}
-                  strokeWidth={isHovered ? ringWidth + 4 : ringWidth}
+                  strokeWidth={isHovered ? ringWidth + 3 : ringWidth}
                   strokeLinecap="round"
                   style={{
-                    filter: isHovered ? `drop-shadow(0 0 8px ${item.color})` : 'none',
+                    filter: isHovered ? `drop-shadow(0 0 6px ${item.color})` : 'none',
                     transition: 'all 0.3s ease',
                   }}
                 />
@@ -336,7 +365,6 @@ const OperatorRankingChart = () => {
           })}
         </svg>
 
-        {/* Center Content */}
         <Box
           sx={{
             position: 'absolute',
@@ -348,35 +376,31 @@ const OperatorRankingChart = () => {
           }}
         >
           {hoveredOperator !== null ? (
-            // Show hovered operator info
             <Fade in>
               <Box>
                 <Typography
-                  variant="h5"
                   fontWeight="900"
-                  sx={{ color: chartData[hoveredOperator]?.color, lineHeight: 1 }}
+                  sx={{ color: chartData[hoveredOperator]?.color, lineHeight: 1, fontSize: '16px' }}
                 >
                   {chartData[hoveredOperator]?.percentage}%
                 </Typography>
                 <Typography
-                  variant="caption"
                   fontWeight="700"
-                  sx={{ color: chartData[hoveredOperator]?.darkColor, fontSize: '11px' }}
+                  sx={{ color: chartData[hoveredOperator]?.darkColor, fontSize: '9px' }}
                 >
                   {chartData[hoveredOperator]?.label}
                 </Typography>
-                <Typography variant="caption" display="block" sx={{ color: '#888', fontSize: '10px' }}>
+                <Typography sx={{ color: '#888', fontSize: '8px' }}>
                   {formatNumber(chartData[hoveredOperator]?.value)}
                 </Typography>
               </Box>
             </Fade>
           ) : (
-            // Show total info
             <Box>
               <Typography
-                variant="h5"
                 fontWeight="900"
                 sx={{
+                  fontSize: '14px',
                   background: chartType === 'coverage'
                     ? 'linear-gradient(135deg, #1565c0, #42a5f5)'
                     : 'linear-gradient(135deg, #ef6c00, #ffb74d)',
@@ -387,10 +411,10 @@ const OperatorRankingChart = () => {
               >
                 {formatNumber(stats.total)}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#666', fontSize: '10px' }}>
+              <Typography sx={{ color: '#666', fontSize: '8px' }}>
                 Total Samples
               </Typography>
-              <Typography variant="caption" display="block" sx={{ color: '#999', fontSize: '9px' }}>
+              <Typography sx={{ color: '#999', fontSize: '7px' }}>
                 {chartData.length} Operators
               </Typography>
             </Box>
@@ -400,7 +424,6 @@ const OperatorRankingChart = () => {
     );
   };
 
-  // Compact Legend
   const CompactLegend = () => (
     <Box
       sx={{
@@ -414,13 +437,13 @@ const OperatorRankingChart = () => {
         <Chip
           key={item.id}
           size="small"
-          icon={<Circle sx={{ fontSize: '8px !important', color: `${item.color} !important` }} />}
+          icon={<Circle sx={{ fontSize: '6px !important', color: `${item.color} !important` }} />}
           label={`${item.label}: ${item.percentage}%`}
           onMouseEnter={() => setHoveredOperator(item.id)}
           onMouseLeave={() => setHoveredOperator(null)}
           sx={{
-            height: 22,
-            fontSize: '10px',
+            height: 20,
+            fontSize: '9px',
             fontWeight: 600,
             backgroundColor: hoveredOperator === item.id ? alpha(item.color, 0.15) : '#f5f5f5',
             border: '1px solid',
@@ -428,7 +451,7 @@ const OperatorRankingChart = () => {
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             '& .MuiChip-icon': { ml: 0.5 },
-            '& .MuiChip-label': { px: 0.75 },
+            '& .MuiChip-label': { px: 0.5 },
           }}
         />
       ))}
@@ -457,16 +480,13 @@ const OperatorRankingChart = () => {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          p: 2,
+          p: 1.5,
           boxSizing: 'border-box',
           overflow: 'hidden',
-          gap: 2,
+          gap: 1.5,
         }}
       >
-        {/* Multi-Ring Gauge */}
         <MultiRingGauge />
-
-        {/* Compact Legend */}
         <CompactLegend />
       </Box>
     </ChartCard>

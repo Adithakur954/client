@@ -48,9 +48,9 @@ const formatSpeed = (kbps) => {
 const formatBytes = (kb, toUnit = "GB") => {
   if (!kb || kb <= 0) return "0.00";
   if (toUnit === "GB") {
-    return (kb / 1024 / 1024).toFixed(2);
+    return (kb / 1024 / 1024/10).toFixed(2);
   } else if (toUnit === "MB") {
-    return (kb / 1024).toFixed(2);
+    return (kb / 1024/10).toFixed(2);
   }
   return kb.toFixed(2);
 };
@@ -71,6 +71,7 @@ export const OverviewTab = ({
   expanded,
   tptVolume,
   durationData,
+  distance,
 }) => {
   const [searchParams] = useSearchParams();
   const [providerVolume, setProviderVolume] = useState({});
@@ -413,8 +414,8 @@ export const OverviewTab = ({
       >
         <StatCard
           icon={MapPin}
-          label="Total Samples"
-          value={totalLocations.toLocaleString()}
+          label="Total Distance (km)"
+          value={distance?.toLocaleString()}
           color="blue"
         />
         <StatCard
